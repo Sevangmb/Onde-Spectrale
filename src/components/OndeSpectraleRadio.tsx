@@ -5,19 +5,22 @@ import { useDebounce } from 'use-debounce';
 import { getStation, getInterference } from '@/app/actions';
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS, MOCK_USER_ID } from '@/lib/data';
+import { auth } from '@/lib/firebase';
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss } from 'lucide-react';
+import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, LogOut, LogIn } from 'lucide-react';
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -25,6 +28,7 @@ export function OndeSpectraleRadio() {
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [interference, setInterference] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
 
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -34,14 +38,39 @@ export function OndeSpectraleRadio() {
 
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Erreur de connexion avec Google", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Erreur de déconnexion", error);
+    }
+  };
+
   const dj = useMemo(() => {
     if (!currentStation) return null;
     return DJ_CHARACTERS.find(d => d.id === currentStation.djCharacterId) || null;
   }, [currentStation]);
 
   const isOwner = useMemo(() => {
-    return currentStation?.ownerId === MOCK_USER_ID;
-  }, [currentStation]);
+    if (!user || !currentStation) return false;
+    return currentStation?.ownerId === user.uid;
+  }, [currentStation, user]);
 
   const handleFrequencyChange = (value: number[]) => {
     setFrequency(value[0]);
@@ -53,14 +82,15 @@ export function OndeSpectraleRadio() {
       setIsPlaying(false);
       const station = await getStation(debouncedFrequency);
       setCurrentStation(station);
-      setPlaylist(station?.playlist || []);
-      setCurrentTrackIndex(0);
-
-      if (!station) {
+      
+      if (station) {
+        setPlaylist(station.playlist);
+        setCurrentTrackIndex(0);
+        setInterference(null);
+      } else {
+        setPlaylist([]);
         const interferenceText = await getInterference(debouncedFrequency);
         setInterference(interferenceText);
-      } else {
-        setInterference(null);
       }
       setIsLoading(false);
     };
@@ -102,7 +132,7 @@ export function OndeSpectraleRadio() {
                 Onde Spectrale
               </CardTitle>
             </div>
-            <div className="flex items-center gap-4">
+             <div className="flex items-center gap-4">
                {currentStation && isOwner && (
                 <StationManagementSheet station={currentStation} dj={dj}>
                   <Button variant="ghost" size="icon">
@@ -110,13 +140,36 @@ export function OndeSpectraleRadio() {
                   </Button>
                 </StationManagementSheet>
               )}
-               {!currentStation && !isLoading && (
+               {!currentStation && !isLoading && user && (
                 <CreateStationDialog frequency={frequency} >
                     <Button variant="default" className="bg-accent text-accent-foreground hover:bg-accent/90">
                         <Rss className="mr-2 h-4 w-4" />
                         Créer une station
                     </Button>
                 </CreateStationDialog>
+              )}
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'Avatar'} />
+                        <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Se déconnecter</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button onClick={handleGoogleSignIn} variant="outline">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Connexion
+                </Button>
               )}
             </div>
           </div>
@@ -150,7 +203,9 @@ export function OndeSpectraleRadio() {
               ) : (
                 <>
                   <p className="text-lg text-muted-foreground animate-glitch">{interference || 'Statique...'}</p>
-                  <p className="text-sm text-muted-foreground/50 mt-2">Aucun signal détecté</p>
+                  <p className="text-sm text-muted-foreground/50 mt-2">
+                    {user ? "Aucun signal détecté" : "Connectez-vous pour créer une station"}
+                  </p>
                 </>
               )}
             </div>

@@ -19,6 +19,7 @@ import { DJ_CHARACTERS } from '@/lib/data';
 import { createStation } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { auth } from '@/lib/firebase';
 
 interface CreateStationDialogProps {
   frequency: number;
@@ -31,6 +32,12 @@ export function CreateStationDialog({ frequency, children }: CreateStationDialog
   const { toast } = useToast();
 
   const handleCreateStation = async (formData: FormData) => {
+    const user = auth.currentUser;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Vous devez être connecté pour créer une station.' });
+        return;
+    }
+
     formData.append('frequency', frequency.toString());
     formData.append('djCharacterId', selectedDjId);
 

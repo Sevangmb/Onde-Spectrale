@@ -1,11 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { stations, DJ_CHARACTERS, MOCK_USER_ID, MOCK_MUSIC_SEARCH_RESULTS } from '@/lib/data';
+import { stations, DJ_CHARACTERS, MOCK_MUSIC_SEARCH_RESULTS } from '@/lib/data';
 import type { Station, PlaylistItem } from '@/lib/types';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
+import { auth } from '@/lib/firebase';
+import { headers } from 'next/headers';
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -29,6 +31,16 @@ export async function getInterference(frequency: number): Promise<string> {
 }
 
 export async function createStation(formData: FormData) {
+  const userToken = headers().get('Authorization')?.split('Bearer ')[1];
+  if (!userToken) {
+     return { error: { general: 'Authentification requise.' } };
+  }
+  // In a real app, you'd verify the token here.
+  // For now, we'll just check for its existence.
+  // We'll also need the user's UID. Let's assume we can get it.
+  // This is a placeholder for actual token verification and UID extraction.
+  const MOCK_USER_ID = "mock-user-id-from-token"; 
+
   const validatedFields = CreateStationSchema.safeParse({
     name: formData.get('name'),
     frequency: parseFloat(formData.get('frequency') as string),
