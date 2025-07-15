@@ -17,6 +17,16 @@ const CreateStationSchema = z.object({
   ownerId: z.string(),
 });
 
+function serializeStation(doc: any): Station {
+    const data = doc.data();
+    return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+        playlist: data.playlist || [],
+    } as Station;
+}
+
 export async function getStation(frequency: number): Promise<Station | null> {
     const stationsCol = collection(db, 'stations');
     const q = query(stationsCol, where('frequency', '==', frequency));
@@ -27,13 +37,7 @@ export async function getStation(frequency: number): Promise<Station | null> {
     }
 
     const stationDoc = querySnapshot.docs[0];
-    const stationData = stationDoc.data();
-    
-    if (!stationData.playlist) {
-        stationData.playlist = [];
-    }
-
-    return { id: stationDoc.id, ...stationData } as Station;
+    return serializeStation(stationDoc);
 }
 
 export async function getInterference(frequency: number): Promise<string> {
@@ -83,9 +87,13 @@ export async function createStation(ownerId: string, formData: FormData) {
 
   // Increment user's station count
   const userRef = doc(db, 'users', ownerId);
-  await updateDoc(userRef, {
-      stationsCreated: increment(1)
-  });
+  const userDoc = await getDoc(userRef);
+  if (userDoc.exists()) {
+    await updateDoc(userRef, {
+        stationsCreated: increment(1)
+    });
+  }
+
 
   const newStation: Station = {
       id: docRef.id,
