@@ -6,7 +6,7 @@ import { getStation, getInterference, updateUserOnLogin, getUserData, updateUser
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
+import { signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -17,12 +17,8 @@ import { OndeSpectraleLogo } from '@/components/icons';
 import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal } from 'lucide-react';
 
-import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, LogOut, LogIn } from 'lucide-react';
+import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss } from 'lucide-react';
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -31,7 +27,6 @@ export function OndeSpectraleRadio() {
   const [interference, setInterference] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,43 +37,29 @@ export function OndeSpectraleRadio() {
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
   useEffect(() => {
+    const signIn = async () => {
+        try {
+            await signInAnonymously(auth);
+        } catch (error) {
+            console.error("Erreur de connexion anonyme", error);
+        }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
       if (currentUser) {
-        await updateUserOnLogin(currentUser.uid, currentUser.email);
+        setUser(currentUser);
+        await updateUserOnLogin(currentUser.uid);
         const userData = await getUserData(currentUser.uid);
         if (userData && userData.lastFrequency) {
           setFrequency(userData.lastFrequency);
         }
+      } else {
+        signIn();
       }
       setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
-
-  const handleGoogleSignIn = async () => {
-    setAuthError(null);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      if (error.code === 'auth/unauthorized-domain') {
-          const currentDomain = window.location.hostname;
-          setAuthError(`Ce domaine (${currentDomain}) n'est pas autorisé. Veuillez l'ajouter à la liste des "Domaines autorisés" dans les paramètres d'authentification de votre console Firebase.`);
-      } else {
-        console.error("Erreur de connexion avec Google", error);
-        setAuthError("Une erreur est survenue lors de la connexion.");
-      }
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Erreur de déconnexion", error);
-    }
-  };
 
   const dj = useMemo(() => {
     if (!currentStation) return null;
@@ -170,40 +151,8 @@ export function OndeSpectraleRadio() {
                     </Button>
                 </CreateStationDialog>
               )}
-              {user ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'Avatar'} />
-                        <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Se déconnecter</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button onClick={handleGoogleSignIn} variant="outline">
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Connexion
-                </Button>
-              )}
             </div>
           </div>
-           {authError && (
-              <Alert variant="destructive" className="mt-4">
-                  <Terminal className="h-4 w-4" />
-                  <AlertTitle>Erreur d'authentification</AlertTitle>
-                  <AlertDescription>
-                     {authError}
-                  </AlertDescription>
-              </Alert>
-            )}
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative">
           <div className="flex flex-col gap-6">
@@ -236,7 +185,7 @@ export function OndeSpectraleRadio() {
                 <>
                   <p className="text-lg text-muted-foreground animate-glitch">{interference || 'Statique...'}</p>
                   <p className="text-sm text-muted-foreground/50 mt-2">
-                    {user ? "Aucun signal détecté" : "Connectez-vous pour créer une station"}
+                    Aucun signal détecté. Créez une station ici.
                   </p>
                 </>
               )}

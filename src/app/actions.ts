@@ -5,7 +5,7 @@ import type { Station, PlaylistItem } from '@/lib/types';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
@@ -45,9 +45,8 @@ export async function getInterference(frequency: number): Promise<string> {
     return result.interference;
 }
 
-export async function createStation(formData: FormData) {
-  const user = auth.currentUser;
-  if (!user) {
+export async function createStation(ownerId: string, formData: FormData) {
+  if (!ownerId) {
      return { error: { general: 'Authentification requise.' } };
   }
   
@@ -55,7 +54,7 @@ export async function createStation(formData: FormData) {
     name: formData.get('name'),
     frequency: parseFloat(formData.get('frequency') as string),
     djCharacterId: formData.get('djCharacterId'),
-    ownerId: user.uid
+    ownerId: ownerId,
   });
 
   if (!validatedFields.success) {
@@ -64,7 +63,7 @@ export async function createStation(formData: FormData) {
     };
   }
   
-  const { name, frequency, djCharacterId, ownerId } = validatedFields.data;
+  const { name, frequency, djCharacterId } = validatedFields.data;
 
   const existingStation = await getStation(frequency);
   if (existingStation) {
@@ -191,13 +190,13 @@ export async function addMusicToStation(stationId: string, musicId: string, musi
 }
 
 
-export async function updateUserOnLogin(userId: string, email: string | null) {
+export async function updateUserOnLogin(userId: string) {
   const userRef = doc(db, 'users', userId);
   const userDoc = await getDoc(userRef);
 
   if (!userDoc.exists()) {
     await setDoc(userRef, {
-      email: email,
+      email: null,
       stationsCreated: 0,
       lastFrequency: 92.1,
       createdAt: serverTimestamp(),

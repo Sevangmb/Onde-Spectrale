@@ -40,10 +40,8 @@ export function CreateStationDialog({ frequency, children }: CreateStationDialog
 
     formData.append('frequency', frequency.toString());
     formData.append('djCharacterId', selectedDjId);
-    formData.append('ownerId', user.uid);
 
-
-    const result = await createStation(formData);
+    const result = await createStation(user.uid, formData);
 
     if (result.error) {
       const errorMessages = Object.values(result.error).join(' ');
