@@ -52,21 +52,21 @@ async (input) => {
       case 'marcus':
         return {
           name: 'Marcus',
-          voiceName: 'fr-FR-Wavenet-B',
+          voiceName: 'Mizar', // Corrected for Gemini TTS
           pitch: -2,
           speakingRate: 0.9,
         };
       case 'sarah':
         return {
           name: 'Sarah',
-          voiceName: 'fr-FR-Wavenet-A',
+          voiceName: 'Alhena', // Corrected for Gemini TTS
           pitch: 1,
           speakingRate: 1.1,
         };
       case 'tommy':
         return {
           name: 'Tommy',
-          voiceName: 'fr-FR-Wavenet-D',
+          voiceName: 'Antares', // Corrected for Gemini TTS
           pitch: 0,
           speakingRate: 1.0,
         };
@@ -118,9 +118,9 @@ const generateDjAudioFlow = ai.defineFlow({
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: character.voiceName },
-            pitch: character.pitch,
-            speakingRate: character.speakingRate,
           },
+          pitch: character.pitch,
+          speakingRate: character.speakingRate,
         },
       },
       prompt: input.message,
@@ -140,4 +140,3 @@ const generateDjAudioFlow = ai.defineFlow({
     };
   }
 );
-
