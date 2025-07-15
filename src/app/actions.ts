@@ -1,13 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { stations, DJ_CHARACTERS, MOCK_MUSIC_SEARCH_RESULTS } from '@/lib/data';
+import { DJ_CHARACTERS, MOCK_MUSIC_SEARCH_RESULTS } from '@/lib/data';
 import type { Station, PlaylistItem } from '@/lib/types';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { headers } from 'next/headers';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -16,13 +18,20 @@ const CreateStationSchema = z.object({
 });
 
 export async function getStation(frequency: number): Promise<Station | null> {
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  const station = stations.find(s => s.frequency === frequency);
-  return station || null;
+    const stationsCol = collection(db, 'stations');
+    const q = query(stationsCol, where('frequency', '==', frequency));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return null;
+    }
+
+    const stationDoc = querySnapshot.docs[0];
+    return { id: stationDoc.id, ...stationDoc.data() } as Station;
 }
 
 export async function getInterference(frequency: number): Promise<string> {
-    const station = stations.find(s => s.frequency === frequency);
+    const station = await getStation(frequency);
     const result = await simulateFrequencyInterference({
         frequency,
         stationName: station?.name,
@@ -35,16 +44,14 @@ export async function createStation(formData: FormData) {
   if (!userToken) {
      return { error: { general: 'Authentification requise.' } };
   }
-  // In a real app, you'd verify the token here.
-  // For now, we'll just check for its existence.
-  // We'll also need the user's UID. Let's assume we can get it.
-  // This is a placeholder for actual token verification and UID extraction.
-  const MOCK_USER_ID = "mock-user-id-from-token"; 
-
+  
+  // In a real app, you would verify the token server-side.
+  // For now, we'll proceed assuming the client-side check is sufficient for this demo.
   const validatedFields = CreateStationSchema.safeParse({
     name: formData.get('name'),
     frequency: parseFloat(formData.get('frequency') as string),
     djCharacterId: formData.get('djCharacterId'),
+    ownerId: formData.get('ownerId')
   });
 
   if (!validatedFields.success) {
@@ -53,29 +60,36 @@ export async function createStation(formData: FormData) {
     };
   }
   
-  const { name, frequency, djCharacterId } = validatedFields.data;
+  const { name, frequency, djCharacterId, ownerId } = validatedFields.data;
 
-  if (stations.some(s => s.frequency === frequency)) {
+  const existingStation = await getStation(frequency);
+  if (existingStation) {
     return { error: { general: 'Cette fréquence est déjà occupée.' } };
   }
 
-  const newStation: Station = {
-    id: `station-${Date.now()}`,
+  const newStationData = {
     name,
     frequency,
     djCharacterId,
-    ownerId: MOCK_USER_ID,
+    ownerId,
     playlist: [],
     createdAt: new Date().toISOString(),
   };
+  
+  const docRef = await addDoc(collection(db, 'stations'), newStationData);
 
-  stations.push(newStation);
+  const newStation: Station = {
+      id: docRef.id,
+      ...newStationData
+  }
+
   revalidatePath('/');
   return { success: true, station: newStation };
 }
 
 export async function addMessageToStation(stationId: string, message: string) {
-    const station = stations.find(s => s.id === stationId);
+    const stationRef = doc(db, 'stations', stationId);
+    const station = (await getDocs(query(collection(db, 'stations'), where('__name__', '==', stationId)))).docs[0]?.data() as Station;
     if (!station) {
         return { error: "Station non trouvée." };
     }
@@ -96,14 +110,18 @@ export async function addMessageToStation(stationId: string, message: string) {
             type: 'message',
             title: message.substring(0, 30) + '...',
             url: audio.audioUrl,
-            duration: 15, // Mock duration
+            duration: 15, // Mock duration, could be calculated from audio file
         };
 
-        station.playlist.push(newPlaylistItem);
+        await updateDoc(stationRef, {
+            playlist: arrayUnion(newPlaylistItem)
+        });
+
         revalidatePath('/');
         return { success: true, playlistItem: newPlaylistItem };
 
     } catch (e) {
+        console.error(e);
         return { error: "Erreur lors de la génération de l'audio."}
     }
 }
@@ -114,7 +132,8 @@ export async function searchMusic(query: string) {
 }
 
 export async function addMusicToStation(stationId: string, musicId: string) {
-    const station = stations.find(s => s.id === stationId);
+    const stationRef = doc(db, 'stations', stationId);
+    const station = (await getDocs(query(collection(db, 'stations'), where('__name__', '==', stationId)))).docs[0]?.data();
     if (!station) {
         return { error: "Station non trouvée." };
     }
@@ -124,7 +143,10 @@ export async function addMusicToStation(stationId: string, musicId: string) {
         return { error: "Musique non trouvée." };
     }
 
-    station.playlist.push(musicTrack);
+    await updateDoc(stationRef, {
+        playlist: arrayUnion(musicTrack)
+    });
+    
     revalidatePath('/');
     return { success: true, playlistItem: musicTrack };
 }

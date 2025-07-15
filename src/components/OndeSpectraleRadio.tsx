@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStation, getInterference } from '@/app/actions';
+import { getStation, getInterference, addMessageToStation, addMusicToStation } from '@/app/actions';
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
-import { DJ_CHARACTERS, MOCK_USER_ID } from '@/lib/data';
+import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
@@ -30,17 +30,28 @@ export function OndeSpectraleRadio() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
-  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        // Set bearer token for server actions
+        currentUser.getIdToken().then(token => {
+            // In a real app, you might store this in a state management library
+            // or context. For now, we'll rely on the header being set before
+            // each secured action. This is a simplified approach.
+            (window as any).__FIREBASE_TOKEN__ = token;
+        });
+      } else {
+        delete (window as any).__FIREBASE_TOKEN__;
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -84,11 +95,9 @@ export function OndeSpectraleRadio() {
       setCurrentStation(station);
       
       if (station) {
-        setPlaylist(station.playlist);
         setCurrentTrackIndex(0);
         setInterference(null);
       } else {
-        setPlaylist([]);
         const interferenceText = await getInterference(debouncedFrequency);
         setInterference(interferenceText);
       }

@@ -21,23 +21,6 @@ export const DJ_CHARACTERS: DJCharacter[] = [
   },
 ];
 
-export let stations: Station[] = [
-  {
-    id: 'station-1',
-    frequency: 92.1,
-    name: "L'Aube des Survivants",
-    ownerId: 'user-system',
-    djCharacterId: 'marcus',
-    playlist: [
-      { id: 'msg-1', type: 'message', title: 'Bulletin du jour', url: '', duration: 15 },
-      { id: 'music-1', type: 'music', title: 'Swing de l\'ancien monde', artist: 'Inconnu', url: '', duration: 180 },
-    ],
-    createdAt: new Date().toISOString(),
-  }
-];
-
-export const MOCK_USER_ID = 'user-01';
-
 export const MOCK_MUSIC_SEARCH_RESULTS = [
     { id: 'music-a', type: 'music', title: 'Midnight Blues', artist: 'The Ghosts', url: '', duration: 210 },
     { id: 'music-b', type: 'music', title: 'Echoes in the Rain', artist: 'Lost Signals', url: '', duration: 185 },
