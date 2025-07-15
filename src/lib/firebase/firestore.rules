@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Stations can be read by anyone.
+    // Only the owner can create or update their own station.
+    match /stations/{stationId} {
+      allow read: if true;
+      allow create: if request.auth.uid == request.resource.data.ownerId;
+      allow update: if request.auth.uid == resource.data.ownerId;
+    }
+
+    // Users can read and write to their own user document.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
