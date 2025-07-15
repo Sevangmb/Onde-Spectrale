@@ -13,6 +13,12 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Vérification que les variables d'environnement sont bien chargées
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error("Les variables d'environnement Firebase ne sont pas correctement configurées. Vérifiez votre fichier .env.local et assurez-vous que les variables commençant par NEXT_PUBLIC_FIREBASE_ sont bien définies.");
+}
+
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);

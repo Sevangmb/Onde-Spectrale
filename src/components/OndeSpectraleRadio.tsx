@@ -18,7 +18,7 @@ import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 
-import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss } from 'lucide-react';
+import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, AlertTriangle } from 'lucide-react';
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -26,6 +26,7 @@ export function OndeSpectraleRadio() {
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [interference, setInterference] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -37,28 +38,28 @@ export function OndeSpectraleRadio() {
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
   useEffect(() => {
-    const signIn = async () => {
-        try {
+    const initializeAuth = async () => {
+      try {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+          if (currentUser) {
+            setUser(currentUser);
+            await updateUserOnLogin(currentUser.uid);
+            const userData = await getUserData(currentUser.uid);
+            if (userData && userData.lastFrequency) {
+              setFrequency(userData.lastFrequency);
+            }
+          } else {
             await signInAnonymously(auth);
-        } catch (error) {
-            console.error("Erreur de connexion anonyme", error);
-        }
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        await updateUserOnLogin(currentUser.uid);
-        const userData = await getUserData(currentUser.uid);
-        if (userData && userData.lastFrequency) {
-          setFrequency(userData.lastFrequency);
-        }
-      } else {
-        signIn();
+          }
+        });
+        return () => unsubscribe();
+      } catch (err: any) {
+        console.error("Erreur d'authentification Firebase:", err);
+        setError(`Erreur d'authentification: ${err.message}. Vérifiez la configuration Firebase.`);
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    });
-    return () => unsubscribe();
+    };
+    initializeAuth();
   }, []);
 
   const dj = useMemo(() => {
@@ -82,24 +83,34 @@ export function OndeSpectraleRadio() {
   }
   
   useEffect(() => {
+    if (!user) return; // Ne rien faire si l'utilisateur n'est pas encore authentifié
+
     const fetchData = async () => {
       setIsLoading(true);
+      setError(null);
       setIsPlaying(false);
-      const station = await getStation(debouncedFrequency);
-      setCurrentStation(station);
-      
-      if (station) {
-        setCurrentTrackIndex(0);
-        setInterference(null);
-      } else {
-        const interferenceText = await getInterference(debouncedFrequency);
-        setInterference(interferenceText);
+      try {
+        const station = await getStation(debouncedFrequency);
+        setCurrentStation(station);
+        
+        if (station) {
+          setCurrentTrackIndex(0);
+          setInterference(null);
+        } else {
+          const interferenceText = await getInterference(debouncedFrequency);
+          setInterference(interferenceText);
+        }
+      } catch (err: any) {
+        console.error("Erreur de récupération des données:", err);
+        setError(`Erreur de données: ${err.message}. Vérifiez les règles Firestore.`);
+        setCurrentStation(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchData();
-  }, [debouncedFrequency]);
+  }, [debouncedFrequency, user]);
 
   const onTrackSelect = (index: number) => {
     setCurrentTrackIndex(index);
@@ -143,7 +154,7 @@ export function OndeSpectraleRadio() {
                   </Button>
                 </StationManagementSheet>
               )}
-               {!currentStation && !isLoading && user && (
+               {!currentStation && !isLoading && user && !error &&(
                 <CreateStationDialog frequency={frequency} >
                     <Button variant="default" className="bg-accent text-accent-foreground hover:bg-accent/90">
                         <Rss className="mr-2 h-4 w-4" />
@@ -170,11 +181,18 @@ export function OndeSpectraleRadio() {
                 onValueChange={handleFrequencyChange}
                 onValueCommit={handleFrequencyCommit}
                 className="w-full my-2"
+                disabled={!user || !!error}
               />
             </div>
             <div className="h-40 bg-black/50 border border-border rounded-lg p-4 flex flex-col justify-center items-center text-center">
               {isLoading ? (
                 <Skeleton className="w-4/5 h-12 animate-flicker" />
+              ) : error ? (
+                 <div className="text-destructive-foreground flex flex-col items-center gap-2">
+                    <AlertTriangle className="h-8 w-8 text-destructive" />
+                    <p className="font-semibold">Erreur de connexion</p>
+                    <p className="text-sm">{error}</p>
+                 </div>
               ) : currentStation ? (
                 <>
                   <RadioTower className="h-6 w-6 text-primary mb-2" />
@@ -225,7 +243,7 @@ export function OndeSpectraleRadio() {
                 </ul>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                    <p>{currentStation ? "Playlist vide." : "Silence radio."}</p>
+                    <p>{currentStation ? "Playlist vide." : error ? "" : "Silence radio."}</p>
                 </div>
               )}
             </ScrollArea>
