@@ -1,13 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { DJ_CHARACTERS, MOCK_MUSIC_SEARCH_RESULTS } from '@/lib/data';
 import type { Station, PlaylistItem } from '@/lib/types';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
 import { auth, db } from '@/lib/firebase';
-import { headers } from 'next/headers';
+import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 
 
@@ -30,7 +29,6 @@ export async function getStation(frequency: number): Promise<Station | null> {
     const stationDoc = querySnapshot.docs[0];
     const stationData = stationDoc.data();
     
-    // Firestore does not store undefined, so playlist might be missing
     if (!stationData.playlist) {
         stationData.playlist = [];
     }
@@ -49,7 +47,6 @@ export async function getInterference(frequency: number): Promise<string> {
 
 export async function createStation(formData: FormData) {
   const user = auth.currentUser;
-  // This is a simplified check. In a real app, verify the token.
   if (!user) {
      return { error: { general: 'Authentification requise.' } };
   }
@@ -101,7 +98,7 @@ export async function addMessageToStation(stationId: string, message: string) {
     if (!stationDoc.exists()) {
         return { error: "Station non trouvée." };
     }
-    const station = stationDoc.data() as Station;
+    const station = { id: stationDoc.id, ...stationDoc.data() } as Station;
     
     const character = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
     if (!character) {
@@ -135,10 +132,39 @@ export async function addMessageToStation(stationId: string, message: string) {
     }
 }
 
-export async function searchMusic(query: string) {
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    return MOCK_MUSIC_SEARCH_RESULTS;
+let MOCK_MUSIC_SEARCH_RESULTS: PlaylistItem[] = [];
+
+export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
+    if (!searchTerm) return [];
+
+    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,avg_rating&sort=avg_rating%20desc&rows=10&page=1&output=json`;
+    
+    try {
+        const response = await fetch(searchUrl);
+        if (!response.ok) {
+            console.error('Archive.org API error:', response.statusText);
+            return [];
+        }
+        const data = await response.json();
+        const docs = data.response.docs;
+
+        MOCK_MUSIC_SEARCH_RESULTS = docs.map((doc: any) => ({
+            id: doc.identifier,
+            type: 'music',
+            title: doc.title || 'Titre inconnu',
+            artist: doc.creator || 'Artiste inconnu',
+            url: `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp3`,
+            duration: 180, // Mock duration
+        }));
+        
+        return MOCK_MUSIC_SEARCH_RESULTS;
+
+    } catch (error) {
+        console.error('Failed to fetch from Archive.org:', error);
+        return [];
+    }
 }
+
 
 export async function addMusicToStation(stationId: string, musicId: string) {
     const stationRef = doc(db, 'stations', stationId);
@@ -149,7 +175,7 @@ export async function addMusicToStation(stationId: string, musicId: string) {
 
     const musicTrack = MOCK_MUSIC_SEARCH_RESULTS.find(m => m.id === musicId);
     if (!musicTrack) {
-        return { error: "Musique non trouvée." };
+        return { error: "Musique non trouvée. Essayez une nouvelle recherche." };
     }
 
     await updateDoc(stationRef, {

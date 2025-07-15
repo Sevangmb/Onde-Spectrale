@@ -1,4 +1,4 @@
-import type { DJCharacter, Station } from '@/lib/types';
+import type { DJCharacter } from '@/lib/types';
 
 export const DJ_CHARACTERS: DJCharacter[] = [
   {
@@ -20,9 +20,3 @@ export const DJ_CHARACTERS: DJCharacter[] = [
     voice: { name: 'fr-FR-Wavenet-D', pitch: 0, speed: 1.0 },
   },
 ];
-
-export const MOCK_MUSIC_SEARCH_RESULTS = [
-    { id: 'music-a', type: 'music', title: 'Midnight Blues', artist: 'The Ghosts', url: '', duration: 210 },
-    { id: 'music-b', type: 'music', title: 'Echoes in the Rain', artist: 'Lost Signals', url: '', duration: 185 },
-    { id: 'music-c', type: 'music', title: 'Wasteland Waltz', artist: 'The Wanderers', url: '', duration: 150 },
-]
