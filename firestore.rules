@@ -1,27 +1,22 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Stations can be read by anyone, but only written by the owner.
     match /stations/{stationId} {
-      allow read;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == resource.data.ownerId;
     }
 
-    // Characters are public, but read-only. System data.
-    match /characters/{characterId} {
-      allow read;
-      allow write: if false;
-    }
-
-    // Users can only create, read and update their own data. No one can delete user data.
     match /users/{userId} {
-      allow get, update: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
-      allow delete: if false;
-      allow list: if false;
+      // Un utilisateur authentifié peut lire, écrire et créer son propre document.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Les personnages sont en lecture seule
+    match /characters/{charId} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }
