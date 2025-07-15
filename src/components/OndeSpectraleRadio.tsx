@@ -19,6 +19,8 @@ import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Terminal } from 'lucide-react';
 
 import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, LogOut, LogIn } from 'lucide-react';
 
@@ -29,6 +31,7 @@ export function OndeSpectraleRadio() {
   const [interference, setInterference] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -54,11 +57,18 @@ export function OndeSpectraleRadio() {
   }, []);
 
   const handleGoogleSignIn = async () => {
+    setAuthError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Erreur de connexion avec Google", error);
+    } catch (error: any) {
+      if (error.code === 'auth/unauthorized-domain') {
+          const currentDomain = window.location.hostname;
+          setAuthError(`Ce domaine (${currentDomain}) n'est pas autorisé. Veuillez l'ajouter à la liste des "Domaines autorisés" dans les paramètres d'authentification de votre console Firebase.`);
+      } else {
+        console.error("Erreur de connexion avec Google", error);
+        setAuthError("Une erreur est survenue lors de la connexion.");
+      }
     }
   };
 
@@ -135,7 +145,7 @@ export function OndeSpectraleRadio() {
         onPause={() => setIsPlaying(false)} 
       />
       <Card className="w-full border-2 border-primary/20 bg-black/50 shadow-lg shadow-primary/10 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%238B0000%27%20stroke-width%3D%271%27%3E%3Cpath%20d%3D%27M769%20229L1037%20260.9M927%20880L731%20737%27%2F%3E%3Cpath%20d%3D%27M731%20737L769%20229%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L927%20880%27%2F%3E%3Cpath%20d%3D%27M769%20229L927%20880%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L731%20737%27%2F%3E%3Cpath%20d%3D%27M-231%20880L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20229%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20880%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-231%20880%27%2F%3E%3C%g%20fill%3D%27%231A1A1A%27%3E%3Ccircle%20cx%3D%27769%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%271037%27%20cy%3D%27260.9%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27927%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27731%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-427%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-5"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%238B0000%27%20stroke-width%3D%271%27%3E%3Cpath%20d%3D%27M769%20229L1037%20260.9M927%20880L731%20737%27%2F%3E%3Cpath%20d%3D%27M731%20737L769%20229%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L927%20880%27%2F%3E%3Cpath%20d%3D%27M769%20229L927%20880%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L731%20737%27%2F%3E%3Cpath%20d%3D%27M-231%20880L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20229%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20880%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-231%20880%27%2F%3E%3Cg%20fill%3D%27%231A1A1A%27%3E%3Ccircle%20cx%3D%27769%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%271037%27%20cy%3D%27260.9%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27927%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27731%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-427%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-5"></div>
         <CardHeader className="relative border-b-2 border-primary/20 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -185,6 +195,15 @@ export function OndeSpectraleRadio() {
               )}
             </div>
           </div>
+           {authError && (
+              <Alert variant="destructive" className="mt-4">
+                  <Terminal className="h-4 w-4" />
+                  <AlertTitle>Erreur d'authentification</AlertTitle>
+                  <AlertDescription>
+                     {authError}
+                  </AlertDescription>
+              </Alert>
+            )}
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative">
           <div className="flex flex-col gap-6">
