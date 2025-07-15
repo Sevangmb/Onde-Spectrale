@@ -1,0 +1,13 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // WARNING: This is a temporary rule for debugging purposes.
+    // It allows anyone to read and write to your entire database.
+    // We will need to secure this before going to production.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
