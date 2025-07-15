@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,12 +77,12 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
           <SheetTitle className="font-headline text-2xl text-primary">Gérer la station</SheetTitle>
           <SheetDescription>"{station.name}"</SheetDescription>
         </SheetHeader>
-        <Tabs defaultValue="message" className="flex-grow flex flex-col">
+        <Tabs defaultValue="message" className="flex-grow flex flex-col mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="message"><MessageSquare className="mr-2 h-4 w-4"/> Message DJ</TabsTrigger>
             <TabsTrigger value="music"><Music className="mr-2 h-4 w-4"/> Musique</TabsTrigger>
           </TabsList>
-          <TabsContent value="message" className="flex-grow mt-4">
+          <TabsContent value="message" className="flex-grow mt-4 flex flex-col">
             <div className="flex flex-col h-full">
               <Label htmlFor="message">Nouveau message pour {dj?.name}:</Label>
               <Textarea
@@ -90,8 +91,9 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Écrivez votre message ici... Il sera lu avec la voix de votre DJ."
                 className="flex-grow mt-2"
+                rows={5}
               />
-              <Button onClick={handleGenerateMessage} disabled={isGenerating} className="mt-4">
+              <Button onClick={handleGenerateMessage} disabled={isGenerating || !message} className="mt-4">
                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
                 Générer et diffuser
               </Button>
@@ -115,10 +117,10 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
                     <div className="p-2 space-y-2">
                         {searchResults.map(track => (
                             <Card key={track.id} className="p-2 flex items-center justify-between">
-                                <div>
+                                <CardContent className="p-0">
                                     <p className="font-semibold text-sm">{track.title}</p>
                                     <p className="text-xs text-muted-foreground">{track.artist}</p>
-                                </div>
+                                </CardContent>
                                 <Button size="sm" variant="outline" onClick={() => handleAddMusic(track.id)}>
                                     <Plus className="h-4 w-4"/>
                                 </Button>

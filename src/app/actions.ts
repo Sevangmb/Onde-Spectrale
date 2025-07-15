@@ -8,13 +8,14 @@ import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-int
 import { z } from 'zod';
 import { auth, db } from '@/lib/firebase';
 import { headers } from 'next/headers';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
   frequency: z.number(),
   djCharacterId: z.string(),
+  ownerId: z.string(),
 });
 
 export async function getStation(frequency: number): Promise<Station | null> {
@@ -27,7 +28,14 @@ export async function getStation(frequency: number): Promise<Station | null> {
     }
 
     const stationDoc = querySnapshot.docs[0];
-    return { id: stationDoc.id, ...stationDoc.data() } as Station;
+    const stationData = stationDoc.data();
+    
+    // Firestore does not store undefined, so playlist might be missing
+    if (!stationData.playlist) {
+        stationData.playlist = [];
+    }
+
+    return { id: stationDoc.id, ...stationData } as Station;
 }
 
 export async function getInterference(frequency: number): Promise<string> {
@@ -40,18 +48,17 @@ export async function getInterference(frequency: number): Promise<string> {
 }
 
 export async function createStation(formData: FormData) {
-  const userToken = headers().get('Authorization')?.split('Bearer ')[1];
-  if (!userToken) {
+  const user = auth.currentUser;
+  // This is a simplified check. In a real app, verify the token.
+  if (!user) {
      return { error: { general: 'Authentification requise.' } };
   }
   
-  // In a real app, you would verify the token server-side.
-  // For now, we'll proceed assuming the client-side check is sufficient for this demo.
   const validatedFields = CreateStationSchema.safeParse({
     name: formData.get('name'),
     frequency: parseFloat(formData.get('frequency') as string),
     djCharacterId: formData.get('djCharacterId'),
-    ownerId: formData.get('ownerId')
+    ownerId: user.uid
   });
 
   if (!validatedFields.success) {
@@ -89,11 +96,13 @@ export async function createStation(formData: FormData) {
 
 export async function addMessageToStation(stationId: string, message: string) {
     const stationRef = doc(db, 'stations', stationId);
-    const station = (await getDocs(query(collection(db, 'stations'), where('__name__', '==', stationId)))).docs[0]?.data() as Station;
-    if (!station) {
+    const stationDoc = await getDoc(stationRef);
+
+    if (!stationDoc.exists()) {
         return { error: "Station non trouvée." };
     }
-
+    const station = stationDoc.data() as Station;
+    
     const character = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
     if (!character) {
         return { error: "Personnage DJ non trouvé." };
@@ -108,7 +117,7 @@ export async function addMessageToStation(stationId: string, message: string) {
         const newPlaylistItem: PlaylistItem = {
             id: `msg-${Date.now()}`,
             type: 'message',
-            title: message.substring(0, 30) + '...',
+            title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
             url: audio.audioUrl,
             duration: 15, // Mock duration, could be calculated from audio file
         };
@@ -133,8 +142,8 @@ export async function searchMusic(query: string) {
 
 export async function addMusicToStation(stationId: string, musicId: string) {
     const stationRef = doc(db, 'stations', stationId);
-    const station = (await getDocs(query(collection(db, 'stations'), where('__name__', '==', stationId)))).docs[0]?.data();
-    if (!station) {
+    const stationDoc = await getDoc(stationRef);
+    if (!stationDoc.exists()) {
         return { error: "Station non trouvée." };
     }
 
