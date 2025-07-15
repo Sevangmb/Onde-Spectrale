@@ -7,7 +7,7 @@ import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-int
 import { z } from 'zod';
 import { db } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 
 const CreateStationSchema = z.object({
@@ -216,5 +216,20 @@ export async function updateUserFrequency(userId: string, frequency: number) {
 export async function getUserData(userId: string) {
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
-    return userDoc.exists() ? userDoc.data() : null;
+
+    if (!userDoc.exists()) {
+        return null;
+    }
+
+    const data = userDoc.data();
+    const plainObject: { [key: string]: any } = {};
+    for (const key in data) {
+        if (data[key] instanceof Timestamp) {
+            plainObject[key] = (data[key] as Timestamp).toDate().toISOString();
+        } else {
+            plainObject[key] = data[key];
+        }
+    }
+    
+    return plainObject;
 }
