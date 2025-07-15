@@ -53,14 +53,15 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
   };
   
   const handleSearchMusic = async () => {
+      if (!musicQuery.trim()) return;
       setIsSearching(true);
       const results = await searchMusic(musicQuery);
       setSearchResults(results);
       setIsSearching(false);
   };
 
-  const handleAddMusic = async (musicId: string) => {
-    const result = await addMusicToStation(station.id, musicId);
+  const handleAddMusic = async (track: PlaylistItem) => {
+    const result = await addMusicToStation(station.id, track.id, track);
      if (result.error) {
       toast({ variant: 'destructive', title: "Erreur", description: result.error });
     } else {
@@ -106,22 +107,23 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
                 placeholder="Chercher une musique vintage..." 
                 value={musicQuery}
                 onChange={(e) => setMusicQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchMusic()}
               />
-              <Button type="button" size="icon" onClick={handleSearchMusic} disabled={isSearching}>
+              <Button type="button" size="icon" onClick={handleSearchMusic} disabled={isSearching || !musicQuery}>
                 {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Recherche sur Archive.org (simulé)</p>
+            <p className="text-xs text-muted-foreground mt-2">Recherche sur Archive.org</p>
             <ScrollArea className="flex-grow mt-4 border rounded-md">
                 {searchResults.length > 0 ? (
                     <div className="p-2 space-y-2">
                         {searchResults.map(track => (
                             <Card key={track.id} className="p-2 flex items-center justify-between">
-                                <CardContent className="p-0">
-                                    <p className="font-semibold text-sm">{track.title}</p>
-                                    <p className="text-xs text-muted-foreground">{track.artist}</p>
+                                <CardContent className="p-0 overflow-hidden">
+                                    <p className="font-semibold text-sm truncate">{track.title}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                                 </CardContent>
-                                <Button size="sm" variant="outline" onClick={() => handleAddMusic(track.id)}>
+                                <Button size="sm" variant="outline" onClick={() => handleAddMusic(track)}>
                                     <Plus className="h-4 w-4"/>
                                 </Button>
                             </Card>
@@ -129,7 +131,7 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
                     </div>
                 ) : (
                     <div className="p-4 text-center text-sm text-muted-foreground">
-                        {isSearching ? "Recherche en cours..." : "Aucun résultat."}
+                        {isSearching ? "Recherche en cours..." : "Entrez un terme pour lancer une recherche."}
                     </div>
                 )}
             </ScrollArea>

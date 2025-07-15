@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStation, getInterference, addMessageToStation, addMusicToStation } from '@/app/actions';
+import { getStation, getInterference, updateUserOnLogin, getUserData, updateUserFrequency } from '@/app/actions';
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -39,19 +39,16 @@ export function OndeSpectraleRadio() {
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Set bearer token for server actions
-        currentUser.getIdToken().then(token => {
-            // In a real app, you might store this in a state management library
-            // or context. For now, we'll rely on the header being set before
-            // each secured action. This is a simplified approach.
-            (window as any).__FIREBASE_TOKEN__ = token;
-        });
-      } else {
-        delete (window as any).__FIREBASE_TOKEN__;
+        await updateUserOnLogin(currentUser.uid, currentUser.email);
+        const userData = await getUserData(currentUser.uid);
+        if (userData && userData.lastFrequency) {
+          setFrequency(userData.lastFrequency);
+        }
       }
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -86,6 +83,12 @@ export function OndeSpectraleRadio() {
   const handleFrequencyChange = (value: number[]) => {
     setFrequency(value[0]);
   };
+
+  const handleFrequencyCommit = async (value: number[]) => {
+      if (user) {
+          await updateUserFrequency(user.uid, value[0]);
+      }
+  }
   
   useEffect(() => {
     const fetchData = async () => {
@@ -197,6 +200,7 @@ export function OndeSpectraleRadio() {
                 step={0.1}
                 value={[frequency]}
                 onValueChange={handleFrequencyChange}
+                onValueCommit={handleFrequencyCommit}
                 className="w-full my-2"
               />
             </div>

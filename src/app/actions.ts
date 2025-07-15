@@ -7,7 +7,7 @@ import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-int
 import { z } from 'zod';
 import { auth, db } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
 
 const CreateStationSchema = z.object({
@@ -82,6 +82,12 @@ export async function createStation(formData: FormData) {
   
   const docRef = await addDoc(collection(db, 'stations'), newStationData);
 
+  // Increment user's station count
+  const userRef = doc(db, 'users', ownerId);
+  await updateDoc(userRef, {
+      stationsCreated: increment(1)
+  });
+
   const newStation: Station = {
       id: docRef.id,
       ...newStationData
@@ -132,7 +138,6 @@ export async function addMessageToStation(stationId: string, message: string) {
     }
 }
 
-let MOCK_MUSIC_SEARCH_RESULTS: PlaylistItem[] = [];
 
 export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
     if (!searchTerm) return [];
@@ -148,7 +153,7 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
         const data = await response.json();
         const docs = data.response.docs;
 
-        MOCK_MUSIC_SEARCH_RESULTS = docs.map((doc: any) => ({
+        const searchResults: PlaylistItem[] = docs.map((doc: any) => ({
             id: doc.identifier,
             type: 'music',
             title: doc.title || 'Titre inconnu',
@@ -157,7 +162,7 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
             duration: 180, // Mock duration
         }));
         
-        return MOCK_MUSIC_SEARCH_RESULTS;
+        return searchResults;
 
     } catch (error) {
         console.error('Failed to fetch from Archive.org:', error);
@@ -166,14 +171,13 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
 }
 
 
-export async function addMusicToStation(stationId: string, musicId: string) {
+export async function addMusicToStation(stationId: string, musicId: string, musicTrack: PlaylistItem) {
     const stationRef = doc(db, 'stations', stationId);
     const stationDoc = await getDoc(stationRef);
     if (!stationDoc.exists()) {
         return { error: "Station non trouvée." };
     }
-
-    const musicTrack = MOCK_MUSIC_SEARCH_RESULTS.find(m => m.id === musicId);
+    
     if (!musicTrack) {
         return { error: "Musique non trouvée. Essayez une nouvelle recherche." };
     }
@@ -184,4 +188,34 @@ export async function addMusicToStation(stationId: string, musicId: string) {
     
     revalidatePath('/');
     return { success: true, playlistItem: musicTrack };
+}
+
+
+export async function updateUserOnLogin(userId: string, email: string | null) {
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+
+  if (!userDoc.exists()) {
+    await setDoc(userRef, {
+      email: email,
+      stationsCreated: 0,
+      lastFrequency: 92.1,
+      createdAt: serverTimestamp(),
+    });
+  } else {
+     await updateDoc(userRef, {
+      lastLogin: serverTimestamp(),
+    });
+  }
+}
+
+export async function updateUserFrequency(userId: string, frequency: number) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, { lastFrequency: frequency });
+}
+
+export async function getUserData(userId: string) {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    return userDoc.exists() ? userDoc.data() : null;
 }
