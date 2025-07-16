@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -5,8 +6,10 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
+import { getUserData, getStationsForUser, getCustomCharactersForUser } from '@/app/actions';
+import type { Station, CustomDJCharacter } from '@/lib/types';
+
 
 import {
   Sidebar,
@@ -29,11 +32,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { LayoutDashboard, Radio, Users, Library, BarChart2, Settings, LogOut, RadioTower } from 'lucide-react';
-import { getUserData, getStationsForUser, getCustomCharactersForUser } from '@/app/actions';
-import type { Station, CustomDJCharacter } from '@/lib/types';
+
 
 interface AdminLayoutContextType {
   user: User | null;
@@ -78,13 +79,18 @@ function AdminLayout({ children }: { children: ReactNode }) {
         setUserData(null);
         setStations([]);
         setCustomCharacters([]);
-        router.push('/login');
       }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
+
+  useEffect(() => {
+      if (!isLoading && !user) {
+          router.push('/login');
+      }
+  }, [isLoading, user, router]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -114,13 +120,13 @@ function AdminLayout({ children }: { children: ReactNode }) {
   if (!user) {
     return null; // La redirection est gérée dans le useEffect
   }
-
+  
   const contextValue = {
     user,
     userData,
     stations,
     customCharacters,
-    isLoading: isLoading,
+    isLoading,
   };
 
   return (
@@ -142,7 +148,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
                     : pathname.startsWith(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <Link href={item.href} legacyBehavior passHref>
+                    <Link href={item.href}>
                       <SidebarMenuButton isActive={isActive}>
                         <item.icon />
                         <span>{item.label}</span>
