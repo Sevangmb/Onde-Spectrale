@@ -11,15 +11,15 @@ import { signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
+import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 
-import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -454,52 +454,16 @@ export function OndeSpectraleRadio() {
                      />
                    )}
                 </div>
+                
+                {/* Playlist améliorée */}
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-2 mb-4">
-                      <ListMusic className="h-5 w-5 text-orange-400" />
-                      <h3 className="font-headline text-xl text-orange-100 tracking-wider">Playlist</h3>
-                  </div>
-                  <ScrollArea className="h-80 bg-black/70 border border-orange-500/40 rounded-lg p-2 backdrop-blur-sm shadow-lg shadow-orange-500/10">
-                    {isLoading ? (
-                      <div className="p-2 space-y-3">
-                          <Skeleton className="w-full h-10 bg-orange-400/20" />
-                          <Skeleton className="w-full h-10 bg-orange-400/20" />
-                          <Skeleton className="w-full h-10 bg-orange-400/20" />
-                          <Skeleton className="w-full h-10 bg-orange-400/20" />
-                      </div>
-                    ) : playlist.length > 0 ? (
-                      <ul className="space-y-1">
-                        {playlist.map((item, index) => (
-                          <li key={item.id}>
-                            <button
-                              onClick={() => onTrackSelect(index)}
-                              className={`w-full text-left p-2 rounded-md flex items-center gap-3 transition-all duration-200 ${
-                                index === currentTrackIndex 
-                                  ? 'bg-orange-500/50 border border-orange-400/50 shadow-md shadow-orange-500/20' 
-                                  : 'hover:bg-orange-500/20 hover:border hover:border-orange-500/30'
-                              }`}
-                            >
-                              {item.type === 'music' ? 
-                                <Music className="h-4 w-4 text-orange-400 shrink-0" /> : 
-                                <MessageSquare className="h-4 w-4 text-orange-400 shrink-0" />
-                              }
-                              <div className="flex-grow overflow-hidden">
-                                  <p className="truncate text-sm text-orange-100">{item.title}</p>
-                                  {item.artist && <p className="text-xs text-orange-300/70 truncate">{item.artist}</p>}
-                              </div>
-                              {index === currentTrackIndex && isPlaying && 
-                                <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse shadow-lg shadow-orange-400/50"></div>
-                              }
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-center text-orange-300/60 p-4">
-                          <p>{currentStation ? "Playlist vide." : error ? "" : "Silence radio."}</p>
-                      </div>
-                    )}
-                  </ScrollArea>
+                  <EnhancedPlaylist 
+                    playlist={playlist}
+                    currentTrackIndex={currentTrackIndex}
+                    isPlaying={isPlaying}
+                    isLoading={isLoading}
+                    onTrackSelect={onTrackSelect}
+                  />
                 </div>
               </CardContent>
             </Card>
