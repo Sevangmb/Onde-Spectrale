@@ -103,6 +103,12 @@ body {
     100% { top: 100%; opacity: 0; }
   }
 
+  @keyframes scanline-slow {
+    0% { top: -1px; opacity: 0.8; }
+    50% { opacity: 0.4; }
+    100% { top: 100%; opacity: 0; }
+  }
+
   @keyframes float {
     0%, 100% { 
       transform: translateY(0px) translateX(0px);
@@ -138,6 +144,17 @@ body {
     }
   }
 
+  @keyframes flicker-subtle {
+    0%, 85%, 100% {
+      opacity: 1;
+      text-shadow: 0 0 5px rgba(255, 165, 0, 0.4);
+    }
+    87%, 89% {
+      opacity: 0.8;
+      text-shadow: none;
+    }
+  }
+
   @keyframes glitch {
     0%, 90%, 100% {
       transform: translateX(0);
@@ -161,12 +178,35 @@ body {
     }
   }
 
+  @keyframes equalizer {
+    0%, 100% { 
+      height: 4px;
+      background: rgba(255, 165, 0, 0.6);
+    }
+    25% { 
+      height: 12px;
+      background: rgba(255, 69, 0, 0.8);
+    }
+    50% { 
+      height: 20px;
+      background: rgba(255, 140, 0, 1);
+    }
+    75% { 
+      height: 16px;
+      background: rgba(255, 165, 0, 0.9);
+    }
+  }
+
   .animate-drift {
     animation: drift 20s linear infinite;
   }
 
   .animate-scanline {
     animation: scanline 3s linear infinite;
+  }
+
+  .animate-scanline-slow {
+    animation: scanline-slow 8s linear infinite;
   }
 
   .animate-float {
@@ -181,7 +221,15 @@ body {
     animation: flicker 3s linear infinite;
   }
 
+  .animate-flicker-subtle {
+    animation: flicker-subtle 4s linear infinite;
+  }
+
   .animate-glitch {
     animation: glitch 2s linear infinite;
+  }
+
+  .animate-equalizer {
+    animation: equalizer ease-in-out infinite;
   }
 }
