@@ -109,6 +109,20 @@ body {
     100% { top: 100%; opacity: 0; }
   }
 
+  @keyframes scan {
+    0% { 
+      transform: translateX(-100%);
+      opacity: 0.3;
+    }
+    50% { 
+      opacity: 0.8;
+    }
+    100% { 
+      transform: translateX(100%);
+      opacity: 0.3;
+    }
+  }
+
   @keyframes float {
     0%, 100% { 
       transform: translateY(0px) translateX(0px);
@@ -207,6 +221,10 @@ body {
 
   .animate-scanline-slow {
     animation: scanline-slow 8s linear infinite;
+  }
+
+  .animate-scan {
+    animation: scan 1s ease-in-out;
   }
 
   .animate-float {
