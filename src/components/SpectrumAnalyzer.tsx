@@ -43,13 +43,13 @@ export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: Spectr
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
+    const width = canvas.width;
+    const height = canvas.height;
 
     const draw = () => {
       if (!analyzerRef.current || !dataArrayRef.current) return;
 
-      const width = canvas.width;
-      const height = canvas.height;
-      
       analyzerRef.current.getByteFrequencyData(dataArrayRef.current);
       
       ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
