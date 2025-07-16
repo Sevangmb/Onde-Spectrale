@@ -18,6 +18,7 @@ import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
+import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
 import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
@@ -51,6 +52,11 @@ export function OndeSpectraleRadio() {
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
+
+  // État pour déterminer si la radio est "active" pour les alertes d'urgence
+  const isRadioActive = useMemo(() => {
+    return isClient && !isLoading && (currentStation !== null || !!interference);
+  }, [isClient, isLoading, currentStation, interference]);
 
   useEffect(() => {
     // This effect runs only on the client, after the initial render.
@@ -464,6 +470,12 @@ export function OndeSpectraleRadio() {
             </Card>
           </div>
         </div>
+
+        {/* Système d'alertes d'urgence */}
+        <EmergencyAlertSystem 
+          isRadioActive={isRadioActive}
+          currentFrequency={frequency}
+        />
       </div>
     </>
   );
