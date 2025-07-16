@@ -2,24 +2,31 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStation, getInterference, updateUserOnLogin, getUserData, updateUserFrequency } from '@/app/actions';
+import { getStation, getInterference, updateUserFrequency } from '@/app/actions';
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
-import { signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
-import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 
 import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+
+interface ParticleStyle {
+    left: string;
+    top: string;
+    animationDelay: string;
+    animationDuration: string;
+}
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -30,25 +37,46 @@ export function OndeSpectraleRadio() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const router = useRouter();
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Client-side only state to prevent hydration errors
+  const [signalStrength, setSignalStrength] = useState(0);
+  const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
-  // Simulated signal strength based on frequency and station presence
-  const signalStrength = useMemo(() => {
-    if (currentStation) {
-      // Strong signal when station is found
-      return Math.floor(Math.random() * 20) + 80; // 80-100%
-    } else {
-      // Weak random signal when no station
-      return Math.floor(Math.random() * 30) + 10; // 10-40%
+  useEffect(() => {
+    // This effect runs only on the client, after the initial render.
+    setIsClient(true);
+
+    // Generate particle styles on the client
+    setParticleStyles(
+      Array.from({ length: 15 }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 5}s`,
+        animationDuration: `${3 + Math.random() * 4}s`,
+      }))
+    );
+  }, []);
+
+  useEffect(() => {
+    // Generate signal strength on the client, and when station changes
+    if (isClient) {
+        if (currentStation) {
+            setSignalStrength(Math.floor(Math.random() * 20) + 80); // 80-100%
+        } else {
+            setSignalStrength(Math.floor(Math.random() * 30) + 10); // 10-40%
+        }
     }
-  }, [currentStation, debouncedFrequency]);
+  }, [currentStation, debouncedFrequency, isClient]);
 
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
@@ -67,28 +95,11 @@ export function OndeSpectraleRadio() {
   }, [frequency, isScanning]);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-          if (currentUser) {
-            setUser(currentUser);
-            await updateUserOnLogin(currentUser.uid);
-            const userData = await getUserData(currentUser.uid);
-            if (userData && userData.lastFrequency) {
-              setFrequency(userData.lastFrequency);
-            }
-          } else {
-            await signInAnonymously(auth);
-          }
-        });
-        return () => unsubscribe();
-      } catch (err: any) {
-        console.error("Erreur d'authentification Firebase:", err);
-        setError(`Erreur d'authentification: ${err.message}. Vérifiez la configuration Firebase.`);
-        setIsLoading(false);
-      }
-    };
-    initializeAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      // We removed auto-login logic, this just checks who is logged in.
+    });
+    return () => unsubscribe();
   }, []);
 
   const dj = useMemo(() => {
@@ -112,8 +123,6 @@ export function OndeSpectraleRadio() {
   }
   
   useEffect(() => {
-    if (!user) return; // Ne rien faire si l'utilisateur n'est pas encore authentifié
-
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
@@ -139,9 +148,8 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, user]);
+  }, [debouncedFrequency]);
 
-  // Fix: Improved track selection with better bounds checking
   const onTrackSelect = useCallback((index: number) => {
     if (playlist.length === 0) return;
     
@@ -163,7 +171,6 @@ export function OndeSpectraleRadio() {
     }
   }, [currentTrackIndex, playlist.length]);
 
-  // Fix: Safer navigation functions with bounds checking
   const handleNext = useCallback(() => {
     if (playlist.length === 0) return;
     const nextIndex = (currentTrackIndex + 1) % playlist.length;
@@ -181,7 +188,6 @@ export function OndeSpectraleRadio() {
     setIsPlaying(prev => !prev);
   }, [playlist.length]);
 
-  // Fix: Reset track index when station changes to prevent out-of-bounds errors
   useEffect(() => {
     if (currentStation && playlist.length > 0) {
       setCurrentTrackIndex(0);
@@ -228,16 +234,11 @@ export function OndeSpectraleRadio() {
         
         {/* Particules flottantes */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(15)].map((_, i) => (
+          {particleStyles.map((style, i) => (
             <div
               key={i}
               className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 5}s`,
-                animationDuration: `${3 + Math.random() * 4}s`
-              }}
+              style={style}
             />
           ))}
         </div>
@@ -265,7 +266,7 @@ export function OndeSpectraleRadio() {
                       <span className="inline-block animate-flicker">Onde Spectrale</span>
                     </CardTitle>
                   </div>
-                   <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-2">
                      {currentStation && isOwner && (
                       <StationManagementSheet station={currentStation} dj={dj}>
                         <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
@@ -273,14 +274,17 @@ export function OndeSpectraleRadio() {
                         </Button>
                       </StationManagementSheet>
                     )}
-                     {!currentStation && !isLoading && user && !error &&(
-                      <CreateStationDialog frequency={frequency} >
-                          <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20">
-                              <Rss className="mr-2 h-4 w-4" />
-                              Créer une station
-                          </Button>
-                      </CreateStationDialog>
+                     {!currentStation && !isLoading && !user && (
+                      <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
+                          <Rss className="mr-2 h-4 w-4" />
+                          Créer une station
+                      </Button>
                     )}
+                     {user && (
+                        <Button variant="outline" onClick={() => router.push('/admin')}>
+                            Tableau de bord
+                        </Button>
+                     )}
                   </div>
                 </div>
               </CardHeader>
@@ -381,7 +385,7 @@ export function OndeSpectraleRadio() {
                           onValueChange={handleFrequencyChange}
                           onValueCommit={handleFrequencyCommit}
                           className="w-full"
-                          disabled={!user || !!error || isScanning}
+                          disabled={!!error || isScanning}
                         />
                         
                         {/* Marqueurs de fréquence */}
@@ -435,12 +439,12 @@ export function OndeSpectraleRadio() {
                         <p className="text-orange-300/80">DJ: {dj?.name || 'Inconnu'}</p>
                       </>
                     ) : (
-                      <>
+                      <div className="flex flex-col items-center text-center break-words">
                         <p className="text-lg text-orange-300/70 animate-glitch">{interference || 'Statique...'}</p>
                         <p className="text-sm text-orange-200/50 mt-2">
                           Aucun signal détecté. Créez une station ici.
                         </p>
-                      </>
+                      </div>
                     )}
                   </div>
                    {currentStation && playlist.length > 0 && (
