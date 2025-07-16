@@ -17,6 +17,7 @@ import { OndeSpectraleLogo } from '@/components/icons';
 import { CreateStationDialog } from '@/components/CreateStationDialog';
 import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 
 import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, AlertTriangle } from 'lucide-react';
 
@@ -170,7 +171,7 @@ export function OndeSpectraleRadio() {
         onPause={() => setIsPlaying(false)} 
       />
       <Card className="w-full border-2 border-primary/20 bg-black/50 shadow-lg shadow-primary/10 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%238B0000%27%20stroke-width%3D%271%27%3E%3Cpath%20d%3D%27M769%20229L1037%20260.9M927%20880L731%20737%27%2F%3E%3Cpath%20d%3D%27M731%20737L769%20229%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L927%20880%27%2F%3E%3Cpath%20d%3D%27M769%20229L927%20880%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L731%20737%27%2F%3E%3Cpath%20d%3D%27M-231%20880L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20229%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20880%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-231%20880%27%2F%3E%3Cg%20fill%3D%27%231A1A1A%27%3E%3Ccircle%20cx%3D%27769%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%271037%27%20cy%3D%27260.9%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27927%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27731%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-427%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-5"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%238B0000%27%20stroke-width%3D%271%27%3E%3Cpath%20d%3D%27M769%20229L1037%20260.9M927%20880L731%20737%27%2F%3E%3Cpath%20d%3D%27M731%20737L769%20229%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L927%20880%27%2F%3E%3Cpath%20d%3D%27M769%20229L927%20880%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L731%20737%27%2F%3E%3Cpath%20d%3D%27M-231%20880L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20229%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20880%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-231%20880%27%2F%3E%3Cg%20fill%3D%27%231A1A1A%27%3E%3Ccircle%20cx%3D%27769%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%271037%27%20cy%3D%27260.9%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27927%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27731%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-427%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-5"></div>
         <CardHeader className="relative border-b-2 border-primary/20 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -217,6 +218,14 @@ export function OndeSpectraleRadio() {
                 disabled={!user || !!error}
               />
             </div>
+            
+            {/* Analyseur de spectre */}
+            <SpectrumAnalyzer 
+              isPlaying={isPlaying && currentStation !== null} 
+              audioRef={audioRef} 
+              className="h-24"
+            />
+
             <div className="h-40 bg-black/50 border border-border rounded-lg p-4 flex flex-col justify-center items-center text-center">
               {isLoading ? (
                 <Skeleton className="w-4/5 h-12 animate-flicker" />
