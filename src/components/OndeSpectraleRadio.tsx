@@ -19,7 +19,7 @@ import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 
-import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, AlertTriangle } from 'lucide-react';
+import { RadioTower, Music, MessageSquare, ListMusic, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
@@ -29,6 +29,7 @@ export function OndeSpectraleRadio() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -37,6 +38,33 @@ export function OndeSpectraleRadio() {
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
+
+  // Simulated signal strength based on frequency and station presence
+  const signalStrength = useMemo(() => {
+    if (currentStation) {
+      // Strong signal when station is found
+      return Math.floor(Math.random() * 20) + 80; // 80-100%
+    } else {
+      // Weak random signal when no station
+      return Math.floor(Math.random() * 30) + 10; // 10-40%
+    }
+  }, [currentStation, debouncedFrequency]);
+
+  const handleScanUp = useCallback(() => {
+    if (isScanning) return;
+    setIsScanning(true);
+    const newFreq = Math.min(108.0, frequency + 0.5);
+    setFrequency(newFreq);
+    setTimeout(() => setIsScanning(false), 1000);
+  }, [frequency, isScanning]);
+
+  const handleScanDown = useCallback(() => {
+    if (isScanning) return;
+    setIsScanning(true);
+    const newFreq = Math.max(87.0, frequency - 0.5);
+    setFrequency(newFreq);
+    setTimeout(() => setIsScanning(false), 1000);
+  }, [frequency, isScanning]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -258,22 +286,130 @@ export function OndeSpectraleRadio() {
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
                 <div className="flex flex-col gap-6">
-                  <div className="bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col items-center gap-2 backdrop-blur-sm shadow-lg shadow-orange-500/10">
-                    <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider">FRÉQUENCE</label>
-                    <div className="text-5xl font-headline font-bold text-orange-400 tracking-widest animate-flicker drop-shadow-lg">
-                      {frequency.toFixed(1)} <span className="text-2xl text-orange-300">MHz</span>
+                  {/* Sélecteur de fréquence amélioré */}
+                  <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+                    {/* Effet de tuning */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none">
+                      <div className={`w-full h-full bg-gradient-to-r from-transparent via-orange-400/30 to-transparent ${isScanning ? 'animate-scan' : ''}`}></div>
                     </div>
-                    <Slider
-                      id="frequency"
-                      min={87.0}
-                      max={108.0}
-                      step={0.1}
-                      value={[frequency]}
-                      onValueChange={handleFrequencyChange}
-                      onValueCommit={handleFrequencyCommit}
-                      className="w-full my-2"
-                      disabled={!user || !!error}
-                    />
+                    
+                    <div className="relative z-10 space-y-4">
+                      {/* En-tête avec indicateur de signal */}
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider uppercase">
+                          Syntoniseur
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-orange-400" />
+                          <div className="flex gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-1 h-4 rounded-full transition-all duration-300 ${
+                                  i < Math.floor(signalStrength / 20) 
+                                    ? 'bg-orange-400 shadow-lg shadow-orange-400/50' 
+                                    : 'bg-gray-600'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-orange-300/60 font-mono w-8">
+                            {signalStrength}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Affichage principal de la fréquence */}
+                      <div className="text-center">
+                        <div className="text-6xl font-headline font-bold text-orange-400 tracking-widest drop-shadow-lg relative">
+                          <span className={`${currentStation ? 'animate-flicker-subtle' : 'animate-flicker'}`}>
+                            {frequency.toFixed(1)}
+                          </span>
+                          <span className="text-3xl text-orange-300 ml-2">MHz</span>
+                          
+                          {/* Indicateur de station trouvée */}
+                          {currentStation && (
+                            <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
+                          )}
+                        </div>
+                        
+                        {/* Indicateur de scan */}
+                        {isScanning && (
+                          <div className="text-orange-300/60 text-sm mt-2 animate-pulse">
+                            SCAN EN COURS...
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Contrôles de scan rapide */}
+                      <div className="flex items-center justify-center gap-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleScanDown}
+                          disabled={frequency <= 87.0 || isScanning}
+                          className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          SCAN
+                        </Button>
+                        
+                        <div className="px-4 py-2 bg-black/60 border border-orange-500/20 rounded text-orange-300/80 text-xs font-mono">
+                          87.0 - 108.0 MHz
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleScanUp}
+                          disabled={frequency >= 108.0 || isScanning}
+                          className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 disabled:opacity-50"
+                        >
+                          SCAN
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+
+                      {/* Slider principal */}
+                      <div className="space-y-2">
+                        <Slider
+                          id="frequency"
+                          min={87.0}
+                          max={108.0}
+                          step={0.1}
+                          value={[frequency]}
+                          onValueChange={handleFrequencyChange}
+                          onValueCommit={handleFrequencyCommit}
+                          className="w-full"
+                          disabled={!user || !!error || isScanning}
+                        />
+                        
+                        {/* Marqueurs de fréquence */}
+                        <div className="flex justify-between text-xs text-orange-400/60 font-mono">
+                          <span>87.0</span>
+                          <span>90.0</span>
+                          <span>95.0</span>
+                          <span>100.0</span>
+                          <span>105.0</span>
+                          <span>108.0</span>
+                        </div>
+                      </div>
+
+                      {/* Statut de la connexion */}
+                      <div className="text-center">
+                        {currentStation ? (
+                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            STATION VERROUILLÉE
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
+                            <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                            RECHERCHE DE SIGNAL
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   
                   {/* Analyseur de spectre */}
