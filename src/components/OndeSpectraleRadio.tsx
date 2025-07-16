@@ -170,137 +170,206 @@ export function OndeSpectraleRadio() {
         onPlay={() => setIsPlaying(true)} 
         onPause={() => setIsPlaying(false)} 
       />
-      <Card className="w-full border-2 border-primary/20 bg-black/50 shadow-lg shadow-primary/10 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20800%22%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%238B0000%27%20stroke-width%3D%271%27%3E%3Cpath%20d%3D%27M769%20229L1037%20260.9M927%20880L731%20737%27%2F%3E%3Cpath%20d%3D%27M731%20737L769%20229%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L927%20880%27%2F%3E%3Cpath%20d%3D%27M769%20229L927%20880%27%2F%3E%3Cpath%20d%3D%27M1037%20260.9L731%20737%27%2F%3E%3Cpath%20d%3D%27M-231%20880L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20229%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-427%20737%27%2F%3E%3Cpath%20d%3D%27M-427%20737L-231%20880%27%2F%3E%3Cpath%20d%3D%27M-231%20229L-231%20880%27%2F%3E%3Cg%20fill%3D%27%231A1A1A%27%3E%3Ccircle%20cx%3D%27769%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%271037%27%20cy%3D%27260.9%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27927%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27731%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27880%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-427%27%20cy%3D%27737%27%20r%3D%272%27%2F%3E%3Ccircle%20cx%3D%27-231%27%20cy%3D%27229%27%20r%3D%272%27%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-5"></div>
-        <CardHeader className="relative border-b-2 border-primary/20 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <OndeSpectraleLogo className="h-8 w-8 text-primary" />
-              <CardTitle className="font-headline text-3xl text-primary-foreground tracking-wider">
-                Onde Spectrale
-              </CardTitle>
-            </div>
-             <div className="flex items-center gap-4">
-               {currentStation && isOwner && (
-                <StationManagementSheet station={currentStation} dj={dj}>
-                  <Button variant="ghost" size="icon">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </StationManagementSheet>
-              )}
-               {!currentStation && !isLoading && user && !error &&(
-                <CreateStationDialog frequency={frequency} >
-                    <Button variant="default" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                        <Rss className="mr-2 h-4 w-4" />
-                        Créer une station
-                    </Button>
-                </CreateStationDialog>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative">
-          <div className="flex flex-col gap-6">
-            <div className="bg-black/50 border border-border rounded-lg p-4 flex flex-col items-center gap-2">
-              <label htmlFor="frequency" className="text-sm font-medium text-muted-foreground font-headline">FRÉQUENCE</label>
-              <div className="text-5xl font-headline font-bold text-accent tracking-widest animate-flicker">
-                {frequency.toFixed(1)} <span className="text-2xl">MHz</span>
-              </div>
-              <Slider
-                id="frequency"
-                min={87.0}
-                max={108.0}
-                step={0.1}
-                value={[frequency]}
-                onValueChange={handleFrequencyChange}
-                onValueCommit={handleFrequencyCommit}
-                className="w-full my-2"
-                disabled={!user || !!error}
-              />
-            </div>
-            
-            {/* Analyseur de spectre */}
-            <SpectrumAnalyzer 
-              isPlaying={isPlaying && currentStation !== null} 
-              audioRef={audioRef} 
-              className="h-24"
+      <div className="relative w-full min-h-screen overflow-hidden">
+        {/* Arrière-plan post-apocalyptique animé */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
+        
+        {/* Effet de radiation/interference */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-red-700/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-yellow-500/30 rounded-full blur-xl animate-pulse delay-500"></div>
+        </div>
+        
+        {/* Grille futuriste déformée */}
+        <div className="absolute inset-0 opacity-10">
+          <div 
+            className="w-full h-full"
+            style={{
+              backgroundImage: `
+                radial-gradient(circle at 20% 50%, rgba(255, 165, 0, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 69, 0, 0.2) 0%, transparent 50%),
+                linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
+                linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)
+              `,
+              backgroundSize: '100px 100px, 150px 150px, 50px 50px, 50px 50px',
+              animation: 'drift 20s linear infinite'
+            }}
+          />
+        </div>
+        
+        {/* Particules flottantes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(15)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`
+              }}
             />
+          ))}
+        </div>
 
-            <div className="h-40 bg-black/50 border border-border rounded-lg p-4 flex flex-col justify-center items-center text-center">
-              {isLoading ? (
-                <Skeleton className="w-4/5 h-12 animate-flicker" />
-              ) : error ? (
-                 <div className="text-destructive-foreground flex flex-col items-center gap-2">
-                    <AlertTriangle className="h-8 w-8 text-destructive" />
-                    <p className="font-semibold">Erreur de connexion</p>
-                    <p className="text-sm">{error}</p>
-                 </div>
-              ) : currentStation ? (
-                <>
-                  <RadioTower className="h-6 w-6 text-primary mb-2" />
-                  <h3 className="font-headline text-2xl text-primary-foreground">{currentStation.name}</h3>
-                  <p className="text-muted-foreground">DJ: {dj?.name || 'Inconnu'}</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-lg text-muted-foreground animate-glitch">{interference || 'Statique...'}</p>
-                  <p className="text-sm text-muted-foreground/50 mt-2">
-                    Aucun signal détecté. Créez une station ici.
-                  </p>
-                </>
-              )}
-            </div>
-             {currentStation && playlist.length > 0 && (
-               <AudioPlayer 
-                 track={currentTrack} 
-                 isPlaying={isPlaying} 
-                 onPlayPause={handlePlayPause} 
-                 onNext={handleNext} 
-                 onPrev={handlePrev} 
-                 audioRef={audioRef} 
-               />
-             )}
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 mb-4">
-                <ListMusic className="h-5 w-5 text-primary" />
-                <h3 className="font-headline text-xl text-primary-foreground">Playlist</h3>
-            </div>
-            <ScrollArea className="h-80 bg-black/50 border border-border rounded-lg p-2">
-              {isLoading ? (
-                <div className="p-2 space-y-3">
-                    <Skeleton className="w-full h-10" />
-                    <Skeleton className="w-full h-10" />
-                    <Skeleton className="w-full h-10" />
-                    <Skeleton className="w-full h-10" />
+        {/* Interface principale */}
+        <div className="relative z-10 flex min-h-screen w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
+          <div className="w-full max-w-4xl mx-auto">
+            <Card className="w-full border-2 border-orange-500/30 bg-black/80 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+              {/* Effet de scanline */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
+              </div>
+              
+              {/* Bordure intérieure avec effet électrique */}
+              <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
+              
+              <CardHeader className="relative border-b-2 border-orange-500/30 pb-4 bg-gradient-to-r from-black/90 to-zinc-900/90">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <OndeSpectraleLogo className="h-8 w-8 text-orange-400 drop-shadow-lg" />
+                      <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
+                    </div>
+                    <CardTitle className="font-headline text-3xl text-orange-100 tracking-wider drop-shadow-lg">
+                      <span className="inline-block animate-flicker">Onde Spectrale</span>
+                    </CardTitle>
+                  </div>
+                   <div className="flex items-center gap-4">
+                     {currentStation && isOwner && (
+                      <StationManagementSheet station={currentStation} dj={dj}>
+                        <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
+                          <Settings className="h-5 w-5 text-orange-300" />
+                        </Button>
+                      </StationManagementSheet>
+                    )}
+                     {!currentStation && !isLoading && user && !error &&(
+                      <CreateStationDialog frequency={frequency} >
+                          <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20">
+                              <Rss className="mr-2 h-4 w-4" />
+                              Créer une station
+                          </Button>
+                      </CreateStationDialog>
+                    )}
+                  </div>
                 </div>
-              ) : playlist.length > 0 ? (
-                <ul className="space-y-1">
-                  {playlist.map((item, index) => (
-                    <li key={item.id}>
-                      <button
-                        onClick={() => onTrackSelect(index)}
-                        className={`w-full text-left p-2 rounded-md flex items-center gap-3 transition-colors ${index === currentTrackIndex ? 'bg-primary/50' : 'hover:bg-primary/20'}`}
-                      >
-                        {item.type === 'music' ? <Music className="h-4 w-4 text-accent shrink-0" /> : <MessageSquare className="h-4 w-4 text-accent shrink-0" />}
-                        <div className="flex-grow overflow-hidden">
-                            <p className="truncate text-sm text-primary-foreground">{item.title}</p>
-                            {item.artist && <p className="text-xs text-muted-foreground truncate">{item.artist}</p>}
-                        </div>
-                        {index === currentTrackIndex && isPlaying && <div className="w-2 h-2 rounded-full bg-accent animate-pulse"></div>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                    <p>{currentStation ? "Playlist vide." : error ? "" : "Silence radio."}</p>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
+                <div className="flex flex-col gap-6">
+                  <div className="bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col items-center gap-2 backdrop-blur-sm shadow-lg shadow-orange-500/10">
+                    <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider">FRÉQUENCE</label>
+                    <div className="text-5xl font-headline font-bold text-orange-400 tracking-widest animate-flicker drop-shadow-lg">
+                      {frequency.toFixed(1)} <span className="text-2xl text-orange-300">MHz</span>
+                    </div>
+                    <Slider
+                      id="frequency"
+                      min={87.0}
+                      max={108.0}
+                      step={0.1}
+                      value={[frequency]}
+                      onValueChange={handleFrequencyChange}
+                      onValueCommit={handleFrequencyCommit}
+                      className="w-full my-2"
+                      disabled={!user || !!error}
+                    />
+                  </div>
+                  
+                  {/* Analyseur de spectre */}
+                  <SpectrumAnalyzer 
+                    isPlaying={isPlaying && currentStation !== null} 
+                    audioRef={audioRef} 
+                    className="h-24 border border-orange-500/30 rounded-lg bg-black/50 backdrop-blur-sm"
+                  />
+
+                  <div className="h-40 bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col justify-center items-center text-center backdrop-blur-sm shadow-lg shadow-orange-500/10">
+                    {isLoading ? (
+                      <Skeleton className="w-4/5 h-12 animate-flicker bg-orange-400/20" />
+                    ) : error ? (
+                       <div className="text-red-400 flex flex-col items-center gap-2">
+                          <AlertTriangle className="h-8 w-8 text-red-500 animate-pulse" />
+                          <p className="font-semibold">Erreur de connexion</p>
+                          <p className="text-sm text-red-300/80">{error}</p>
+                       </div>
+                    ) : currentStation ? (
+                      <>
+                        <RadioTower className="h-6 w-6 text-orange-400 mb-2 animate-pulse" />
+                        <h3 className="font-headline text-2xl text-orange-100 drop-shadow-lg">{currentStation.name}</h3>
+                        <p className="text-orange-300/80">DJ: {dj?.name || 'Inconnu'}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-lg text-orange-300/70 animate-glitch">{interference || 'Statique...'}</p>
+                        <p className="text-sm text-orange-200/50 mt-2">
+                          Aucun signal détecté. Créez une station ici.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                   {currentStation && playlist.length > 0 && (
+                     <AudioPlayer 
+                       track={currentTrack} 
+                       isPlaying={isPlaying} 
+                       onPlayPause={handlePlayPause} 
+                       onNext={handleNext} 
+                       onPrev={handlePrev} 
+                       audioRef={audioRef} 
+                     />
+                   )}
                 </div>
-              )}
-            </ScrollArea>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-4">
+                      <ListMusic className="h-5 w-5 text-orange-400" />
+                      <h3 className="font-headline text-xl text-orange-100 tracking-wider">Playlist</h3>
+                  </div>
+                  <ScrollArea className="h-80 bg-black/70 border border-orange-500/40 rounded-lg p-2 backdrop-blur-sm shadow-lg shadow-orange-500/10">
+                    {isLoading ? (
+                      <div className="p-2 space-y-3">
+                          <Skeleton className="w-full h-10 bg-orange-400/20" />
+                          <Skeleton className="w-full h-10 bg-orange-400/20" />
+                          <Skeleton className="w-full h-10 bg-orange-400/20" />
+                          <Skeleton className="w-full h-10 bg-orange-400/20" />
+                      </div>
+                    ) : playlist.length > 0 ? (
+                      <ul className="space-y-1">
+                        {playlist.map((item, index) => (
+                          <li key={item.id}>
+                            <button
+                              onClick={() => onTrackSelect(index)}
+                              className={`w-full text-left p-2 rounded-md flex items-center gap-3 transition-all duration-200 ${
+                                index === currentTrackIndex 
+                                  ? 'bg-orange-500/50 border border-orange-400/50 shadow-md shadow-orange-500/20' 
+                                  : 'hover:bg-orange-500/20 hover:border hover:border-orange-500/30'
+                              }`}
+                            >
+                              {item.type === 'music' ? 
+                                <Music className="h-4 w-4 text-orange-400 shrink-0" /> : 
+                                <MessageSquare className="h-4 w-4 text-orange-400 shrink-0" />
+                              }
+                              <div className="flex-grow overflow-hidden">
+                                  <p className="truncate text-sm text-orange-100">{item.title}</p>
+                                  {item.artist && <p className="text-xs text-orange-300/70 truncate">{item.artist}</p>}
+                              </div>
+                              {index === currentTrackIndex && isPlaying && 
+                                <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse shadow-lg shadow-orange-400/50"></div>
+                              }
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center text-orange-300/60 p-4">
+                          <p>{currentStation ? "Playlist vide." : error ? "" : "Silence radio."}</p>
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </>
   );
 }
