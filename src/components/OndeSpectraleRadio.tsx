@@ -112,19 +112,52 @@ export function OndeSpectraleRadio() {
     fetchData();
   }, [debouncedFrequency, user]);
 
-  const onTrackSelect = (index: number) => {
-    setCurrentTrackIndex(index);
+  // Fix: Improved track selection with better bounds checking
+  const onTrackSelect = useCallback((index: number) => {
+    if (playlist.length === 0) return;
+    
+    const clampedIndex = Math.max(0, Math.min(index, playlist.length - 1));
+    setCurrentTrackIndex(clampedIndex);
     setIsPlaying(true);
-  };
+  }, [playlist.length]);
   
   const onEnded = useCallback(() => {
-     if (currentTrackIndex < playlist.length - 1) {
+    if (playlist.length === 0) {
+      setIsPlaying(false);
+      return;
+    }
+    
+    if (currentTrackIndex < playlist.length - 1) {
       setCurrentTrackIndex(prev => prev + 1);
     } else {
       setIsPlaying(false);
     }
   }, [currentTrackIndex, playlist.length]);
-  
+
+  // Fix: Safer navigation functions with bounds checking
+  const handleNext = useCallback(() => {
+    if (playlist.length === 0) return;
+    const nextIndex = (currentTrackIndex + 1) % playlist.length;
+    onTrackSelect(nextIndex);
+  }, [currentTrackIndex, playlist.length, onTrackSelect]);
+
+  const handlePrev = useCallback(() => {
+    if (playlist.length === 0) return;
+    const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+    onTrackSelect(prevIndex);
+  }, [currentTrackIndex, playlist.length, onTrackSelect]);
+
+  const handlePlayPause = useCallback(() => {
+    if (playlist.length === 0) return;
+    setIsPlaying(prev => !prev);
+  }, [playlist.length]);
+
+  // Fix: Reset track index when station changes to prevent out-of-bounds errors
+  useEffect(() => {
+    if (currentStation && playlist.length > 0) {
+      setCurrentTrackIndex(0);
+    }
+  }, [currentStation, playlist.length]);
 
   return (
     <>
@@ -208,7 +241,16 @@ export function OndeSpectraleRadio() {
                 </>
               )}
             </div>
-             {currentStation && <AudioPlayer track={playlist[currentTrackIndex]} isPlaying={isPlaying} onPlayPause={() => setIsPlaying(p => !p)} onNext={() => onTrackSelect((currentTrackIndex + 1) % playlist.length)} onPrev={() => onTrackSelect((currentTrackIndex - 1 + playlist.length) % playlist.length)} audioRef={audioRef} />}
+             {currentStation && playlist.length > 0 && (
+               <AudioPlayer 
+                 track={currentTrack} 
+                 isPlaying={isPlaying} 
+                 onPlayPause={handlePlayPause} 
+                 onNext={handleNext} 
+                 onPrev={handlePrev} 
+                 audioRef={audioRef} 
+               />
+             )}
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-4">
