@@ -1,11 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { Station, PlaylistItem } from '@/lib/types';
+import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
+import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 
@@ -27,7 +28,7 @@ function serializeStation(doc: any): Station {
     } as Station;
 }
 
-export async function getStation(frequency: number): Promise<Station | null> {
+export async function getStationForFrequency(frequency: number): Promise<Station | null> {
     const stationsCol = collection(db, 'stations');
     const q = query(stationsCol, where('frequency', '==', frequency));
     const querySnapshot = await getDocs(q);
@@ -40,8 +41,29 @@ export async function getStation(frequency: number): Promise<Station | null> {
     return serializeStation(stationDoc);
 }
 
+
+export async function getStationById(stationId: string): Promise<Station | null> {
+    const stationRef = doc(db, 'stations', stationId);
+    const stationDoc = await getDoc(stationRef);
+
+    if (!stationDoc.exists()) {
+        return null;
+    }
+
+    return serializeStation(stationDoc);
+}
+
+export async function getStationsForUser(userId: string): Promise<Station[]> {
+    if (!userId) return [];
+    const stationsCol = collection(db, 'stations');
+    const q = query(stationsCol, where('ownerId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(serializeStation);
+}
+
+
 export async function getInterference(frequency: number): Promise<string> {
-    const station = await getStation(frequency);
+    const station = await getStationForFrequency(frequency);
     const result = await simulateFrequencyInterference({
         frequency,
         stationName: station?.name,
@@ -69,7 +91,7 @@ export async function createStation(ownerId: string, formData: FormData) {
   
   const { name, frequency, djCharacterId } = validatedFields.data;
 
-  const existingStation = await getStation(frequency);
+  const existingStation = await getStationForFrequency(frequency);
   if (existingStation) {
     return { error: { general: 'Cette fréquence est déjà occupée.' } };
   }
@@ -100,7 +122,7 @@ export async function createStation(ownerId: string, formData: FormData) {
       ...newStationData
   }
 
-  revalidatePath('/');
+  revalidatePath('/admin');
   return { success: true, station: newStation };
 }
 
@@ -111,38 +133,49 @@ export async function addMessageToStation(stationId: string, message: string) {
     if (!stationDoc.exists()) {
         return { error: "Station non trouvée." };
     }
-    const station = { id: stationDoc.id, ...stationDoc.data() } as Station;
+    const station = await getStationById(stationId);
+    if (!station) {
+        return { error: "Station non trouvée." };
+    }
     
-    const character = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
-    if (!character) {
-        return { error: "Personnage DJ non trouvé." };
-    }
+    const officialCharacter = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
 
-    try {
-        const audio = await generateDjAudio({
+    let audio;
+
+    if (officialCharacter) {
+         audio = await generateDjAudio({
             message,
-            characterId: character.id
+            characterId: officialCharacter.id
         });
-        
-        const newPlaylistItem: PlaylistItem = {
-            id: `msg-${Date.now()}`,
-            type: 'message',
-            title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
-            url: audio.audioUrl,
-            duration: 15, // Mock duration, could be calculated from audio file
-        };
-
-        await updateDoc(stationRef, {
-            playlist: arrayUnion(newPlaylistItem)
+    } else {
+        // It's a custom character, fetch from Firestore
+        const customCharRef = doc(db, 'users', station.ownerId, 'characters', station.djCharacterId);
+        const customCharDoc = await getDoc(customCharRef);
+        if (!customCharDoc.exists()) {
+            return { error: "Personnage DJ personnalisé non trouvé." };
+        }
+        const customChar = customCharDoc.data() as CustomDJCharacter;
+        audio = await generateCustomDjAudio({
+            message,
+            voice: customChar.voice
         });
-
-        revalidatePath('/');
-        return { success: true, playlistItem: newPlaylistItem };
-
-    } catch (e) {
-        console.error(e);
-        return { error: "Erreur lors de la génération de l'audio."}
     }
+    
+    const newPlaylistItem: PlaylistItem = {
+        id: `msg-${Date.now()}`,
+        type: 'message',
+        title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
+        url: audio.audioUrl,
+        duration: 15, // Mock duration, could be calculated from audio file
+    };
+
+    await updateDoc(stationRef, {
+        playlist: arrayUnion(newPlaylistItem)
+    });
+
+    revalidatePath(`/admin/stations/${stationId}`);
+    return { success: true, playlistItem: newPlaylistItem };
+
 }
 
 
@@ -178,7 +211,7 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
 }
 
 
-export async function addMusicToStation(stationId: string, musicId: string, musicTrack: PlaylistItem) {
+export async function addMusicToStation(stationId: string, musicTrack: PlaylistItem) {
     const stationRef = doc(db, 'stations', stationId);
     const stationDoc = await getDoc(stationRef);
     if (!stationDoc.exists()) {
@@ -193,18 +226,18 @@ export async function addMusicToStation(stationId: string, musicId: string, musi
         playlist: arrayUnion(musicTrack)
     });
     
-    revalidatePath('/');
+    revalidatePath(`/admin/stations/${stationId}`);
     return { success: true, playlistItem: musicTrack };
 }
 
 
-export async function updateUserOnLogin(userId: string) {
+export async function updateUserOnLogin(userId: string, email: string | null) {
   const userRef = doc(db, 'users', userId);
   const userDoc = await getDoc(userRef);
 
   if (!userDoc.exists()) {
     await setDoc(userRef, {
-      email: null,
+      email: email,
       stationsCreated: 0,
       lastFrequency: 92.1,
       createdAt: serverTimestamp(),
@@ -222,6 +255,7 @@ export async function updateUserFrequency(userId: string, frequency: number) {
 }
 
 export async function getUserData(userId: string) {
+    if (!userId) return null;
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
 
@@ -240,4 +274,77 @@ export async function getUserData(userId: string) {
     }
     
     return plainObject;
+}
+
+const CreateCustomDJSchema = z.object({
+  name: z.string().min(2, 'Le nom doit contenir au moins 2 caractères.'),
+  background: z.string().min(10, 'L\'histoire doit contenir au moins 10 caractères.'),
+  gender: z.string(),
+  tone: z.string(),
+  style: z.string(),
+  speakingRate: z.number(),
+});
+
+export async function createCustomDj(userId: string, formData: FormData) {
+  if (!userId) {
+    return { error: { general: 'Authentification requise.' } };
+  }
+
+  const validatedFields = CreateCustomDJSchema.safeParse({
+    name: formData.get('name'),
+    background: formData.get('background'),
+    gender: formData.get('gender'),
+    tone: formData.get('tone'),
+    style: formData.get('style'),
+    speakingRate: parseFloat(formData.get('speakingRate') as string),
+  });
+
+  if (!validatedFields.success) {
+    return { error: validatedFields.error.flatten().fieldErrors };
+  }
+
+  const { name, background, gender, tone, style, speakingRate } = validatedFields.data;
+
+  const newCharacterData: Omit<CustomDJCharacter, 'id'> = {
+    name,
+    description: background,
+    voice: {
+      gender,
+      tone,
+      style,
+      speakingRate,
+    },
+    isCustom: true,
+    ownerId: userId,
+    createdAt: new Date().toISOString(),
+  };
+
+  const userCharactersCollection = collection(db, 'users', userId, 'characters');
+  const docRef = await addDoc(userCharactersCollection, newCharacterData);
+
+  revalidatePath('/admin/personnages');
+  return { success: true, characterId: docRef.id };
+}
+
+export async function getCustomCharactersForUser(userId: string): Promise<CustomDJCharacter[]> {
+  if (!userId) return [];
+  const charactersCol = collection(db, 'users', userId, 'characters');
+  const querySnapshot = await getDocs(charactersCol);
+  
+  if (querySnapshot.empty) {
+    return [];
+  }
+
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      description: data.description,
+      voice: data.voice,
+      isCustom: true,
+      ownerId: data.ownerId,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+    };
+  });
 }

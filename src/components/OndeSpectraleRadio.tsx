@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStation, getInterference, updateUserFrequency } from '@/app/actions';
+import { getStationForFrequency, getInterference, updateUserFrequency } from '@/app/actions';
 import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -97,7 +97,6 @@ export function OndeSpectraleRadio() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      // We removed auto-login logic, this just checks who is logged in.
     });
     return () => unsubscribe();
   }, []);
@@ -128,7 +127,7 @@ export function OndeSpectraleRadio() {
       setError(null);
       setIsPlaying(false);
       try {
-        const station = await getStation(debouncedFrequency);
+        const station = await getStationForFrequency(debouncedFrequency);
         setCurrentStation(station);
         
         if (station) {
@@ -274,16 +273,11 @@ export function OndeSpectraleRadio() {
                         </Button>
                       </StationManagementSheet>
                     )}
-                     {!currentStation && !isLoading && !user && (
+                     {!user && (
                       <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
                           <Rss className="mr-2 h-4 w-4" />
-                          Créer une station
+                          Créer ou Gérer
                       </Button>
-                    )}
-                     {user && (
-                        <Button variant="outline" onClick={() => router.push('/admin')}>
-                            Tableau de bord
-                        </Button>
                      )}
                   </div>
                 </div>
@@ -439,11 +433,8 @@ export function OndeSpectraleRadio() {
                         <p className="text-orange-300/80">DJ: {dj?.name || 'Inconnu'}</p>
                       </>
                     ) : (
-                      <div className="flex flex-col items-center text-center break-words">
-                        <p className="text-lg text-orange-300/70 animate-glitch">{interference || 'Statique...'}</p>
-                        <p className="text-sm text-orange-200/50 mt-2">
-                          Aucun signal détecté. Créez une station ici.
-                        </p>
+                      <div className="flex flex-col items-center text-center">
+                        <p className="text-lg text-orange-300/70 animate-glitch break-words">{interference || 'Statique...'}</p>
                       </div>
                     )}
                   </div>
