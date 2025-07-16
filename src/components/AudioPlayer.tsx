@@ -42,12 +42,27 @@ export function AudioPlayer({
     if (!audio) return;
     
     const updateProgress = () => {
-      setProgress((audio.currentTime / audio.duration) * 100);
+      // Fix: Check if duration exists and is not 0 to avoid NaN
+      if (audio.duration && audio.duration > 0) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      } else {
+        setProgress(0);
+      }
     };
 
     const timer = setInterval(updateProgress, 500);
-    return () => clearInterval(timer);
-  }, [audioRef]);
+    
+    // Fix: Add event listeners for more accurate progress tracking
+    audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('loadedmetadata', updateProgress);
+    
+    return () => {
+      clearInterval(timer);
+      // Fix: Clean up event listeners to prevent memory leaks
+      audio.removeEventListener('timeupdate', updateProgress);
+      audio.removeEventListener('loadedmetadata', updateProgress);
+    };
+  }, [audioRef, track]); // Fix: Add track as dependency to reset progress when track changes
 
 
   return (
@@ -63,7 +78,7 @@ export function AudioPlayer({
       </div>
       
       <div className="w-full">
-        <Progress value={progress} className="h-1 bg-primary/20" />
+        <Progress value={isNaN(progress) ? 0 : progress} className="h-1 bg-primary/20" />
       </div>
 
       <div className="flex justify-center items-center gap-4">
