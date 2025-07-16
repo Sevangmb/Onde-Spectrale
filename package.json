@@ -1,7 +1,8 @@
 {
-  "name": "nextn",
-  "version": "0.1.0",
+  "name": "onde-spectrale",
+  "version": "0.9.5",
   "private": true,
+  "description": "Radio post-apocalyptique interactive inspirée de Fallout",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -9,7 +10,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:firebase": "firebase deploy --only hosting",
+    "deploy:vercel": "vercel --prod",
+    "prebuild": "npm run typecheck",
+    "postbuild": "echo '✅ Build terminé - Prêt pour déploiement'"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.13.0",
@@ -65,5 +71,23 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sevangmb/Onde-Spectrale.git"
+  },
+  "keywords": [
+    "radio",
+    "post-apocalyptic",
+    "fallout",
+    "interactive",
+    "nextjs",
+    "firebase",
+    "ai",
+    "voice-generation"
+  ]
 }
