@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { generateDjAudioFlow, type GenerateDjAudioOutput } from '@/ai/flows/generate-dj-audio';
-import { generateCustomDjAudioFlow, type GenerateCustomDjAudioOutput, type GenerateCustomDjAudioInput } from '@/ai/flows/generate-custom-dj-audio';
+import { generateDjAudioFlow } from '@/ai/flows/generate-dj-audio';
+import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 
 
 const CreateStationSchema = z.object({
@@ -121,24 +121,14 @@ export async function createStation(ownerId: string, formData: FormData) {
   return { success: true, stationId: docRef.id };
 }
 
-export async function streamCustomDjAudio(input: GenerateCustomDjAudioInput) {
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        await generateCustomDjAudioFlow(input, (chunk) => {
-          const encoder = new TextEncoder();
-          controller.enqueue(encoder.encode(chunk));
-        });
-        controller.close();
-      } catch (e: any) {
-        console.error("Streaming error in streamCustomDjAudio:", e);
-        const errorMessage = `Failed to stream audio: ${e.message || 'Unknown error'}`;
-        controller.error(new Error(errorMessage));
-      }
-    },
-  });
-
-  return stream;
+export async function previewCustomDjAudio(input: { message: string, voice: any }): Promise<{ audioBase64?: string; error?: string }> {
+  try {
+    const result = await generateCustomDjAudio(input);
+    return { audioBase64: result.audioBase64 };
+  } catch (e: any) {
+    console.error("Audio generation failed in previewCustomDjAudio:", e);
+    return { error: e.message || 'Unknown error during audio generation.' };
+  }
 }
 
 export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
@@ -155,7 +145,8 @@ export async function addMessageToStation(stationId: string, message: string): P
     
     const officialCharacter = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
 
-    let audio: GenerateDjAudioOutput | GenerateCustomDjAudioOutput;
+    let audio;
+    let base64Data: string;
 
     try {
       console.log('Étape 1: Début de la génération de voix IA...');
@@ -164,6 +155,7 @@ export async function addMessageToStation(stationId: string, message: string): P
               message,
               characterId: officialCharacter.id
           });
+          base64Data = audio.audioUrl.split(',')[1];
       } else {
           const customCharRef = doc(db, 'users', station.ownerId, 'characters', station.djCharacterId);
           const customCharDoc = await getDoc(customCharRef);
@@ -171,13 +163,19 @@ export async function addMessageToStation(stationId: string, message: string): P
               return { error: "Personnage DJ personnalisé non trouvé." };
           }
           const customChar = customCharDoc.data() as CustomDJCharacter;
-          audio = await generateCustomDjAudioFlow({
+          audio = await generateCustomDjAudio({
               message,
               voice: customChar.voice
           });
+          base64Data = audio.audioBase64;
       }
       console.log('Étape 2: Génération de voix IA terminée avec succès.');
-    } catch(err) {
+
+      if (!base64Data) {
+        throw new Error('Données audio base64 invalides ou vides.');
+      }
+
+    } catch(err: any) {
       console.error("Erreur détaillée de génération de voix :", err);
       return { error: "La génération de la voix IA a échoué. Vérifiez la console pour les détails." };
     }
@@ -190,11 +188,6 @@ export async function addMessageToStation(stationId: string, message: string): P
 
     try {
         console.log('Étape 3: Début de l\'upload sur Firebase Storage...');
-        const base64Data = audio.audioUrl.split(',')[1];
-        if (!base64Data) {
-            throw new Error('Données audio base64 invalides.');
-        }
-
         const snapshot = await uploadString(storageRef, base64Data, 'base64', {
             contentType: 'audio/wav'
         });

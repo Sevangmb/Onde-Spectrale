@@ -5,10 +5,7 @@
  * @fileOverview This file defines a Genkit flow for generating audio clips for custom DJ characters.
  *
  * It takes a message and a voice configuration object as input, uses Google Cloud Text-to-Speech
- * to generate an audio clip with the specified voice parameters, and returns the URL of the generated audio.
- *
- * @interface GenerateCustomDjAudioInput - The input type for the generateCustomDjAudio function.
- * @interface GenerateCustomDjAudioOutput - The output type for the generateCustomDjAudio function.
+ * to generate an audio clip with the specified voice parameters, and returns the generated audio data.
  */
 
 import {ai} from '@/ai/genkit';
@@ -17,23 +14,22 @@ import {z} from 'genkit';
 import wav from 'wav';
 
 // Define a mapping from your simplified gender/style to Google TTS voice names
-// This is a creative choice to give character to the voices
 const voiceMap: { [key: string]: { [key: string]: string } } = {
   male: {
-    calm: 'umbriel',      // Voix masculine calme
-    energetic: 'zephyr',  // Voix masculine énergique
-    joker: 'puck',        // Voix masculine de farceur
-    deep: 'rasalgethi',   // Voix masculine grave
-    medium: 'zubenelgenubi',// Voix masculine médium
-    high: 'achernar'      // Voix masculine aiguë
+    calm: 'umbriel',
+    energetic: 'zephyr',
+    joker: 'puck',
+    deep: 'rasalgethi',
+    medium: 'zubenelgenubi',
+    high: 'achernar'
   },
   female: {
-    calm: 'autonoe',      // Voix féminine calme
-    energetic: 'callirrhoe',// Voix féminine énergique
-    joker: 'erinome',     // Voix féminine de farceuse
-    deep: 'laomedeia',    // Voix féminine grave
-    medium: 'leda',       // Voix féminine médium
-    high: 'kore'          // Voix féminine aiguë
+    calm: 'autonoe',
+    energetic: 'callirrhoe',
+    joker: 'erinome',
+    deep: 'laomedeia',
+    medium: 'leda',
+    high: 'kore'
   },
 };
 
@@ -47,12 +43,12 @@ const GenerateCustomDjAudioInputSchema = z.object({
   message: z.string().describe('The message to be spoken.'),
   voice: VoiceInputSchema,
 });
-export type GenerateCustomDjAudioInput = z.infer<typeof GenerateCustomDjAudioInputSchema>;
+type GenerateCustomDjAudioInput = z.infer<typeof GenerateCustomDjAudioInputSchema>;
 
 const GenerateCustomDjAudioOutputSchema = z.object({
-  audioUrl: z.string().describe('The URL of the generated audio clip.'),
+  audioBase64: z.string().describe('The base64 encoded WAV audio data.'),
 });
-export type GenerateCustomDjAudioOutput = z.infer<typeof GenerateCustomDjAudioOutputSchema>;
+type GenerateCustomDjAudioOutput = z.infer<typeof GenerateCustomDjAudioOutputSchema>;
 
 
 // Helper to convert PCM audio data to WAV format
@@ -69,31 +65,27 @@ async function toWav(
       bitDepth: sampleWidth * 8,
     });
 
-    let bufs: Buffer[] = [];
+    const bufs: Buffer[] = [];
     writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
+    writer.on('data', (d) => bufs.push(d));
+    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
 
     writer.write(pcmData);
     writer.end();
   });
 }
 
-export const generateCustomDjAudioFlow = ai.defineFlow({
+const generateCustomDjAudioFlow = ai.defineFlow({
     name: 'generateCustomDjAudioFlow',
     inputSchema: GenerateCustomDjAudioInputSchema,
     outputSchema: GenerateCustomDjAudioOutputSchema,
   },
-  async (input, streamingCallback) => {
+  async (input) => {
     const { voice, message } = input;
     
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix';
 
-    const {stream: mediaStream, response: responsePromise} = ai.generateStream({
+    const { media } = await ai.generate({
       model: googleAI.model('gemini-2.5-flash-preview-tts'),
       config: {
         responseModalities: ['AUDIO'],
@@ -105,34 +97,29 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
       },
       prompt: message,
     });
-
-    const audioChunks: Buffer[] = [];
-
-    for await (const chunk of mediaStream) {
-        if (chunk.media) {
-            const audioBuffer = Buffer.from(
-                chunk.media.url.substring(chunk.media.url.indexOf(',') + 1),
-                'base64'
-            );
-            audioChunks.push(audioBuffer);
-            if (streamingCallback) {
-                streamingCallback(audioBuffer.toString('base64'));
-            }
-        }
-    }
     
-    // Ensure the stream has fully completed
-    await responsePromise;
-
-    if (audioChunks.length === 0) {
+    if (!media) {
       throw new Error('No media was returned from the TTS service.');
     }
+    
+    const pcmBuffer = Buffer.from(
+      media.url.substring(media.url.indexOf(',') + 1),
+      'base64'
+    );
 
-    const fullAudioBuffer = Buffer.concat(audioChunks);
-    const wavData = await toWav(fullAudioBuffer);
+    if (pcmBuffer.length === 0) {
+      throw new Error('Generated PCM buffer is empty.');
+    }
+    
+    const wavData = await toWav(pcmBuffer);
 
     return {
-      audioUrl: 'data:audio/wav;base64,' + wavData,
+      audioBase64: wavData,
     };
   }
 );
+
+
+export async function generateCustomDjAudio(input: GenerateCustomDjAudioInput): Promise<GenerateCustomDjAudioOutput> {
+    return await generateCustomDjAudioFlow(input);
+}

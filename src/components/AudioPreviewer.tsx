@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { streamCustomDjAudio } from '@/app/actions';
+import { previewCustomDjAudio } from '@/app/actions';
 import type { CustomDJCharacter } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,17 +24,6 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
-    // Initialiser AudioContext au premier montage
-    if (!audioContextRef.current) {
-        try {
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        } catch (e) {
-            console.error("AudioContext is not supported by this browser.", e);
-            setStatus('error');
-            setError('Votre navigateur ne supporte pas l\'audio en temps réel.');
-        }
-    }
-    
     // Cleanup
     return () => {
       sourceRef.current?.stop();
@@ -44,9 +33,27 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
       }
     };
   }, []);
+  
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+       try {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        } catch (e) {
+            console.error("AudioContext is not supported by this browser.", e);
+            setStatus('error');
+            setError('Votre navigateur ne supporte pas l\'audio en temps réel.');
+            return null;
+        }
+    }
+    if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+
 
   const handleGenerateAudio = async () => {
-    if (!message.trim() || !audioContextRef.current) return;
+    if (!message.trim()) return;
 
     setStatus('loading');
     setError(null);
@@ -55,58 +62,38 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
       sourceRef.current.stop();
     }
 
-    const audioCtx = audioContextRef.current;
-    if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-    }
-
     try {
-      const stream = await streamCustomDjAudio({ message, voice: character.voice });
-      const reader = stream.getReader();
-      const decoder = new TextDecoder();
-      let pcmBuffer = new Float32Array(0);
+      const result = await previewCustomDjAudio({ message, voice: character.voice });
       
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const base64Chunk = decoder.decode(value);
-        const bytes = Buffer.from(base64Chunk, 'base64');
-        const pcm16 = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2);
-        const pcm32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-            pcm32[i] = pcm16[i] / 32768.0;
-        }
-        
-        const newPcmBuffer = new Float32Array(pcmBuffer.length + pcm32.length);
-        newPcmBuffer.set(pcmBuffer);
-        newPcmBuffer.set(pcm32, pcmBuffer.length);
-        pcmBuffer = newPcmBuffer;
+      if (result.error) {
+        throw new Error(result.error);
       }
+      
+      if (result.audioBase64) {
+        const audioCtx = getAudioContext();
+        if (!audioCtx) return;
 
-      if (pcmBuffer.length > 0) {
-        const audioBuffer = audioCtx.createBuffer(1, pcmBuffer.length, audioCtx.sampleRate);
-        audioBuffer.copyToChannel(pcmBuffer, 0);
-        setGeneratedBuffer(audioBuffer);
+        const audioData = Buffer.from(result.audioBase64, 'base64');
+        const decodedAudio = await audioCtx.decodeAudioData(audioData.buffer);
+
+        setGeneratedBuffer(decodedAudio);
         setStatus('ready');
       } else {
-        throw new Error('Aucune donnée audio n\'a été générée.');
+        throw new Error("Aucune donnée audio n'a été reçue.");
       }
 
     } catch (e: any) {
-      console.error('Streaming failed:', e);
-      setError(e.message || 'Une erreur est survenue lors du streaming audio.');
+      console.error('Audio generation failed:', e);
+      setError(e.message || 'Une erreur est survenue lors de la génération audio.');
       setStatus('error');
     }
   };
 
   const playAudio = () => {
-    if (!generatedBuffer || !audioContextRef.current) return;
+    if (!generatedBuffer) return;
     
-    const audioCtx = audioContextRef.current;
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    const audioCtx = getAudioContext();
+    if (!audioCtx) return;
     
     if (sourceRef.current) {
       sourceRef.current.stop();
