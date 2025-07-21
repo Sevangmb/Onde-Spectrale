@@ -8,6 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
 
 const GeneratePlaylistInputSchema = z.object({
   stationName: z.string().describe('Le nom de la station de radio.'),
@@ -62,7 +63,7 @@ const generatePlaylistFlow = ai.defineFlow(
     outputSchema: GeneratePlaylistOutputSchema,
   },
   async (input) => {
-    const { output } = await playlistPrompt(input);
+    const { output } = await playlistPrompt({ input, model: 'googleai/gemini-1.5-flash-latest' });
     if (!output) {
       throw new Error("L'IA n'a pas réussi à générer de script pour la playlist.");
     }
