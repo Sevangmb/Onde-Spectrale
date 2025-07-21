@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStationForFrequency, getInterference, updateUserFrequency } from '@/app/actions';
+import { getStationForFrequency, getInterference, updateUserFrequency, getAudioForMessage } from '@/app/actions';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -19,7 +19,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
-import { LayoutDashboard, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, RadioTower } from 'lucide-react';
+import { LayoutDashboard, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, RadioTower, Loader2 } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -41,12 +41,17 @@ export function OndeSpectraleRadio() {
 
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
+
 
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const [isClient, setIsClient] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
+  const currentAudioUrlRef = useRef<string | null>(null);
+
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
@@ -139,7 +144,6 @@ export function OndeSpectraleRadio() {
           setInterference(interferenceText);
         }
       } catch (err: any) {
-        console.error("Erreur de récupération des données:", err);
         setError(`Erreur de données: ${err.message}. Vérifiez les règles Firestore.`);
         setCurrentStation(null);
       } finally {
@@ -166,13 +170,63 @@ export function OndeSpectraleRadio() {
     
     const nextIndex = (currentTrackIndex + 1) % playlist.length;
     setCurrentTrackIndex(nextIndex);
-    // Continue playing if there are more tracks
     if(playlist.length > 1) {
         setIsPlaying(true);
     } else {
         setIsPlaying(false);
     }
   }, [currentTrackIndex, playlist.length]);
+
+    // Effect to generate audio for messages on the fly
+  useEffect(() => {
+    if (currentTrack?.type === 'music') {
+      setAudioUrl(currentTrack.url);
+      return;
+    }
+
+    if (currentTrack?.type === 'message' && isPlaying) {
+      const generateAudio = async () => {
+        if (!currentStation || !user) return;
+        setIsGeneratingMessage(true);
+        if (currentAudioUrlRef.current) {
+          URL.revokeObjectURL(currentAudioUrlRef.current);
+          currentAudioUrlRef.current = null;
+        }
+
+        const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
+        
+        if (result.audioBase64) {
+          try {
+            const byteCharacters = atob(result.audioBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+            currentAudioUrlRef.current = url;
+          } catch (e) {
+            setError("Failed to process audio data.");
+          }
+        } else {
+          setError(result.error || "Failed to generate message audio.");
+        }
+        setIsGeneratingMessage(false);
+      };
+
+      generateAudio();
+    }
+    
+    // Cleanup Object URL
+    return () => {
+      if (currentAudioUrlRef.current) {
+        URL.revokeObjectURL(currentAudioUrlRef.current);
+        currentAudioUrlRef.current = null;
+      }
+    };
+  }, [currentTrack, isPlaying, currentStation, user]);
 
 
   const handleNext = useCallback(() => {
@@ -188,9 +242,9 @@ export function OndeSpectraleRadio() {
   }, [currentTrackIndex, playlist.length, onTrackSelect]);
 
   const handlePlayPause = useCallback(() => {
-    if (playlist.length === 0) return;
+    if (playlist.length === 0 || isGeneratingMessage) return;
     setIsPlaying(prev => !prev);
-  }, [playlist.length]);
+  }, [playlist.length, isGeneratingMessage]);
 
   useEffect(() => {
     if (currentStation && playlist.length > 0) {
@@ -201,9 +255,9 @@ export function OndeSpectraleRadio() {
   return (
     <>
       <audio 
-        key={currentTrack?.id}
+        key={audioUrl}
         ref={audioRef} 
-        src={currentTrack?.url || undefined} 
+        src={audioUrl} 
         onEnded={onEnded} 
         onPlay={() => setIsPlaying(true)} 
         onPause={() => setIsPlaying(false)} 
@@ -371,8 +425,11 @@ export function OndeSpectraleRadio() {
                   <SpectrumAnalyzer isPlaying={isPlaying && currentStation !== null} audioRef={audioRef} className="h-24" />
 
                   <div className="h-40 bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col justify-center items-center text-center backdrop-blur-sm shadow-lg shadow-orange-500/10">
-                    {isLoading ? (
-                      <Skeleton className="w-4/5 h-12 animate-flicker bg-orange-400/20" />
+                    {isLoading || isGeneratingMessage ? (
+                      <div className="flex flex-col items-center gap-2 text-orange-300">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="font-semibold">{isLoading ? 'Syntonisation...' : 'Génération du message...'}</p>
+                      </div>
                     ) : error ? (
                        <div className="text-red-400 flex flex-col items-center gap-2">
                           <AlertTriangle className="h-8 w-8 text-red-500 animate-pulse" />

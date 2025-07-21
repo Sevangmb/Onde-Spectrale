@@ -438,44 +438,17 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
     }
     
     const newPlaylist: PlaylistItem[] = [];
-    const stationRef = doc(db, 'stations', stationId);
 
-    // 2. Process each item
+    // 2. Process each item from the script
     for (const item of playlistScript.items) {
         if (item.type === 'message') {
-            let audioResult;
-            try {
-                if ('isCustom' in dj && dj.isCustom) {
-                    audioResult = await generateCustomDjAudio({ message: item.content, voice: dj.voice });
-                } else {
-                    audioResult = await generateDjAudio({ message: item.content, characterId: dj.id });
-                }
-
-                if (!audioResult || !audioResult.audioBase64) {
-                    throw new Error('Données audio générées vides.');
-                }
-            } catch (e: any) {
-                console.error(`Skipping message due to TTS error: ${e.message}`);
-                continue; // Skip this item and continue with the next
-            }
-            
             const messageId = `msg-${Date.now()}-${Math.random()}`;
-            const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
-            let downloadUrl: string;
-            
-            try {
-                const audioBuffer = Buffer.from(audioResult.audioBase64, 'base64');
-                downloadUrl = await uploadAudioToStorage(audioBuffer, audioPath);
-            } catch(e) {
-                 console.error(`Skipping message due to upload error: ${e}`);
-                 continue;
-            }
-
             newPlaylist.push({
                 id: messageId,
                 type: 'message',
+                // Store the text content directly in the URL field
+                url: item.content, 
                 title: item.content.substring(0, 40) + '...',
-                url: downloadUrl,
                 duration: 15, // MOCK DURATION
                 artist: dj.name,
                 addedAt: new Date().toISOString(),
@@ -485,17 +458,44 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
             const randomTrack = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
             newPlaylist.push({
                 ...randomTrack,
-                id: `${randomTrack.id}-${Date.now()}-${Math.random()}`, // Ensure unique ID for each playlist instance
+                id: `${randomTrack.id}-${Date.now()}-${Math.random()}`,
                 addedAt: new Date().toISOString(),
             });
         }
     }
     
     // 3. Update Firestore with the new playlist
+    const stationRef = doc(db, 'stations', stationId);
     await updateDoc(stationRef, {
         playlist: newPlaylist // Replace the entire playlist
     });
 
     revalidatePath(`/admin/stations/${stationId}`);
     return { success: true, playlist: newPlaylist };
+}
+
+export async function getAudioForMessage(message: string, djCharacterId: string, ownerId: string): Promise<{ audioBase64?: string; error?: string }> {
+    const allDjs = await getCustomCharactersForUser(ownerId);
+    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+    const dj = fullDjList.find(d => d.id === djCharacterId);
+    
+    if (!dj) {
+        return { error: "Personnage DJ non trouvé." };
+    }
+    
+    try {
+        let audioResult;
+        if ('isCustom' in dj && dj.isCustom) {
+            audioResult = await generateCustomDjAudio({ message, voice: dj.voice });
+        } else {
+            audioResult = await generateDjAudio({ message, characterId: dj.id });
+        }
+
+        if (!audioResult || !audioResult.audioBase64) {
+            throw new Error('Données audio générées vides.');
+        }
+        return { audioBase64: audioResult.audioBase64 };
+    } catch(err: any) {
+        return { error: `La génération de la voix IA a échoué: ${err.message}` };
+    }
 }
