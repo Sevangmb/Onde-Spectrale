@@ -19,7 +19,7 @@ import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, LayoutDashboard } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -253,13 +253,13 @@ export function OndeSpectraleRadio() {
                    <div className="flex items-center gap-2">
                      {user ? (
                         <Button variant="outline" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push('/admin')}>
-                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          <Settings className="mr-2 h-4 w-4" />
                           Admin
                         </Button>
                       ) : (
                         <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50" onClick={() => router.push('/login')}>
                           <Rss className="mr-2 h-4 w-4" />
-                          Connexion / Gérer
+                          Créer ou Gérer
                         </Button>
                      )}
                   </div>
