@@ -50,7 +50,6 @@ export function OndeSpectraleRadio() {
   const [isClient, setIsClient] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [audioUrl, setAudioUrl] = useState<string | undefined>();
   const currentBlobUrl = useRef<string | null>(null);
 
 
@@ -157,14 +156,55 @@ export function OndeSpectraleRadio() {
     }
   }, [playlist, lastTrackWasMessage]);
   
-  // --- Effect 1: Fetch station data on frequency change ---
+  const loadAndPlayAudio = useCallback((url: string | undefined, loop = false) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.loop = loop;
+
+    if (!url) {
+      audio.pause();
+      audio.removeAttribute('src');
+      return;
+    }
+    
+    // Function to handle playing the audio once it's ready
+    const handleCanPlay = () => {
+      if (isPlaying) {
+        audio.play().catch(e => {
+            if (e.name !== 'AbortError') {
+              console.error("Erreur de lecture:", e);
+              setError("Erreur de lecture audio.");
+              setIsPlaying(false);
+            }
+        });
+      }
+      // Remove listener after it has been used to avoid multiple plays
+      audio.removeEventListener('canplay', handleCanPlay);
+    };
+
+    // Attach the event listener
+    audio.addEventListener('canplay', handleCanPlay);
+
+    // Set the source and load it. The event listener will handle the play.
+    if (audio.src !== url) {
+        audio.src = url;
+        audio.load();
+    } else if (isPlaying) {
+        // if src is same and we want to play (e.g. unpausing)
+        audio.play().catch(e => console.error("Error resuming play:", e));
+    }
+
+  }, [isPlaying]);
+
+
+  // Effect 1: Fetch station data on frequency change
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      setIsPlaying(false); // Stop playback while tuning
+      setIsPlaying(false);
       setCurrentTrackIndex(-1);
-      setAudioUrl(undefined);
       
       try {
         const station = await getStationForFrequency(debouncedFrequency);
@@ -175,12 +215,15 @@ export function OndeSpectraleRadio() {
           if (station.playlist.length > 0) {
             selectNextTrack();
             setIsPlaying(true);
+          } else {
+            // Station exists but playlist is empty
+             loadAndPlayAudio(undefined);
           }
         } else {
-          setInterference(null); // will be updated by getInterference
+          setInterference(null);
           const interferenceText = await getInterference(debouncedFrequency);
           setInterference(interferenceText);
-          setAudioUrl('/audio/static.mp3'); // Play static
+          loadAndPlayAudio('/audio/static.mp3', true);
           setIsPlaying(true);
         }
       } catch (err: any) {
@@ -193,7 +236,7 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, selectNextTrack]);
+  }, [debouncedFrequency, selectNextTrack, loadAndPlayAudio]);
 
   const onTrackSelect = useCallback((index: number) => {
     if (playlist.length === 0 || index < 0 || index >= playlist.length) return;
@@ -204,15 +247,13 @@ export function OndeSpectraleRadio() {
   }, [playlist]);
   
   const onEnded = useCallback(() => {
-    if (audioRef.current && audioRef.current.loop) {
-        // It's static, just keep looping
-        return;
-    }
+    if (audioRef.current && audioRef.current.loop) return;
     selectNextTrack();
     setIsPlaying(true);
   }, [selectNextTrack]);
 
-  // --- Effect 2: Prepare Audio URL when track changes ---
+
+  // Effect 2: Prepare Audio URL when track changes and initiate playback
   useEffect(() => {
     const prepareAudio = async () => {
         if (currentBlobUrl.current) {
@@ -221,14 +262,14 @@ export function OndeSpectraleRadio() {
         }
 
         if (!currentTrack) {
-            // If there's no track but we are on an empty frequency, static sound is handled by Effect 1.
-            // If on a station with empty playlist, audio will be silent.
-            setAudioUrl(undefined);
+            if (!currentStation) { // Only play static if there is no station
+              loadAndPlayAudio('/audio/static.mp3', true);
+            }
             return;
         }
 
         if (currentTrack.type === 'music') {
-            setAudioUrl(currentTrack.url);
+            loadAndPlayAudio(currentTrack.url);
             return;
         }
 
@@ -240,7 +281,6 @@ export function OndeSpectraleRadio() {
             }
 
             setIsGeneratingMessage(true);
-            setAudioUrl(undefined); // Clear previous URL
 
             const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
             
@@ -255,7 +295,7 @@ export function OndeSpectraleRadio() {
                     const blob = new Blob([byteArray], { type: 'audio/wav' });
                     const url = URL.createObjectURL(blob);
                     currentBlobUrl.current = url;
-                    setAudioUrl(url);
+                    loadAndPlayAudio(url);
                 } catch (e) {
                     setError("Échec du traitement des données audio.");
                     setIsPlaying(false);
@@ -276,34 +316,21 @@ export function OndeSpectraleRadio() {
             currentBlobUrl.current = null;
         }
     };
-}, [currentTrack, currentStation, user]);
+  }, [currentTrack, currentStation, user, loadAndPlayAudio]);
 
-
-// --- Effect 3: Control Audio Element when URL or isPlaying state changes ---
-useEffect(() => {
+  // Effect 3: Handle play/pause state changes
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    audio.loop = audioUrl === '/audio/static.mp3';
-
-    if (isPlaying && audioUrl) {
-        if (audio.src !== audioUrl) {
-            audio.src = audioUrl;
-        }
-        audio.load();
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                if (error.name !== 'AbortError') {
-                    console.error("Erreur de lecture audio:", error);
-                    setIsPlaying(false);
-                }
-            });
-        }
-    } else {
+    
+    if (isPlaying && audio.src && audio.readyState >= 2) { // HAVE_CURRENT_DATA
+        audio.play().catch(e => {
+            if (e.name !== 'AbortError') console.error("Error on play:", e);
+        });
+    } else if (!isPlaying) {
         audio.pause();
     }
-}, [audioUrl, isPlaying]);
+  }, [isPlaying]);
 
 
   const handleNext = useCallback(() => {
@@ -312,7 +339,6 @@ useEffect(() => {
   }, [selectNextTrack]);
 
   const handlePrev = useCallback(() => {
-    // With random playback, "previous" just means another random track
     selectNextTrack();
     setIsPlaying(true);
   }, [selectNextTrack]);
@@ -320,13 +346,13 @@ useEffect(() => {
   const handlePlayPause = useCallback(() => {
     if (isGeneratingMessage) return;
 
-    if (currentStation && playlist.length === 0) {
+    if (!audioRef.current?.src) {
         setIsPlaying(false);
         return;
     }
     
     setIsPlaying(prev => !prev);
-  }, [playlist.length, isGeneratingMessage, currentStation]);
+  }, [isGeneratingMessage]);
 
 
   return (
