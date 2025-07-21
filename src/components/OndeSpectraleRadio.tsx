@@ -19,7 +19,7 @@ import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2 } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
 import { StationManagementSheet } from './StationManagementSheet';
 
 interface ParticleStyle {
@@ -50,7 +50,7 @@ export function OndeSpectraleRadio() {
   const [isClient, setIsClient] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>('/audio/static.mp3');
   const currentAudioUrlRef = useRef<string | null>(null);
 
 
@@ -184,12 +184,21 @@ export function OndeSpectraleRadio() {
 
   useEffect(() => {
     const handleAudio = async () => {
-        if (!isPlaying || !currentTrack) {
-          if (audioRef.current && !audioRef.current.loop) {
-            audioRef.current.pause();
+        if (!currentTrack) {
+          if (currentStation === null) {
+            setAudioUrl('/audio/static.mp3');
+            if (audioRef.current) audioRef.current.loop = true;
+            setIsPlaying(true);
+          } else {
+             if (audioRef.current && !audioRef.current.loop) {
+                audioRef.current.pause();
+             }
+             setIsPlaying(false);
           }
           return;
         }
+
+        if (audioRef.current) audioRef.current.loop = false;
 
         if (currentTrack.type === 'music') {
             setAudioUrl(currentTrack.url);
@@ -236,9 +245,14 @@ export function OndeSpectraleRadio() {
         }
     };
 
-    if (currentStation) {
-      handleAudio();
+    if (isPlaying) {
+        handleAudio();
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     }
+
 
     return () => {
         if (currentAudioUrlRef.current) {
@@ -249,14 +263,20 @@ export function OndeSpectraleRadio() {
 }, [currentTrack, isPlaying, currentStation, user]);
 
 useEffect(() => {
-    if (audioRef.current && audioUrl) {
-      if (audioRef.current.src !== audioUrl) {
-        audioRef.current.src = audioUrl;
-      }
-      if (isPlaying) {
-        audioRef.current.load();
-        audioRef.current.play().catch(e => console.error("Error playing audio on src change:", e));
-      }
+    const audio = audioRef.current;
+    if (audio && audioUrl && audio.src !== audioUrl) {
+        audio.src = audioUrl;
+        if(isPlaying) {
+            audio.load();
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error("Error playing audio on src change:", error);
+                    // This can happen if the user interacts with the page before the audio is ready
+                    // We might not need to setIsPlaying(false) here if we handle it elsewhere.
+                });
+            }
+        }
     }
 }, [audioUrl, isPlaying]);
 
@@ -276,7 +296,10 @@ useEffect(() => {
   const handlePlayPause = useCallback(() => {
     if (isGeneratingMessage) return;
 
-    if (currentStation && playlist.length === 0) return;
+    if (currentStation && playlist.length === 0) {
+        setIsPlaying(false);
+        return;
+    }
     
     setIsPlaying(prev => !prev);
   }, [playlist.length, isGeneratingMessage, currentStation]);
@@ -291,9 +314,7 @@ useEffect(() => {
     <>
       <audio 
         ref={audioRef} 
-        onEnded={onEnded} 
-        onPlay={() => setIsPlaying(true)} 
-        onPause={() => setIsPlaying(false)} 
+        onEnded={onEnded}
         crossOrigin="anonymous"
       />
       <div className="relative w-full min-h-[90vh] overflow-hidden">
@@ -352,7 +373,12 @@ useEffect(() => {
                         </Button>
                       </StationManagementSheet>
                     )}
-                     {!user && (
+                     {user ? (
+                        <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
+                            <UserCog className="mr-2 h-4 w-4" />
+                            Admin
+                        </Button>
+                     ) : (
                       <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
                           <Rss className="mr-2 h-4 w-4" />
                           Créer ou Gérer
