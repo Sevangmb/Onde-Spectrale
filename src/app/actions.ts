@@ -132,7 +132,8 @@ export async function streamCustomDjAudio(input: GenerateCustomDjAudioInput) {
         controller.close();
       } catch (e: any) {
         console.error("Streaming error in streamCustomDjAudio:", e);
-        controller.error(new Error("Failed to stream audio."));
+        const errorMessage = `Failed to stream audio: ${e.message || 'Unknown error'}`;
+        controller.error(new Error(errorMessage));
       }
     },
   });
