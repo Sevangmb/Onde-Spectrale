@@ -107,7 +107,9 @@ export function OndeSpectraleRadio() {
 
   const dj = useMemo(() => {
     if (!currentStation) return null;
-    return DJ_CHARACTERS.find(d => d.id === currentStation.djCharacterId) || null;
+    const allDjs: (CustomDJCharacter | (typeof DJ_CHARACTERS[0]))[] = [...DJ_CHARACTERS];
+    // In a real app, you would also fetch and merge custom characters here if needed
+    return allDjs.find(d => d.id === currentStation.djCharacterId) || null;
   }, [currentStation]);
 
   const handleFrequencyChange = (value: number[]) => {
@@ -162,12 +164,16 @@ export function OndeSpectraleRadio() {
       return;
     }
     
-    if (currentTrackIndex < playlist.length - 1) {
-      setCurrentTrackIndex(prev => prev + 1);
+    const nextIndex = (currentTrackIndex + 1) % playlist.length;
+    setCurrentTrackIndex(nextIndex);
+    // Continue playing if there are more tracks
+    if(playlist.length > 1) {
+        setIsPlaying(true);
     } else {
-      setIsPlaying(false);
+        setIsPlaying(false);
     }
   }, [currentTrackIndex, playlist.length]);
+
 
   const handleNext = useCallback(() => {
     if (playlist.length === 0) return;
@@ -201,6 +207,7 @@ export function OndeSpectraleRadio() {
         onEnded={onEnded} 
         onPlay={() => setIsPlaying(true)} 
         onPause={() => setIsPlaying(false)} 
+        crossOrigin="anonymous"
       />
       <div className="relative w-full min-h-[90vh] overflow-hidden">
         {/* Arrière-plan post-apocalyptique animé */}

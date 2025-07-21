@@ -2,7 +2,7 @@
 'use client';
 
 import type React from 'react';
-import { Play, Pause, Rewind, FastForward, Music, MessageSquare, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, Music, MessageSquare, Volume2, VolumeX, Volume1 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { PlaylistItem } from '@/lib/types';
@@ -30,6 +30,7 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
+  const [lastVolume, setLastVolume] = useState(75);
 
   const formatTime = (time: number) => {
     if (isNaN(time) || !isFinite(time)) return '0:00';
@@ -40,7 +41,7 @@ export function AudioPlayer({
 
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current;
-    if (!audio || !duration) return;
+    if (!audio || !isFinite(duration) || duration === 0) return;
 
     const progressBar = e.currentTarget;
     const rect = progressBar.getBoundingClientRect();
@@ -59,24 +60,29 @@ export function AudioPlayer({
     if (audioRef.current) {
       audioRef.current.volume = newVolume / 100;
     }
-    if (newVolume === 0) {
-      setIsMuted(true);
-    } else if (isMuted) {
+    if (newVolume > 0 && isMuted) {
       setIsMuted(false);
     }
   }, [audioRef, isMuted]);
 
   const toggleMute = useCallback(() => {
     if (audioRef.current) {
-      if (isMuted) {
-        audioRef.current.volume = volume / 100;
-        setIsMuted(false);
-      } else {
-        audioRef.current.volume = 0;
-        setIsMuted(true);
-      }
+        setIsMuted(prev => {
+            const newMuted = !prev;
+            if (newMuted) {
+                setLastVolume(volume);
+                setVolume(0);
+                audioRef.current!.volume = 0;
+            } else {
+                const resumeVolume = lastVolume > 0 ? lastVolume : 75;
+                setVolume(resumeVolume);
+                audioRef.current!.volume = resumeVolume / 100;
+            }
+            return newMuted;
+        });
     }
-  }, [audioRef, volume, isMuted]);
+  }, [audioRef, volume, lastVolume]);
+
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -94,53 +100,56 @@ export function AudioPlayer({
     if (!audio) return;
     
     const updateProgress = () => {
-      if (audio.duration && audio.duration > 0 && isFinite(audio.currentTime) && isFinite(audio.duration)) {
-        const current = audio.currentTime;
-        const total = audio.duration;
-        setCurrentTime(current);
-        setDuration(total);
-        setProgress((current / total) * 100);
-      } else {
-        setProgress(0);
-        setCurrentTime(0);
+      if (audio.duration && isFinite(audio.currentTime) && isFinite(audio.duration) && audio.duration > 0) {
+        setCurrentTime(audio.currentTime);
+        setProgress((audio.currentTime / audio.duration) * 100);
       }
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
+      if (isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
       updateProgress();
     };
+
+    const handleCanPlay = () => {
+      if (isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    }
 
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleCanPlay);
     
-    // Set initial volume
     audio.volume = volume / 100;
     
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('durationchange', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleCanPlay);
     };
-  }, [audioRef, track, volume]);
+  }, [audioRef, track]);
 
   if (!track) {
     return null;
   }
+  
+  const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+
 
   return (
     <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-      {/* Effet de lueur d'arrière-plan */}
       <div className="absolute inset-0 bg-gradient-to-r from-orange-900/10 via-transparent to-red-900/10 pointer-events-none"></div>
       
-      {/* Scanlines subtiles */}
       <div className="absolute inset-0 opacity-20 pointer-events-none">
         <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/30 to-transparent animate-scanline-slow"></div>
       </div>
 
       <div className="relative z-10 flex flex-col gap-4">
-        {/* Info de la piste */}
         <div className="flex items-center gap-4">
           <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3 shadow-lg shadow-orange-500/10">
             {track.type === 'music' ? 
@@ -162,7 +171,6 @@ export function AudioPlayer({
             </p>
           </div>
           
-          {/* Indicateur de lecture */}
           {isPlaying && (
             <div className="flex gap-1">
               {[...Array(3)].map((_, i) => (
@@ -180,7 +188,6 @@ export function AudioPlayer({
           )}
         </div>
         
-        {/* Barre de progression interactive */}
         <div className="space-y-2">
           <div 
             className="relative w-full h-2 bg-black/60 border border-orange-500/30 rounded-full overflow-hidden cursor-pointer group"
@@ -192,24 +199,15 @@ export function AudioPlayer({
             >
               <div className="absolute inset-0 bg-orange-400/30 animate-pulse"></div>
             </div>
-            
-            {/* Point de progression */}
-            <div 
-              className="absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-orange-400 border-2 border-orange-200 rounded-full shadow-lg shadow-orange-400/50 opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ left: `${isNaN(progress) ? 0 : progress}%`, marginLeft: '-8px' }}
-            />
           </div>
           
-          {/* Temps de lecture */}
           <div className="flex justify-between text-xs text-orange-300/80 font-mono">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
-        {/* Contrôles */}
         <div className="flex items-center justify-between">
-          {/* Contrôles de lecture */}
           <div className="flex justify-center items-center gap-2">
             <Button 
               variant="ghost" 
@@ -242,7 +240,6 @@ export function AudioPlayer({
             </Button>
           </div>
 
-          {/* Contrôles de volume */}
           <div className="flex items-center gap-3 min-w-0 flex-shrink">
             <Button 
               variant="ghost" 
@@ -250,10 +247,7 @@ export function AudioPlayer({
               onClick={toggleMute}
               className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 transition-all h-8 w-8"
             >
-              {isMuted || volume === 0 ? 
-                <VolumeX className="h-4 w-4" /> : 
-                <Volume2 className="h-4 w-4" />
-              }
+              <VolumeIcon className="h-4 w-4" />
             </Button>
             
             <div className="w-20">
@@ -261,7 +255,7 @@ export function AudioPlayer({
                 value={[isMuted ? 0 : volume]}
                 onValueChange={handleVolumeChange}
                 max={100}
-                step={5}
+                step={1}
                 className="cursor-pointer"
               />
             </div>

@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface SpectrumAnalyzerProps {
   isPlaying: boolean;
@@ -10,122 +11,124 @@ interface SpectrumAnalyzerProps {
 
 export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: SpectrumAnalyzerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
-  const analyzerRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const animationFrameId = useRef<number>();
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
-  useEffect(() => {
-    if (!audioRef.current || isInitialized) return;
+  const bufferLengthRef = useRef<number>(0);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
+
+  const setupAudioContext = useCallback(() => {
+    if (!audioRef.current || audioContextRef.current) return;
 
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      
       const source = audioContext.createMediaElementSource(audioRef.current);
-      const analyzer = audioContext.createAnalyser();
-      
-      analyzer.fftSize = 256;
-      analyzer.smoothingTimeConstant = 0.8;
-      
-      source.connect(analyzer);
-      analyzer.connect(audioContext.destination);
-      
-      analyzerRef.current = analyzer;
-      dataArrayRef.current = new Uint8Array(analyzer.frequencyBinCount);
-      setIsInitialized(true);
-    } catch (error) {
-      console.error('Erreur lors de l\'initialisation de l\'analyseur:', error);
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      sourceNodeRef.current = source;
+      bufferLengthRef.current = analyser.frequencyBinCount;
+      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+    } catch (e) {
+      console.error("Erreur lors de l'initialisation de l'AudioContext:", e);
     }
-  }, [audioRef, isInitialized]);
+  }, [audioRef]);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
+    if (!analyserRef.current || !dataArrayRef.current || !canvasRef.current) {
+      return;
+    }
+
     const canvas = canvasRef.current;
-    if (!canvas || !analyzerRef.current || !dataArrayRef.current) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    const width = canvas.width;
-    const height = canvas.height;
+    const analyser = analyserRef.current;
+    const dataArray = dataArrayRef.current;
+    const bufferLength = bufferLengthRef.current;
+    
+    analyser.getByteFrequencyData(dataArray);
 
-    const draw = () => {
-      if (!analyzerRef.current || !dataArrayRef.current) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      analyzerRef.current.getByteFrequencyData(dataArrayRef.current);
-      
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.fillRect(0, 0, width, height);
-      
-      const barWidth = width / dataArrayRef.current.length;
-      
-      for (let i = 0; i < dataArrayRef.current.length; i++) {
-        const barHeight = (dataArrayRef.current[i] / 255) * height;
-        
-        // Gradient post-apocalyptique
-        const gradient = ctx.createLinearGradient(0, height - barHeight, 0, height);
-        gradient.addColorStop(0, '#ff6b6b');
-        gradient.addColorStop(0.5, '#feca57');
-        gradient.addColorStop(1, '#ff9ff3');
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
-        
-        // Effet de lueur
-        ctx.shadowColor = '#ff6b6b';
-        ctx.shadowBlur = 10;
-        ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, 2);
-        ctx.shadowBlur = 0;
-      }
-      
-      if (isPlaying) {
-        animationRef.current = requestAnimationFrame(draw);
-      }
-    };
+    const barWidth = (canvas.width / bufferLength) * 1.5;
+    let x = 0;
 
-    if (isPlaying) {
-      draw();
-    } else {
-      // Animation statique quand pas en lecture
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-      ctx.fillRect(0, 0, width, height);
+    for (let i = 0; i < bufferLength; i++) {
+      const barHeight = (dataArray[i] / 255) * canvas.height * 1.2;
       
-      // Lignes statiques pour l'effet radio
-      for (let i = 0; i < 20; i++) {
-        const x = (i / 20) * width;
-        const opacity = Math.random() * 0.3 + 0.1;
-        ctx.strokeStyle = `rgba(255, 107, 107, ${opacity})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
+      const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+      gradient.addColorStop(0, '#ff4800');
+      gradient.addColorStop(0.5, '#ff8c00');
+      gradient.addColorStop(1, '#ffc100');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      
+      x += barWidth + 2;
+    }
+    
+    animationFrameId.current = requestAnimationFrame(draw);
+  }, []);
+
+  const stopDrawing = useCallback(() => {
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = undefined;
+    }
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if(ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
+  }, []);
 
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+
+  useEffect(() => {
+    if (isPlaying) {
+      if (!audioContextRef.current) {
+        setupAudioContext();
       }
-    };
-  }, [isPlaying]);
-
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+      stopDrawing(); // clear previous animation
+      draw();
+    } else {
+      stopDrawing();
+    }
+    
+    return stopDrawing;
+  }, [isPlaying, draw, stopDrawing, setupAudioContext]);
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const resizeCanvas = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * window.devicePixelRatio;
-      canvas.height = rect.height * window.devicePixelRatio;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-      }
-    };
+    const resizeObserver = new ResizeObserver(() => {
+      const { width, height } = canvas.getBoundingClientRect();
+      canvas.width = width;
+      canvas.height = height;
+    });
 
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    
-    return () => window.removeEventListener('resize', resizeCanvas);
+    resizeObserver.observe(canvas);
+
+    return () => resizeObserver.disconnect();
   }, []);
 
   return (
@@ -136,13 +139,15 @@ export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: Spectr
         style={{ background: 'radial-gradient(circle, rgba(139,0,0,0.1) 0%, rgba(0,0,0,0.9) 100%)' }}
       />
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-2 left-2 text-xs text-red-400/70 font-mono">
-          SPECTRUM
+        <div className="absolute top-2 left-2 text-xs text-red-400/70 font-mono uppercase">
+          Analyseur de Spectre
         </div>
-        <div className="absolute top-2 right-2 text-xs text-red-400/70 font-mono">
-          {isPlaying ? '●' : '○'} {isPlaying ? 'LIVE' : 'STATIC'}
+        <div className="absolute top-2 right-2 text-xs text-red-400/70 font-mono flex items-center gap-1">
+          <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
+          {isPlaying ? 'LIVE' : 'OFFLINE'}
         </div>
       </div>
     </div>
   );
 }
+
