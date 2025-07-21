@@ -367,16 +367,22 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
       return { error: "Personnage DJ non trouvé." };
     }
 
-    let playlistScript: GeneratePlaylistOutput;
+    let playlistScript: GeneratePlaylistOutput | undefined;
+    
     try {
-        playlistScript = await generatePlaylist({
+        const input: GeneratePlaylistInput = {
             stationName: station.name,
             djName: dj.name,
             djDescription: 'description' in dj ? dj.description : 'Un DJ mystérieux',
             theme: theme,
-        });
+        };
+        playlistScript = await generatePlaylist(input);
     } catch (e: any) {
-        return { error: `L'IA n'a pas pu générer de playlist: ${e.message}` };
+        let errorMessage = e.message;
+        if (e.message.includes('503')) {
+           errorMessage = "Les serveurs de l'IA sont actuellement surchargés. Veuillez réessayer dans quelques instants.";
+        }
+       return { error: `L'IA n'a pas pu générer de playlist: ${errorMessage}` };
     }
     
     if (!playlistScript || !playlistScript.items || playlistScript.items.length === 0) {

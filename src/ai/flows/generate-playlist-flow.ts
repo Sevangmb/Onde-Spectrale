@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-const GeneratePlaylistInputSchema = z.object({
+export const GeneratePlaylistInputSchema = z.object({
   stationName: z.string().describe('Le nom de la station de radio.'),
   djName: z.string().describe('Le nom du personnage DJ.'),
   djDescription: z.string().describe('Une brève description de la personnalité du DJ.'),
@@ -23,7 +23,7 @@ const PlaylistItemSchema = z.object({
   content: z.string().describe("Le contenu du message du DJ. Laisser vide si le type est 'music'."),
 });
 
-const GeneratePlaylistOutputSchema = z.object({
+export const GeneratePlaylistOutputSchema = z.object({
   items: z.array(PlaylistItemSchema).describe("La liste des éléments de la playlist générée."),
 });
 export type GeneratePlaylistOutput = z.infer<typeof GeneratePlaylistOutputSchema>;
@@ -46,7 +46,7 @@ const playlistPrompt = ai.definePrompt({
 
     Instructions :
     1.  Crée une playlist contenant EXACTEMENT 7 éléments.
-    2.  La structure doit être : Message, Musique, Message, Musique, Message, Musique, Message.
+    2.  La structure doit être: Message, Musique, Message, Musique, Message, Musique, Message.
     3.  Les messages doivent être courts (1-2 phrases), immersifs et correspondre à la personnalité du DJ et au thème de l'émission.
     4.  Les messages doivent être uniques et variés.
     5.  Pour les éléments de type 'music', le champ 'content' doit être une chaîne de caractères vide.
