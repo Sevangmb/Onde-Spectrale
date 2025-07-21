@@ -179,14 +179,19 @@ export function OndeSpectraleRadio() {
 
   useEffect(() => {
     const handleAudio = async () => {
-        if (!isPlaying) return;
+        if (!isPlaying || !currentTrack) {
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+          return;
+        }
 
-        if (currentTrack?.type === 'music') {
+        if (currentTrack.type === 'music') {
             setAudioUrl(currentTrack.url);
             return;
         }
 
-        if (currentTrack?.type === 'message') {
+        if (currentTrack.type === 'message') {
             if (!currentStation || !user) {
                 setError("Connexion requise pour les messages DJ.");
                 setIsPlaying(false);
@@ -195,7 +200,6 @@ export function OndeSpectraleRadio() {
 
             setIsGeneratingMessage(true);
             
-            // Revoke previous blob URL if it exists
             if (currentAudioUrlRef.current) {
                 URL.revokeObjectURL(currentAudioUrlRef.current);
                 currentAudioUrlRef.current = null;
@@ -229,7 +233,6 @@ export function OndeSpectraleRadio() {
 
     handleAudio();
 
-    // Cleanup Object URL on component unmount or track change
     return () => {
         if (currentAudioUrlRef.current) {
             URL.revokeObjectURL(currentAudioUrlRef.current);
@@ -237,6 +240,16 @@ export function OndeSpectraleRadio() {
         }
     };
 }, [currentTrack, isPlaying, currentStation, user]);
+
+useEffect(() => {
+    if (audioRef.current && audioUrl) {
+      audioRef.current.src = audioUrl;
+      if (isPlaying) {
+        audioRef.current.load();
+        audioRef.current.play().catch(e => console.error("Error playing audio on src change:", e));
+      }
+    }
+}, [audioUrl, isPlaying]);
 
 
   const handleNext = useCallback(() => {
@@ -265,9 +278,7 @@ export function OndeSpectraleRadio() {
   return (
     <>
       <audio 
-        key={audioUrl}
         ref={audioRef} 
-        src={audioUrl} 
         onEnded={onEnded} 
         onPlay={() => setIsPlaying(true)} 
         onPause={() => setIsPlaying(false)} 
