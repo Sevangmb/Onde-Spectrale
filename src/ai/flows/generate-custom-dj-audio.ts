@@ -12,6 +12,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 import wav from 'wav';
 
@@ -97,7 +98,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'Antares'; // Default to a neutral voice
 
     const {media} = await ai.generate({
-      model: 'gemini-2.5-flash-preview-tts',
+      model: googleAI.model('gemini-2.5-flash-preview-tts'),
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
@@ -106,7 +107,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
           },
         },
       },
-      prompt: { text: message },
+      prompt: message,
     });
 
     if (!media) {
