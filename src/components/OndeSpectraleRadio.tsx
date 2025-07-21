@@ -20,7 +20,6 @@ import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
 import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
-import { StationManagementSheet } from './StationManagementSheet';
 
 interface ParticleStyle {
     left: string;
@@ -51,8 +50,8 @@ export function OndeSpectraleRadio() {
   const [isClient, setIsClient] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [audioUrl, setAudioUrl] = useState<string | undefined>('/audio/static.mp3');
-  const currentAudioUrlRef = useRef<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | undefined>();
+  const currentBlobUrl = useRef<string | null>(null);
 
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
@@ -158,10 +157,14 @@ export function OndeSpectraleRadio() {
     }
   }, [playlist, lastTrackWasMessage]);
   
+  // --- Effect 1: Fetch station data on frequency change ---
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+      setIsPlaying(false); // Stop playback while tuning
+      setCurrentTrackIndex(-1);
+      setAudioUrl(undefined);
       
       try {
         const station = await getStationForFrequency(debouncedFrequency);
@@ -169,18 +172,15 @@ export function OndeSpectraleRadio() {
         
         if (station) {
           setInterference(null);
-          if (audioRef.current) audioRef.current.loop = false;
           if (station.playlist.length > 0) {
-            selectNextTrack(); // Select initial track
-          } else {
-            setCurrentTrackIndex(-1);
+            selectNextTrack();
+            setIsPlaying(true);
           }
         } else {
-          setCurrentTrackIndex(-1);
+          setInterference(null); // will be updated by getInterference
           const interferenceText = await getInterference(debouncedFrequency);
           setInterference(interferenceText);
-          setAudioUrl('/audio/static.mp3');
-          if (audioRef.current) audioRef.current.loop = true;
+          setAudioUrl('/audio/static.mp3'); // Play static
           setIsPlaying(true);
         }
       } catch (err: any) {
@@ -205,32 +205,27 @@ export function OndeSpectraleRadio() {
   
   const onEnded = useCallback(() => {
     if (audioRef.current && audioRef.current.loop) {
-      setIsPlaying(true); // Keep playing if it's a loop (static)
-      return;
+        // It's static, just keep looping
+        return;
     }
-    
-    selectNextTrack(); // Autoplay next random track
+    selectNextTrack();
     setIsPlaying(true);
-
   }, [selectNextTrack]);
 
+  // --- Effect 2: Prepare Audio URL when track changes ---
   useEffect(() => {
-    const handleAudio = async () => {
-        if (!currentTrack) {
-          if (currentStation === null) {
-            setAudioUrl('/audio/static.mp3');
-            if (audioRef.current) audioRef.current.loop = true;
-            setIsPlaying(true);
-          } else {
-             if (audioRef.current && !audioRef.current.loop) {
-                audioRef.current.pause();
-             }
-             setIsPlaying(false);
-          }
-          return;
+    const prepareAudio = async () => {
+        if (currentBlobUrl.current) {
+            URL.revokeObjectURL(currentBlobUrl.current);
+            currentBlobUrl.current = null;
         }
 
-        if (audioRef.current) audioRef.current.loop = false;
+        if (!currentTrack) {
+            // If there's no track but we are on an empty frequency, static sound is handled by Effect 1.
+            // If on a station with empty playlist, audio will be silent.
+            setAudioUrl(undefined);
+            return;
+        }
 
         if (currentTrack.type === 'music') {
             setAudioUrl(currentTrack.url);
@@ -245,11 +240,7 @@ export function OndeSpectraleRadio() {
             }
 
             setIsGeneratingMessage(true);
-            
-            if (currentAudioUrlRef.current) {
-                URL.revokeObjectURL(currentAudioUrlRef.current);
-                currentAudioUrlRef.current = null;
-            }
+            setAudioUrl(undefined); // Clear previous URL
 
             const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
             
@@ -263,8 +254,8 @@ export function OndeSpectraleRadio() {
                     const byteArray = new Uint8Array(byteNumbers);
                     const blob = new Blob([byteArray], { type: 'audio/wav' });
                     const url = URL.createObjectURL(blob);
+                    currentBlobUrl.current = url;
                     setAudioUrl(url);
-                    currentAudioUrlRef.current = url;
                 } catch (e) {
                     setError("Échec du traitement des données audio.");
                     setIsPlaying(false);
@@ -277,40 +268,40 @@ export function OndeSpectraleRadio() {
         }
     };
 
-    if (isPlaying) {
-        handleAudio();
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    }
+    prepareAudio();
 
     return () => {
-        if (currentAudioUrlRef.current) {
-            URL.revokeObjectURL(currentAudioUrlRef.current);
-            currentAudioUrlRef.current = null;
+        if (currentBlobUrl.current) {
+            URL.revokeObjectURL(currentBlobUrl.current);
+            currentBlobUrl.current = null;
         }
     };
-}, [currentTrack, isPlaying, currentStation, user]);
+}, [currentTrack, currentStation, user]);
 
+
+// --- Effect 3: Control Audio Element when URL or isPlaying state changes ---
 useEffect(() => {
     const audio = audioRef.current;
-    if (audio && audioUrl && audio.src !== audioUrl) {
-        audio.src = audioUrl;
-        if(isPlaying) {
-            audio.load();
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    if (error.name === 'NotAllowedError') {
-                        console.log('Playback prevented by browser. User must interact first.');
-                        setIsPlaying(false);
-                    } else {
-                      console.error("Error playing audio on src change:", error);
-                    }
-                });
-            }
+    if (!audio) return;
+
+    audio.loop = audioUrl === '/audio/static.mp3';
+
+    if (isPlaying && audioUrl) {
+        if (audio.src !== audioUrl) {
+            audio.src = audioUrl;
         }
+        audio.load();
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                if (error.name !== 'AbortError') {
+                    console.error("Erreur de lecture audio:", error);
+                    setIsPlaying(false);
+                }
+            });
+        }
+    } else {
+        audio.pause();
     }
 }, [audioUrl, isPlaying]);
 
@@ -337,11 +328,6 @@ useEffect(() => {
     setIsPlaying(prev => !prev);
   }, [playlist.length, isGeneratingMessage, currentStation]);
 
-  useEffect(() => {
-    if (currentStation && playlist.length > 0 && currentTrackIndex === -1) {
-      selectNextTrack();
-    }
-  }, [currentStation, playlist, currentTrackIndex, selectNextTrack]);
 
   return (
     <>
@@ -399,13 +385,6 @@ useEffect(() => {
                     </CardTitle>
                   </div>
                    <div className="flex items-center gap-2">
-                     {currentStation && user && currentStation.ownerId === user.uid && (
-                      <StationManagementSheet station={currentStation} dj={dj}>
-                        <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
-                          <Settings className="h-5 w-5 text-orange-300" />
-                        </Button>
-                      </StationManagementSheet>
-                    )}
                      {user ? (
                         <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
                             <UserCog className="mr-2 h-4 w-4" />
