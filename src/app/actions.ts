@@ -11,7 +11,8 @@ import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
-import { generatePlaylist } from '@/ai/flows/generate-playlist-flow';
+import { generateThemedMessage } from '@/ai/flows/generate-themed-message';
+
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -372,21 +373,7 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
   });
 }
 
-type GeneratePlaylistInput = {
-    stationName: string;
-    djName: string;
-    djDescription: string;
-    theme: string;
-};
-
-type GeneratePlaylistOutput = {
-    items: {
-        type: 'message' | 'music';
-        content: string;
-    }[];
-};
-
-export async function generateAndAddPlaylist(stationId: string, theme: string): Promise<{ success: true, playlist: PlaylistItem[] } | { error: string }> {
+export async function addThemedMessageToStation(stationId: string, theme: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
     const station = await getStationById(stationId);
     if (!station) {
         return { error: "Station non trouvée." };
@@ -400,61 +387,30 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
       return { error: "Personnage DJ non trouvé." };
     }
 
-    let playlistScript: GeneratePlaylistOutput | undefined;
+    let generatedMessage: { message: string; } | undefined;
     
     try {
-        const input: GeneratePlaylistInput = {
-            stationName: station.name,
+        const input = {
             djName: dj.name,
             djDescription: 'description' in dj ? dj.description : 'Un DJ mystérieux',
             theme: theme,
         };
-        playlistScript = await generatePlaylist(input);
+        generatedMessage = await generateThemedMessage(input);
     } catch (e: any) {
         let errorMessage = e.message;
         if (e.message.includes('503')) {
            errorMessage = "Les serveurs de l'IA sont actuellement surchargés. Veuillez réessayer dans quelques instants.";
         }
-       return { error: `L'IA n'a pas pu générer de playlist: ${errorMessage}` };
+       return { error: `L'IA n'a pas pu générer de message: ${errorMessage}` };
     }
     
-    if (!playlistScript || !playlistScript.items || playlistScript.items.length === 0) {
-      return { error: "L'IA n'a pas pu générer de playlist. Essayez un autre thème." };
+    if (!generatedMessage || !generatedMessage.message) {
+      return { error: "L'IA n'a pas pu générer de message. Essayez un autre thème." };
     }
-    
-    const newPlaylist: PlaylistItem[] = [];
 
-    for (const item of playlistScript.items) {
-        if (item.type === 'message') {
-            const messageId = `msg-${Date.now()}-${Math.random()}`;
-            newPlaylist.push({
-                id: messageId,
-                type: 'message',
-                url: item.content, 
-                title: item.content.substring(0, 40) + '...',
-                duration: 15,
-                artist: dj.name,
-                addedAt: new Date().toISOString(),
-            });
-
-        } else if (item.type === 'music') {
-            const randomTrack = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            newPlaylist.push({
-                ...randomTrack,
-                id: `${randomTrack.id}-${Date.now()}-${Math.random()}`,
-                addedAt: new Date().toISOString(),
-            });
-        }
-    }
-    
-    const stationRef = doc(db, 'stations', stationId);
-    await updateDoc(stationRef, {
-        playlist: newPlaylist
-    });
-
-    revalidatePath(`/admin/stations/${stationId}`);
-    return { success: true, playlist: newPlaylist };
+    return await addMessageToStation(stationId, generatedMessage.message);
 }
+
 
 export async function getAudioForMessage(message: string, djCharacterId: string, ownerId: string): Promise<{ audioBase64?: string; error?: string }> {
     const allDjs = await getCustomCharactersForUser(ownerId);

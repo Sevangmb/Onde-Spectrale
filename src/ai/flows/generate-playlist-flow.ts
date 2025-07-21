@@ -10,13 +10,26 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
+type GeneratePlaylistInput = {
+    stationName: string;
+    djName: string;
+    djDescription: string;
+    theme: string;
+};
+
+type GeneratePlaylistOutput = {
+    items: {
+        type: 'message' | 'music';
+        content: string;
+    }[];
+};
+
 const GeneratePlaylistInputSchema = z.object({
   stationName: z.string().describe('Le nom de la station de radio.'),
   djName: z.string().describe('Le nom du personnage DJ.'),
   djDescription: z.string().describe('Une brève description de la personnalité du DJ.'),
   theme: z.string().describe("Le thème général de l'émission (ex: espoir, survie, humour noir)."),
 });
-type GeneratePlaylistInput = z.infer<typeof GeneratePlaylistInputSchema>;
 
 const PlaylistItemSchema = z.object({
   type: z.enum(['message', 'music']).describe("Le type d'élément de la playlist."),
@@ -26,7 +39,6 @@ const PlaylistItemSchema = z.object({
 const GeneratePlaylistOutputSchema = z.object({
   items: z.array(PlaylistItemSchema).describe("La liste des éléments de la playlist générée."),
 });
-type GeneratePlaylistOutput = z.infer<typeof GeneratePlaylistOutputSchema>;
 
 
 const playlistPrompt = ai.definePrompt({
@@ -63,11 +75,28 @@ const generatePlaylistFlow = ai.defineFlow(
     outputSchema: GeneratePlaylistOutputSchema,
   },
   async (input) => {
-    const { output } = await playlistPrompt(input, { model: googleAI.model('gemini-1.5-flash-latest') });
-    if (!output || !output.items) {
-      throw new Error("L'IA n'a pas réussi à générer de script pour la playlist.");
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const { output } = await playlistPrompt(input, { model: googleAI.model('gemini-1.5-flash-latest') });
+
+        if (!output || !output.items || output.items.length === 0) {
+          throw new Error("L'IA n'a pas réussi à générer de script pour la playlist.");
+        }
+        return output;
+
+      } catch (e: any) {
+        attempts++;
+        if (e.message.includes('503') && attempts < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1500)); // wait 1.5s
+          continue;
+        }
+        // re-throw other errors or if max attempts reached
+        throw e;
+      }
     }
-    return output;
+    // This part should be unreachable if the loop logic is correct
+    throw new Error("Impossible de générer la playlist après plusieurs tentatives.");
   }
 );
 

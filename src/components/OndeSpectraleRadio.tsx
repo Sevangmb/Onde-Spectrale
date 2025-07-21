@@ -40,9 +40,10 @@ export function OndeSpectraleRadio() {
   const [isScanning, setIsScanning] = useState(false);
   const router = useRouter();
 
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
+  const [lastTrackWasMessage, setLastTrackWasMessage] = useState(false);
 
 
   const [signalStrength, setSignalStrength] = useState(0);
@@ -55,7 +56,10 @@ export function OndeSpectraleRadio() {
 
 
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
-  const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
+  const currentTrack = useMemo(() => {
+    if (currentTrackIndex === -1 || !playlist[currentTrackIndex]) return undefined;
+    return playlist[currentTrackIndex];
+  }, [playlist, currentTrackIndex]);
 
   const isRadioActive = useMemo(() => {
     return isClient && !isLoading && (currentStation !== null || !!interference);
@@ -126,6 +130,33 @@ export function OndeSpectraleRadio() {
           await updateUserFrequency(user.uid, value[0]);
       }
   }
+
+  const selectNextTrack = useCallback(() => {
+    if (!playlist || playlist.length === 0) {
+      setCurrentTrackIndex(-1);
+      return;
+    }
+
+    const musicTracks = playlist.map((p, i) => ({...p, originalIndex: i})).filter(p => p.type === 'music');
+    const messageTracks = playlist.map((p, i) => ({...p, originalIndex: i})).filter(p => p.type === 'message');
+
+    // Decide whether to play a message
+    if (!lastTrackWasMessage && messageTracks.length > 0 && Math.random() < 0.3) { // 30% chance to play a message
+      const randomMessageIndex = Math.floor(Math.random() * messageTracks.length);
+      setCurrentTrackIndex(messageTracks[randomMessageIndex].originalIndex);
+      setLastTrackWasMessage(true);
+    } else {
+      if (musicTracks.length > 0) {
+        const randomMusicIndex = Math.floor(Math.random() * musicTracks.length);
+        setCurrentTrackIndex(musicTracks[randomMusicIndex].originalIndex);
+        setLastTrackWasMessage(false);
+      } else { // No music, just play messages
+        const randomMessageIndex = Math.floor(Math.random() * messageTracks.length);
+        setCurrentTrackIndex(messageTracks[randomMessageIndex].originalIndex);
+        setLastTrackWasMessage(true);
+      }
+    }
+  }, [playlist, lastTrackWasMessage]);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -137,10 +168,15 @@ export function OndeSpectraleRadio() {
         setCurrentStation(station);
         
         if (station) {
-          setCurrentTrackIndex(0);
           setInterference(null);
           if (audioRef.current) audioRef.current.loop = false;
+          if (station.playlist.length > 0) {
+            selectNextTrack(); // Select initial track
+          } else {
+            setCurrentTrackIndex(-1);
+          }
         } else {
+          setCurrentTrackIndex(-1);
           const interferenceText = await getInterference(debouncedFrequency);
           setInterference(interferenceText);
           setAudioUrl('/audio/static.mp3');
@@ -157,30 +193,26 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency]);
+  }, [debouncedFrequency, selectNextTrack]);
 
   const onTrackSelect = useCallback((index: number) => {
-    if (playlist.length === 0) return;
+    if (playlist.length === 0 || index < 0 || index >= playlist.length) return;
     
-    const clampedIndex = Math.max(0, Math.min(index, playlist.length - 1));
-    setCurrentTrackIndex(clampedIndex);
+    setCurrentTrackIndex(index);
+    setLastTrackWasMessage(playlist[index].type === 'message');
     setIsPlaying(true);
-  }, [playlist.length]);
+  }, [playlist]);
   
   const onEnded = useCallback(() => {
-    if (playlist.length === 0 || (audioRef.current && audioRef.current.loop)) {
+    if (audioRef.current && audioRef.current.loop) {
       setIsPlaying(true); // Keep playing if it's a loop (static)
       return;
     }
     
-    const nextIndex = (currentTrackIndex + 1) % playlist.length;
-    setCurrentTrackIndex(nextIndex);
-    if(playlist.length > 1) {
-        setIsPlaying(true);
-    } else {
-        setIsPlaying(false);
-    }
-  }, [currentTrackIndex, playlist.length]);
+    selectNextTrack(); // Autoplay next random track
+    setIsPlaying(true);
+
+  }, [selectNextTrack]);
 
   useEffect(() => {
     const handleAudio = async () => {
@@ -253,7 +285,6 @@ export function OndeSpectraleRadio() {
       }
     }
 
-
     return () => {
         if (currentAudioUrlRef.current) {
             URL.revokeObjectURL(currentAudioUrlRef.current);
@@ -271,9 +302,12 @@ useEffect(() => {
             const playPromise = audio.play();
             if (playPromise !== undefined) {
                 playPromise.catch(error => {
-                    console.error("Error playing audio on src change:", error);
-                    // This can happen if the user interacts with the page before the audio is ready
-                    // We might not need to setIsPlaying(false) here if we handle it elsewhere.
+                    if (error.name === 'NotAllowedError') {
+                        console.log('Playback prevented by browser. User must interact first.');
+                        setIsPlaying(false);
+                    } else {
+                      console.error("Error playing audio on src change:", error);
+                    }
                 });
             }
         }
@@ -282,16 +316,15 @@ useEffect(() => {
 
 
   const handleNext = useCallback(() => {
-    if (playlist.length === 0) return;
-    const nextIndex = (currentTrackIndex + 1) % playlist.length;
-    onTrackSelect(nextIndex);
-  }, [currentTrackIndex, playlist.length, onTrackSelect]);
+    selectNextTrack();
+    setIsPlaying(true);
+  }, [selectNextTrack]);
 
   const handlePrev = useCallback(() => {
-    if (playlist.length === 0) return;
-    const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
-    onTrackSelect(prevIndex);
-  }, [currentTrackIndex, playlist.length, onTrackSelect]);
+    // With random playback, "previous" just means another random track
+    selectNextTrack();
+    setIsPlaying(true);
+  }, [selectNextTrack]);
 
   const handlePlayPause = useCallback(() => {
     if (isGeneratingMessage) return;
@@ -305,10 +338,10 @@ useEffect(() => {
   }, [playlist.length, isGeneratingMessage, currentStation]);
 
   useEffect(() => {
-    if (currentStation && playlist.length > 0) {
-      setCurrentTrackIndex(0);
+    if (currentStation && playlist.length > 0 && currentTrackIndex === -1) {
+      selectNextTrack();
     }
-  }, [currentStation, playlist.length]);
+  }, [currentStation, playlist, currentTrackIndex, selectNextTrack]);
 
   return (
     <>

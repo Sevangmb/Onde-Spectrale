@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
-import { getStationById, addMessageToStation, addMusicToStation, searchMusic, generateAndAddPlaylist } from '@/app/actions';
+import { getStationById, addMessageToStation, addMusicToStation, searchMusic, addThemedMessageToStation } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -55,8 +55,8 @@ export default function StationDetailPage() {
   
   const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
 
-  const [playlistTheme, setPlaylistTheme] = useState('Annonces optimistes et conseils de survie');
-  const [isGeneratingPlaylist, setIsGeneratingPlaylist] = useState(false);
+  const [messageTheme, setMessageTheme] = useState('Annonces optimistes et conseils de survie');
+  const [isGeneratingMessageIA, setIsGeneratingMessageIA] = useState(false);
 
 
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
@@ -120,22 +120,22 @@ export default function StationDetailPage() {
     setAddingTrackId(null);
   }
 
-  const handleGeneratePlaylist = async () => {
-    if (!station || !playlistTheme.trim()) {
-        toast({ variant: 'destructive', title: "Erreur", description: "Le thème de la playlist ne peut pas être vide." });
+  const handleGenerateThemedMessage = async () => {
+    if (!station || !messageTheme.trim()) {
+        toast({ variant: 'destructive', title: "Erreur", description: "Le thème ne peut pas être vide." });
         return;
     }
-    setIsGeneratingPlaylist(true);
-    const result = await generateAndAddPlaylist(station.id, playlistTheme);
+    setIsGeneratingMessageIA(true);
+    const result = await addThemedMessageToStation(station.id, messageTheme);
     
     if (result.error) {
         toast({ variant: 'destructive', title: "Erreur de génération", description: result.error });
     } else {
-        toast({ title: "Playlist Générée !", description: `${result.playlist.length} pistes ont été ajoutées à votre station.` });
-        setStation(prev => prev ? { ...prev, playlist: result.playlist } : null);
+        toast({ title: "Message IA ajouté !", description: "Un nouveau message thématique est dans votre playlist." });
+        setStation(prev => prev ? { ...prev, playlist: [...prev.playlist, result.playlistItem!] } : null);
     }
     
-    setIsGeneratingPlaylist(false);
+    setIsGeneratingMessageIA(false);
   };
 
   const sortedPlaylist = useMemo(() => {
@@ -219,25 +219,25 @@ export default function StationDetailPage() {
 
          <Card className="lg:col-span-2">
             <CardHeader>
-                <CardTitle>Générateur de Playlist IA</CardTitle>
-                 <CardDescription>Laissez l'IA créer une émission complète pour vous !</CardDescription>
+                <CardTitle>Générateur de Message IA</CardTitle>
+                 <CardDescription>Laissez l'IA créer un message unique pour votre DJ !</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="playlist-theme">Thème de l'émission</Label>
+                    <Label htmlFor="message-theme">Thème du message</Label>
                     <Input
-                        id="playlist-theme"
-                        value={playlistTheme}
-                        onChange={(e) => setPlaylistTheme(e.target.value)}
+                        id="message-theme"
+                        value={messageTheme}
+                        onChange={(e) => setMessageTheme(e.target.value)}
                         placeholder="Ex: Histoires d'espoir, chroniques des anciens temps..."
                     />
                      <p className="text-xs text-muted-foreground">
-                        L'IA générera des messages et ajoutera des musiques en fonction de ce thème.
+                        L'IA générera un message unique en fonction de ce thème.
                      </p>
                 </div>
-                <Button onClick={handleGeneratePlaylist} disabled={isGeneratingPlaylist} className="w-full">
-                    {isGeneratingPlaylist ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {isGeneratingPlaylist ? 'Génération en cours...' : 'Générer et remplacer la playlist'}
+                <Button onClick={handleGenerateThemedMessage} disabled={isGeneratingMessageIA} className="w-full">
+                    {isGeneratingMessageIA ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {isGeneratingMessageIA ? 'Génération en cours...' : 'Générer et ajouter le message'}
                 </Button>
             </CardContent>
          </Card>
