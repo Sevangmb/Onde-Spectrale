@@ -57,16 +57,16 @@ export default function StationDetailPage({ params }: { params: { id: string } }
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
   const dj = useMemo(() => allDjs.find(d => d.id === station?.djCharacterId), [allDjs, station]);
 
-  const fetchStation = useCallback(async () => {
+  const fetchStation = useCallback(async (stationId: string) => {
     setIsLoading(true);
-    const fetchedStation = await getStationById(params.id);
+    const fetchedStation = await getStationById(stationId);
     setStation(fetchedStation);
     setIsLoading(false);
-  }, [params.id]);
+  }, []);
 
   useEffect(() => {
-    fetchStation();
-  }, [fetchStation]);
+    fetchStation(params.id);
+  }, [params.id, fetchStation]);
 
   const handleGenerateMessage = async () => {
     if (!station || message.trim().length < 5) {
