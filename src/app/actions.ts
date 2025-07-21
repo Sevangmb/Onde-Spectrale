@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { generateDjAudioFlow } from '@/ai/flows/generate-dj-audio';
+import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 
 
@@ -126,7 +126,6 @@ export async function previewCustomDjAudio(input: { message: string, voice: any 
     const result = await generateCustomDjAudio(input);
     return { audioBase64: result.audioBase64 };
   } catch (e: any) {
-    console.error("Audio generation failed in previewCustomDjAudio:", e);
     return { error: e.message || 'Unknown error during audio generation.' };
   }
 }
@@ -149,9 +148,8 @@ export async function addMessageToStation(stationId: string, message: string): P
     let base64Data: string;
 
     try {
-      console.log('Étape 1: Début de la génération de voix IA...');
       if (officialCharacter) {
-          audio = await generateDjAudioFlow({
+          audio = await generateDjAudio({
               message,
               characterId: officialCharacter.id
           });
@@ -163,20 +161,18 @@ export async function addMessageToStation(stationId: string, message: string): P
               return { error: "Personnage DJ personnalisé non trouvé." };
           }
           const customChar = customCharDoc.data() as CustomDJCharacter;
-          audio = await generateCustomDjAudio({
+          const result = await generateCustomDjAudio({
               message,
               voice: customChar.voice
           });
-          base64Data = audio.audioBase64;
+          base64Data = result.audioBase64;
       }
-      console.log('Étape 2: Génération de voix IA terminée avec succès.');
 
       if (!base64Data) {
         throw new Error('Données audio base64 invalides ou vides.');
       }
 
     } catch(err: any) {
-      console.error("Erreur détaillée de génération de voix :", err);
       return { error: "La génération de la voix IA a échoué. Vérifiez la console pour les détails." };
     }
     
@@ -187,15 +183,11 @@ export async function addMessageToStation(stationId: string, message: string): P
     let downloadUrl = '';
 
     try {
-        console.log('Étape 3: Début de l\'upload sur Firebase Storage...');
         const snapshot = await uploadString(storageRef, base64Data, 'base64', {
             contentType: 'audio/wav'
         });
         downloadUrl = await getDownloadURL(snapshot.ref);
-        console.log('Étape 4: Upload terminé. URL obtenu:', downloadUrl);
-
     } catch (storageError) {
-        console.error("Erreur détaillée de l'enregistrement sur Firebase Storage:", storageError);
         return { error: "L'enregistrement du fichier audio a échoué. Vérifiez la console." };
     }
 
@@ -210,13 +202,10 @@ export async function addMessageToStation(stationId: string, message: string): P
     };
     
     try {
-        console.log('Étape 5: Mise à jour de la playlist dans Firestore...');
         await updateDoc(stationRef, {
             playlist: arrayUnion(newPlaylistItem)
         });
-        console.log('Étape 6: Playlist mise à jour avec succès.');
     } catch (firestoreError) {
-        console.error("Erreur lors de la mise à jour de Firestore:", firestoreError);
         return { error: "La mise à jour de la base de données a échoué." };
     }
 
@@ -239,7 +228,6 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
           }
         });
         if (!response.ok) {
-            console.error('Archive.org API error:', response.statusText);
             return {error: `Erreur Archive.org: ${response.statusText}`};
         }
         const data = await response.json();
@@ -264,7 +252,6 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
         return {data: searchResults};
 
     } catch (error) {
-        console.error('Failed to fetch from Archive.org:', error);
         return {error: "La recherche sur Archive.org a échoué."};
     }
 }
@@ -410,3 +397,5 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
     };
   });
 }
+
+    

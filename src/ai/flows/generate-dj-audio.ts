@@ -6,9 +6,6 @@
  *
  * The flow takes a message and a DJ character ID as input, uses Google Cloud Text-to-Speech to generate
  * an audio clip in the selected DJ's voice, and returns the URL of the generated audio.
- *
- * @interface GenerateDjAudioInput - The input type for the generateDjAudio function.
- * @interface GenerateDjAudioOutput - The output type for the generateDjAudio function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -20,12 +17,12 @@ const GenerateDjAudioInputSchema = z.object({
   message: z.string().describe('The message to be spoken by the DJ character.'),
   characterId: z.string().describe('The ID of the DJ character to use for the voice.'),
 });
-export type GenerateDjAudioInput = z.infer<typeof GenerateDjAudioInputSchema>;
+type GenerateDjAudioInput = z.infer<typeof GenerateDjAudioInputSchema>;
 
 const GenerateDjAudioOutputSchema = z.object({
   audioUrl: z.string().describe('The URL of the generated audio clip.'),
 });
-export type GenerateDjAudioOutput = z.infer<typeof GenerateDjAudioOutputSchema>;
+type GenerateDjAudioOutput = z.infer<typeof GenerateDjAudioOutputSchema>;
 
 
 const DjCharacterSchema = z.object({
@@ -93,7 +90,7 @@ async function toWav(
   });
 }
 
-export const generateDjAudioFlow = ai.defineFlow({
+const generateDjAudioFlow = ai.defineFlow({
     name: 'generateDjAudioFlow',
     inputSchema: GenerateDjAudioInputSchema,
     outputSchema: GenerateDjAudioOutputSchema,
@@ -128,3 +125,8 @@ export const generateDjAudioFlow = ai.defineFlow({
     };
   }
 );
+
+
+export async function generateDjAudio(input: GenerateDjAudioInput): Promise<GenerateDjAudioOutput> {
+    return generateDjAudioFlow(input);
+}
