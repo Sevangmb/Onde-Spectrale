@@ -176,7 +176,10 @@ export async function addMessageToStation(stationId: string, message: string): P
 
     try {
         const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', {
-            contentType: 'audio/wav'
+            contentType: 'audio/wav',
+             customMetadata: {
+                ownerId: station.ownerId,
+            }
         });
         downloadUrl = await getDownloadURL(snapshot.ref);
     } catch (storageError: any) {
@@ -453,7 +456,12 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
             let downloadUrl: string;
             
             try {
-                const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', { contentType: 'audio/wav' });
+                const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', { 
+                    contentType: 'audio/wav',
+                    customMetadata: {
+                        ownerId: station.ownerId,
+                    }
+                });
                 downloadUrl = await getDownloadURL(snapshot.ref);
             } catch(e) {
                  console.error(`Skipping message due to upload error: ${e}`);

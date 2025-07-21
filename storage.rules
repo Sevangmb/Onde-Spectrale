@@ -1,16 +1,12 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permettre aux utilisateurs authentifiés de créer des messages audio pour leurs stations
+    // Allow authenticated users to upload their generated DJ messages.
+    // They can only create new files, not read, update, or delete existing ones.
     match /dj-messages/{stationId}/{messageId} {
-      allow create: if request.auth != null;
-    }
-
-    // Par défaut, refuser toutes les autres opérations de lecture/écriture
-    match /{allPaths=**} {
-      allow read, write: if false;
+      allow create: if request.auth != null && request.auth.uid == resource.metadata.ownerId;
+      allow read: if true; // Allow anyone to read the audio files to play them
     }
   }
 }
