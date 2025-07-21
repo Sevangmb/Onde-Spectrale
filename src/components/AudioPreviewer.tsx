@@ -96,15 +96,12 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
         }
 
         const base64Chunk = decoder.decode(value);
-        const binaryString = atob(base64Chunk);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
+        
+        // Use Buffer for robust base64 decoding
+        const bytes = Buffer.from(base64Chunk, 'base64');
         
         // Convert 16-bit PCM to Float32Array
-        const pcm16 = new Int16Array(bytes.buffer);
+        const pcm16 = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.length / 2);
         const pcm32 = new Float32Array(pcm16.length);
         for (let i = 0; i < pcm16.length; i++) {
             pcm32[i] = pcm16[i] / 32768.0; // Normalize to [-1.0, 1.0]
