@@ -19,8 +19,9 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
+import { CreateStationDialog } from '@/components/CreateStationDialog';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Shield, Crown } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -272,6 +273,26 @@ export function OndeSpectraleRadio() {
                     </CardTitle>
                   </div>
                    <div className="flex items-center gap-2">
+                     {/* Bouton Admin - toujours visible mais avec différents styles selon l'auth */}
+                     <Button 
+                       variant="ghost" 
+                       size="icon" 
+                       onClick={() => router.push('/admin')}
+                       className={`border hover:border-amber-400/50 transition-all group ${
+                         user 
+                           ? 'border-amber-500/40 hover:bg-amber-500/20 text-amber-300' 
+                           : 'border-orange-500/30 hover:bg-orange-500/20 text-orange-300'
+                       }`}
+                       title={user ? 'Accès Administration' : 'Interface Administration (connexion requise)'}
+                     >
+                       {user ? (
+                         <Crown className="h-5 w-5 transition-transform group-hover:scale-110" />
+                       ) : (
+                         <Shield className="h-5 w-5 transition-transform group-hover:scale-110" />
+                       )}
+                     </Button>
+
+                     {/* Bouton Station Management - seulement si propriétaire */}
                      {currentStation && isOwner && (
                       <StationManagementSheet station={currentStation} dj={dj}>
                         <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
@@ -279,10 +300,26 @@ export function OndeSpectraleRadio() {
                         </Button>
                       </StationManagementSheet>
                     )}
-                     {!user && (
-                      <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
+
+                     {/* Bouton Créer Station - seulement si pas de station et utilisateur connecté */}
+                     {!currentStation && !isLoading && user && !error && (
+                      <CreateStationDialog frequency={frequency}>
+                        <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20">
                           <Rss className="mr-2 h-4 w-4" />
-                          Créer ou Gérer
+                          Créer Station
+                        </Button>
+                      </CreateStationDialog>
+                     )}
+
+                     {/* Bouton Login - seulement si pas connecté */}
+                     {!user && (
+                      <Button 
+                        variant="default" 
+                        className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" 
+                        onClick={() => router.push('/login')}
+                      >
+                          <Rss className="mr-2 h-4 w-4" />
+                          Se Connecter
                       </Button>
                      )}
                   </div>
