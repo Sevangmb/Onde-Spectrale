@@ -11,8 +11,22 @@ import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
-import { generatePlaylist, type GeneratePlaylistInput, type GeneratePlaylistOutput } from '@/ai/flows/generate-playlist-flow';
+import { generatePlaylist } from '@/ai/flows/generate-playlist-flow';
 
+// Define types locally as they are not exported from the flow file
+type GeneratePlaylistInput = {
+    stationName: string;
+    djName: string;
+    djDescription: string;
+    theme: string;
+};
+
+type GeneratePlaylistOutput = {
+    items: {
+        type: 'message' | 'music';
+        content: string;
+    }[];
+};
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),

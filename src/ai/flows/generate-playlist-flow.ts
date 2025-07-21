@@ -10,23 +10,23 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-export const GeneratePlaylistInputSchema = z.object({
+const GeneratePlaylistInputSchema = z.object({
   stationName: z.string().describe('Le nom de la station de radio.'),
   djName: z.string().describe('Le nom du personnage DJ.'),
   djDescription: z.string().describe('Une brève description de la personnalité du DJ.'),
   theme: z.string().describe("Le thème général de l'émission (ex: espoir, survie, humour noir)."),
 });
-export type GeneratePlaylistInput = z.infer<typeof GeneratePlaylistInputSchema>;
+type GeneratePlaylistInput = z.infer<typeof GeneratePlaylistInputSchema>;
 
 const PlaylistItemSchema = z.object({
   type: z.enum(['message', 'music']).describe("Le type d'élément de la playlist."),
   content: z.string().describe("Le contenu du message du DJ. Laisser vide si le type est 'music'."),
 });
 
-export const GeneratePlaylistOutputSchema = z.object({
+const GeneratePlaylistOutputSchema = z.object({
   items: z.array(PlaylistItemSchema).describe("La liste des éléments de la playlist générée."),
 });
-export type GeneratePlaylistOutput = z.infer<typeof GeneratePlaylistOutputSchema>;
+type GeneratePlaylistOutput = z.infer<typeof GeneratePlaylistOutputSchema>;
 
 
 const playlistPrompt = ai.definePrompt({
