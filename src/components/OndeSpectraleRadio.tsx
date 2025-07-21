@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStationForFrequency, getInterference, updateUserFrequency, getAudioForMessage } from '@/app/actions';
+import { getStationForFrequency, updateUserFrequency, getAudioForMessage } from '@/app/actions';
 import type { Station, PlaylistItem } from '@/lib/types';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
@@ -17,7 +17,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
+import { RadioTower, Rss, ChevronLeft, ChevronRight, Zap, UserCog } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -30,15 +30,14 @@ export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
   const [debouncedFrequency] = useDebounce(frequency, 500);
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
-  const [interference, setInterference] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const router = useRouter();
 
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrack, setCurrentTrack] = useState<PlaylistItem | undefined>(undefined);
+  const [isPlaying, setIsPlaying] = useState(false); // Used for visualizer
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
 
   const [signalStrength, setSignalStrength] = useState(0);
@@ -47,50 +46,130 @@ export function OndeSpectraleRadio() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
-
-  const messagePlaylist = useMemo(() => {
-    if (!currentStation?.playlist) return [];
-    // Filter for messages and store original index
-    return currentStation.playlist
-      .map((item, index) => ({ ...item, originalIndex: index }))
-      .filter(item => item.type === 'message');
-  }, [currentStation]);
-
-  const currentTrack = useMemo(() => {
-    if (!currentStation?.playlist || currentTrackIndex < 0) return undefined;
-    return currentStation.playlist[currentTrackIndex];
-  }, [currentStation, currentTrackIndex]);
-
-  const isRadioActive = useMemo(() => {
-    return isClient && !isLoading && (currentStation !== null || !!interference);
-  }, [isClient, isLoading, currentStation, interference]);
+  const stationMessages = useRef<PlaylistItem[]>([]);
 
   useEffect(() => {
     setIsClient(true);
+    // Generate particles
+    setParticleStyles(
+      Array.from({ length: 15 }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 5}s`,
+        animationDuration: `${3 + Math.random() * 4}s`,
+      }))
+    );
   }, []);
-  
-   useEffect(() => {
-    if (isClient) {
-      setParticleStyles(
-        Array.from({ length: 15 }, () => ({
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-          animationDelay: `${Math.random() * 5}s`,
-          animationDuration: `${3 + Math.random() * 4}s`,
-        }))
-      );
-    }
-  }, [isClient]);
 
-  useEffect(() => {
-    if (isClient) {
-        if (currentStation) {
-            setSignalStrength(Math.floor(Math.random() * 20) + 80);
-        } else {
-            setSignalStrength(Math.floor(Math.random() * 30) + 10);
-        }
+  const playNextMessage = useCallback(async () => {
+    if (currentBlobUrl.current) {
+        URL.revokeObjectURL(currentBlobUrl.current);
+        currentBlobUrl.current = null;
     }
-  }, [currentStation, debouncedFrequency, isClient]);
+    
+    if (stationMessages.current.length === 0) {
+        setIsPlaying(false);
+        setCurrentTrack(undefined);
+        return;
+    }
+
+    setIsGeneratingMessage(true);
+    setCurrentTrack(undefined); // Clear track info while generating
+
+    const message = stationMessages.current[Math.floor(Math.random() * stationMessages.current.length)];
+    setCurrentTrack(message);
+
+    if (!currentStation || !user) {
+        setError("User or station info missing for audio generation.");
+        setIsGeneratingMessage(false);
+        return;
+    }
+
+    const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
+    setIsGeneratingMessage(false);
+
+    if (result.audioBase64) {
+        try {
+            const byteCharacters = atob(result.audioBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'audio/wav' });
+            const url = URL.createObjectURL(blob);
+            currentBlobUrl.current = url;
+
+            const audio = audioRef.current;
+            if (audio) {
+                audio.src = url;
+                audio.load();
+                await audio.play();
+                setIsPlaying(true);
+            }
+        } catch (e: any) {
+            console.error("Audio playback error:", e);
+            setError("Failed to play generated audio.");
+            setIsPlaying(false);
+        }
+    } else {
+        setError(result.error || "Failed to generate audio.");
+        setIsPlaying(false);
+        setTimeout(playNextMessage, 5000); // Retry after a delay
+    }
+  }, [currentStation, user]);
+
+
+  // Effect for finding station on frequency change
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      setCurrentStation(null);
+      setCurrentTrack(undefined);
+      setIsPlaying(false);
+      
+      if(audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+      }
+
+      try {
+        const station = await getStationForFrequency(debouncedFrequency);
+        setCurrentStation(station);
+        setSignalStrength(station ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 10);
+        
+        if (station) {
+            stationMessages.current = station.playlist.filter(p => p.type === 'message');
+            if (stationMessages.current.length > 0) {
+                 playNextMessage();
+            } else {
+                // Station has no messages, remain silent.
+            }
+        }
+      } catch (err: any) {
+        setError(`Erreur de données: ${err.message}.`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [debouncedFrequency, playNextMessage]);
+
+  const onEnded = useCallback(() => {
+    setIsPlaying(false);
+    playNextMessage();
+  }, [playNextMessage]);
+
+
+  // User auth effect
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
@@ -108,13 +187,6 @@ export function OndeSpectraleRadio() {
     setTimeout(() => setIsScanning(false), 1000);
   }, [frequency, isScanning]);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, []);
-
   const handleFrequencyChange = (value: number[]) => {
     setFrequency(value[0]);
   };
@@ -125,168 +197,9 @@ export function OndeSpectraleRadio() {
       }
   }
 
-  const selectNextTrack = useCallback(() => {
-    if (messagePlaylist.length === 0) {
-      setCurrentTrackIndex(-1);
-      return;
-    }
-    const randomIndex = Math.floor(Math.random() * messagePlaylist.length);
-    const originalIndex = messagePlaylist[randomIndex].originalIndex;
-    setCurrentTrackIndex(originalIndex);
-  }, [messagePlaylist]);
-  
-  const loadAndPlayAudio = useCallback((url: string) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    const handleCanPlay = () => {
-      if (isPlaying) {
-        audio.play().catch(e => {
-            if (e.name !== 'AbortError') {
-              console.error("Erreur de lecture:", e);
-              setError("Erreur de lecture audio.");
-              setIsPlaying(false);
-            }
-        });
-      }
-      audio.removeEventListener('canplay', handleCanPlay);
-    };
-
-    audio.addEventListener('canplay', handleCanPlay);
-    
-    audio.src = url;
-    audio.load();
-
-  }, [isPlaying]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      setIsPlaying(false);
-      setCurrentTrackIndex(-1);
-      
-      try {
-        const station = await getStationForFrequency(debouncedFrequency);
-        setCurrentStation(station);
-        
-        if (station) {
-          setInterference(null);
-          if (station.playlist.some(p => p.type === 'message')) {
-            selectNextTrack();
-            setIsPlaying(true);
-          } else {
-            setInterference("Cette station est silencieuse... Aucun message à diffuser.");
-          }
-        } else {
-          setInterference(null);
-          const interferenceText = await getInterference(debouncedFrequency);
-          setInterference(interferenceText);
-        }
-      } catch (err: any) {
-        setError(`Erreur de données: ${err.message}. Vérifiez les règles Firestore.`);
-        setCurrentStation(null);
-        setInterference('Erreur de communication avec la station.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [debouncedFrequency, selectNextTrack]);
-  
-  const onEnded = useCallback(() => {
-    selectNextTrack();
-    setIsPlaying(true);
-  }, [selectNextTrack]);
-
-
-  useEffect(() => {
-    const prepareAudio = async () => {
-        if (currentBlobUrl.current) {
-            URL.revokeObjectURL(currentBlobUrl.current);
-            currentBlobUrl.current = null;
-        }
-
-        const audio = audioRef.current;
-        if(audio) audio.src = '';
-
-
-        if (!currentTrack || currentTrack.type !== 'message') {
-            return;
-        }
-
-        if (!currentStation || !user) {
-            setError("Connexion requise pour les messages DJ.");
-            setIsPlaying(false);
-            return;
-        }
-
-        setIsGeneratingMessage(true);
-        const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
-        
-        if (result.audioBase64) {
-            try {
-                const byteCharacters = atob(result.audioBase64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'audio/wav' });
-                const url = URL.createObjectURL(blob);
-                currentBlobUrl.current = url;
-                loadAndPlayAudio(url);
-            } catch (e) {
-                setError("Échec du traitement des données audio.");
-                setIsPlaying(false);
-            }
-        } else {
-            setError(result.error || "Échec de la génération audio du message.");
-            setIsPlaying(false);
-        }
-        setIsGeneratingMessage(false);
-    };
-
-    prepareAudio();
-
-    return () => {
-        if (currentBlobUrl.current) {
-            URL.revokeObjectURL(currentBlobUrl.current);
-            currentBlobUrl.current = null;
-        }
-    };
-  }, [currentTrack, currentStation, user, loadAndPlayAudio]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    if (isPlaying && audio.src) {
-        audio.play().catch(e => {
-            if (e.name !== 'AbortError') console.error("Error on play:", e);
-        });
-    } else if (!isPlaying) {
-        audio.pause();
-    }
-  }, [isPlaying]);
-
-  const handleNext = useCallback(() => {
-    selectNextTrack();
-    setIsPlaying(true);
-  }, [selectNextTrack]);
-
-  const handlePlayPause = useCallback(() => {
-    if (isGeneratingMessage) return;
-
-    if (!currentTrack && messagePlaylist.length > 0) {
-      selectNextTrack();
-      setIsPlaying(true);
-      return;
-    }
-
-    setIsPlaying(prev => !prev);
-  }, [isGeneratingMessage, currentTrack, messagePlaylist, selectNextTrack]);
+  const isRadioActive = useMemo(() => {
+    return isClient && !isLoading && (currentStation !== null);
+  }, [isClient, isLoading, currentStation]);
 
 
   return (
@@ -442,12 +355,12 @@ export function OndeSpectraleRadio() {
                         {currentStation ? (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            STATION VERROUILLÉE
+                            {isGeneratingMessage ? 'Génération...' : ( isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE' ) }
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
                             <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                            RECHERCHE DE SIGNAL
+                             {isLoading ? 'ANALYSE DU SPECTRE...' : 'STATIQUE'}
                           </div>
                         )}
                       </div>
@@ -458,10 +371,7 @@ export function OndeSpectraleRadio() {
                   
                   <AudioPlayer 
                     track={currentTrack} 
-                    isPlaying={isPlaying} 
-                    onPlayPause={handlePlayPause} 
-                    onNext={handleNext} 
-                    onPrev={handleNext} // Using next for prev as it's random anyway
+                    isPlaying={isPlaying || isGeneratingMessage} 
                     audioRef={audioRef} 
                   />
 
@@ -475,5 +385,3 @@ export function OndeSpectraleRadio() {
     </>
   );
 }
-
-    
