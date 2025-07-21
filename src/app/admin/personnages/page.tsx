@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAdminLayout } from '../layout';
 import { createCustomDj } from '@/app/actions';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -35,6 +35,8 @@ export default function PersonnagesManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
 
   const [formData, setFormData] = useState({
     name: '',

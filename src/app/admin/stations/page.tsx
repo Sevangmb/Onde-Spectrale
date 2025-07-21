@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { createStation } from '@/app/actions';
@@ -38,7 +38,7 @@ export default function StationsManagement() {
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const allDjs = [...DJ_CHARACTERS, ...customCharacters];
+  const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -182,7 +182,7 @@ export default function StationsManagement() {
                     <SelectContent>
                       {allDjs.map((dj) => (
                         <SelectItem key={dj.id} value={dj.id}>
-                           {dj.name} {dj.isCustom ? "(Perso)" : ""}
+                           {dj.name} {(dj as CustomDJCharacter).isCustom ? "(Perso)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
