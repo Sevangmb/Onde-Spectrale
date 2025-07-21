@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -8,7 +9,6 @@
  *
  * @interface GenerateCustomDjAudioInput - The input type for the generateCustomDjAudio function.
  * @interface GenerateCustomDjAudioOutput - The output type for the generateCustomDjAudio function.
- * @function generateCustomDjAudio - A function that handles the custom audio generation process.
  */
 
 import {ai} from '@/ai/genkit';
@@ -23,7 +23,7 @@ const voiceMap: { [key: string]: { [key: string]: string } } = {
     calm: 'Encke',
     energetic: 'Talitha',
     joker: 'Mizar',
-    deep: 'Encke', // map deep to a specific voice
+    deep: 'Encke',
     medium: 'Talitha',
     high: 'Mizar'
   },
@@ -54,9 +54,6 @@ const GenerateCustomDjAudioOutputSchema = z.object({
 });
 export type GenerateCustomDjAudioOutput = z.infer<typeof GenerateCustomDjAudioOutputSchema>;
 
-export async function generateCustomDjAudio(input: GenerateCustomDjAudioInput): Promise<GenerateCustomDjAudioOutput> {
-  return generateCustomDjAudioFlow(input);
-}
 
 // Helper to convert PCM audio data to WAV format
 async function toWav(
@@ -86,7 +83,7 @@ async function toWav(
   });
 }
 
-const generateCustomDjAudioFlow = ai.defineFlow({
+ai.defineFlow({
     name: 'generateCustomDjAudioFlow',
     inputSchema: GenerateCustomDjAudioInputSchema,
     outputSchema: GenerateCustomDjAudioOutputSchema,

@@ -1,3 +1,4 @@
+
 export type DJCharacter = {
   id: string;
   name: string;
@@ -10,7 +11,6 @@ export type CustomDJCharacter = DJCharacter & {
         gender: string;
         tone: string;
         style: string;
-        speakingRate: number;
     };
     isCustom: true;
     ownerId: string;

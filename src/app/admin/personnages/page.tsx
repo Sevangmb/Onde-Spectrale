@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,7 +13,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,7 +44,6 @@ export default function PersonnagesManagement() {
     gender: 'male',
     tone: 'medium',
     style: 'calm',
-    speakingRate: 1.0
   });
 
   const handleCreateCharacter = async (e: React.FormEvent) => {
@@ -56,10 +55,7 @@ export default function PersonnagesManagement() {
 
     try {
       const form = new FormData();
-      // We are not using speakingRate anymore, so we set it to 1.0
-      const dataToSubmit = { ...formData, speakingRate: 1.0 };
-
-      Object.entries(dataToSubmit).forEach(([key, value]) => {
+      Object.entries(formData).forEach(([key, value]) => {
         form.append(key, String(value));
       });
 
@@ -78,7 +74,7 @@ export default function PersonnagesManagement() {
           variant: 'default',
         });
         setIsCreateModalOpen(false);
-        setFormData({ name: '', background: '', gender: 'male', tone: 'medium', style: 'calm', speakingRate: 1.0 });
+        setFormData({ name: '', background: '', gender: 'male', tone: 'medium', style: 'calm' });
       }
     } catch (err: any) {
       console.error('Erreur de création:', err);
@@ -269,7 +265,6 @@ export default function PersonnagesManagement() {
                             <Badge variant="secondary">Genre: {character.voice.gender}</Badge>
                             <Badge variant="secondary">Ton: {character.voice.tone}</Badge>
                             <Badge variant="secondary">Style: {character.voice.style}</Badge>
-                            <Badge variant="secondary">Vitesse: {character.voice.speakingRate}x</Badge>
                          </div>
                        </div>
                        <div>

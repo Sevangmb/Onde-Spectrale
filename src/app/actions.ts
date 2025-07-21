@@ -1,14 +1,16 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
-import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
-import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { z } from 'zod';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { genkitClient } from '@/lib/genkitClient';
+import type { GenerateDjAudioInput, GenerateDjAudioOutput } from '@/ai/flows/generate-dj-audio';
+import type { GenerateCustomDjAudioInput, GenerateCustomDjAudioOutput } from '@/ai/flows/generate-custom-dj-audio';
 
 
 const CreateStationSchema = z.object({
@@ -134,11 +136,11 @@ export async function addMessageToStation(stationId: string, message: string): P
     
     const officialCharacter = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
 
-    let audio;
+    let audio: GenerateDjAudioOutput | GenerateCustomDjAudioOutput;
 
     try {
       if (officialCharacter) {
-          audio = await generateDjAudio({
+          audio = await genkitClient.flow<GenerateDjAudioInput, GenerateDjAudioOutput>('generateDjAudioFlow', {
               message,
               characterId: officialCharacter.id
           });
@@ -149,7 +151,7 @@ export async function addMessageToStation(stationId: string, message: string): P
               return { error: "Personnage DJ personnalisé non trouvé." };
           }
           const customChar = customCharDoc.data() as CustomDJCharacter;
-          audio = await generateCustomDjAudio({
+          audio = await genkitClient.flow<GenerateCustomDjAudioInput, GenerateCustomDjAudioOutput>('generateCustomDjAudioFlow', {
               message,
               voice: customChar.voice
           });
@@ -295,7 +297,6 @@ const CreateCustomDJSchema = z.object({
   gender: z.string(),
   tone: z.string(),
   style: z.string(),
-  speakingRate: z.number(),
 });
 
 export async function createCustomDj(userId: string, formData: FormData) {
@@ -309,14 +310,13 @@ export async function createCustomDj(userId: string, formData: FormData) {
     gender: formData.get('gender'),
     tone: formData.get('tone'),
     style: formData.get('style'),
-    speakingRate: parseFloat(formData.get('speakingRate') as string),
   });
 
   if (!validatedFields.success) {
     return { error: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, background, gender, tone, style, speakingRate } = validatedFields.data;
+  const { name, background, gender, tone, style } = validatedFields.data;
 
   const newCharacterData: Omit<CustomDJCharacter, 'id'> = {
     name,
@@ -325,7 +325,6 @@ export async function createCustomDj(userId: string, formData: FormData) {
       gender,
       tone,
       style,
-      speakingRate,
     },
     isCustom: true,
     ownerId: userId,

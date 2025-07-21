@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -8,7 +9,6 @@
  *
  * @interface GenerateDjAudioInput - The input type for the generateDjAudio function.
  * @interface GenerateDjAudioOutput - The output type for the generateDjAudio function.
- * @function generateDjAudio - A function that handles the audio generation process.
  */
 
 import {ai} from '@/ai/genkit';
@@ -27,9 +27,6 @@ const GenerateDjAudioOutputSchema = z.object({
 });
 export type GenerateDjAudioOutput = z.infer<typeof GenerateDjAudioOutputSchema>;
 
-export async function generateDjAudio(input: GenerateDjAudioInput): Promise<GenerateDjAudioOutput> {
-  return generateDjAudioFlow(input);
-}
 
 const DjCharacterSchema = z.object({
   name: z.string(),
@@ -51,17 +48,17 @@ async (input) => {
       case 'marcus':
         return {
           name: 'Marcus',
-          voiceName: 'Mizar', // Corrected for Gemini TTS
+          voiceName: 'Mizar',
         };
       case 'sarah':
         return {
           name: 'Sarah',
-          voiceName: 'Alhena', // Corrected for Gemini TTS
+          voiceName: 'Alhena',
         };
       case 'tommy':
         return {
           name: 'Tommy',
-          voiceName: 'Antares', // Corrected for Gemini TTS
+          voiceName: 'Antares',
         };
       default:
         throw new Error(`Unknown character ID: ${input.characterId}`);
@@ -96,7 +93,7 @@ async function toWav(
   });
 }
 
-const generateDjAudioFlow = ai.defineFlow({
+ai.defineFlow({
     name: 'generateDjAudioFlow',
     inputSchema: GenerateDjAudioInputSchema,
     outputSchema: GenerateDjAudioOutputSchema,
