@@ -93,7 +93,7 @@ async function toWav(
   });
 }
 
-ai.defineFlow({
+export const generateDjAudioFlow = ai.defineFlow({
     name: 'generateDjAudioFlow',
     inputSchema: GenerateDjAudioInputSchema,
     outputSchema: GenerateDjAudioOutputSchema,

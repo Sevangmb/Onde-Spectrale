@@ -8,9 +8,8 @@ import { z } from 'zod';
 import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { genkitClient } from '@/lib/genkitClient';
-import type { GenerateDjAudioInput, GenerateDjAudioOutput } from '@/ai/flows/generate-dj-audio';
-import type { GenerateCustomDjAudioInput, GenerateCustomDjAudioOutput } from '@/ai/flows/generate-custom-dj-audio';
+import { generateDjAudioFlow, type GenerateDjAudioOutput } from '@/ai/flows/generate-dj-audio';
+import { generateCustomDjAudioFlow, type GenerateCustomDjAudioOutput } from '@/ai/flows/generate-custom-dj-audio';
 
 
 const CreateStationSchema = z.object({
@@ -139,8 +138,9 @@ export async function addMessageToStation(stationId: string, message: string): P
     let audio: GenerateDjAudioOutput | GenerateCustomDjAudioOutput;
 
     try {
+      console.log('Étape 1: Début de la génération de voix IA...');
       if (officialCharacter) {
-          audio = await genkitClient.flow<GenerateDjAudioInput, GenerateDjAudioOutput>('generateDjAudioFlow', {
+          audio = await generateDjAudioFlow({
               message,
               characterId: officialCharacter.id
           });
@@ -151,14 +151,15 @@ export async function addMessageToStation(stationId: string, message: string): P
               return { error: "Personnage DJ personnalisé non trouvé." };
           }
           const customChar = customCharDoc.data() as CustomDJCharacter;
-          audio = await genkitClient.flow<GenerateCustomDjAudioInput, GenerateCustomDjAudioOutput>('generateCustomDjAudioFlow', {
+          audio = await generateCustomDjAudioFlow({
               message,
               voice: customChar.voice
           });
       }
+      console.log('Étape 2: Génération de voix IA terminée avec succès.');
     } catch(err) {
-      console.error(err);
-      return { error: "La génération de la voix IA a échoué. Réessayez." };
+      console.error("Erreur détaillée de génération de voix :", err);
+      return { error: "La génération de la voix IA a échoué. Vérifiez la console pour les détails." };
     }
     
     // Upload audio to Firebase Storage
@@ -168,21 +169,21 @@ export async function addMessageToStation(stationId: string, message: string): P
     let downloadUrl = '';
 
     try {
-        // audio.audioUrl is 'data:audio/wav;base64,....'
-        // We need to extract the base64 part
+        console.log('Étape 3: Début de l\'upload sur Firebase Storage...');
         const base64Data = audio.audioUrl.split(',')[1];
         if (!base64Data) {
-            throw new Error('Invalid base64 audio data.');
+            throw new Error('Données audio base64 invalides.');
         }
 
         const snapshot = await uploadString(storageRef, base64Data, 'base64', {
             contentType: 'audio/wav'
         });
         downloadUrl = await getDownloadURL(snapshot.ref);
+        console.log('Étape 4: Upload terminé. URL obtenu:', downloadUrl);
 
     } catch (storageError) {
-        console.error("Erreur lors de l'enregistrement sur Firebase Storage:", storageError);
-        return { error: "L'enregistrement du fichier audio a échoué." };
+        console.error("Erreur détaillée de l'enregistrement sur Firebase Storage:", storageError);
+        return { error: "L'enregistrement du fichier audio a échoué. Vérifiez la console." };
     }
 
     const newPlaylistItem: PlaylistItem = {
@@ -194,10 +195,18 @@ export async function addMessageToStation(stationId: string, message: string): P
         artist: station.djCharacterId,
         addedAt: new Date().toISOString(),
     };
+    
+    try {
+        console.log('Étape 5: Mise à jour de la playlist dans Firestore...');
+        await updateDoc(stationRef, {
+            playlist: arrayUnion(newPlaylistItem)
+        });
+        console.log('Étape 6: Playlist mise à jour avec succès.');
+    } catch (firestoreError) {
+        console.error("Erreur lors de la mise à jour de Firestore:", firestoreError);
+        return { error: "La mise à jour de la base de données a échoué." };
+    }
 
-    await updateDoc(stationRef, {
-        playlist: arrayUnion(newPlaylistItem)
-    });
 
     revalidatePath(`/admin/stations/${stationId}`);
     return { success: true, playlistItem: newPlaylistItem };
