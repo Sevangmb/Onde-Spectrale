@@ -92,7 +92,7 @@ export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: Spectr
       const ctx = canvas.getContext('2d');
       if(ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
          ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
@@ -150,4 +150,3 @@ export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: Spectr
     </div>
   );
 }
-

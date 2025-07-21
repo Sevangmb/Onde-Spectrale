@@ -131,7 +131,7 @@ export function OndeSpectraleRadio() {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      setIsPlaying(false);
+      
       try {
         const station = await getStationForFrequency(debouncedFrequency);
         setCurrentStation(station);
@@ -139,13 +139,18 @@ export function OndeSpectraleRadio() {
         if (station) {
           setCurrentTrackIndex(0);
           setInterference(null);
+          if (audioRef.current) audioRef.current.loop = false;
         } else {
           const interferenceText = await getInterference(debouncedFrequency);
           setInterference(interferenceText);
+          setAudioUrl('/audio/static.mp3');
+          if (audioRef.current) audioRef.current.loop = true;
+          setIsPlaying(true);
         }
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}. Vérifiez les règles Firestore.`);
         setCurrentStation(null);
+        setInterference('Erreur de communication avec la station.');
       } finally {
         setIsLoading(false);
       }
@@ -163,8 +168,8 @@ export function OndeSpectraleRadio() {
   }, [playlist.length]);
   
   const onEnded = useCallback(() => {
-    if (playlist.length === 0) {
-      setIsPlaying(false);
+    if (playlist.length === 0 || (audioRef.current && audioRef.current.loop)) {
+      setIsPlaying(true); // Keep playing if it's a loop (static)
       return;
     }
     
@@ -180,7 +185,7 @@ export function OndeSpectraleRadio() {
   useEffect(() => {
     const handleAudio = async () => {
         if (!isPlaying || !currentTrack) {
-          if (audioRef.current) {
+          if (audioRef.current && !audioRef.current.loop) {
             audioRef.current.pause();
           }
           return;
@@ -231,7 +236,9 @@ export function OndeSpectraleRadio() {
         }
     };
 
-    handleAudio();
+    if (currentStation) {
+      handleAudio();
+    }
 
     return () => {
         if (currentAudioUrlRef.current) {
@@ -243,7 +250,9 @@ export function OndeSpectraleRadio() {
 
 useEffect(() => {
     if (audioRef.current && audioUrl) {
-      audioRef.current.src = audioUrl;
+      if (audioRef.current.src !== audioUrl) {
+        audioRef.current.src = audioUrl;
+      }
       if (isPlaying) {
         audioRef.current.load();
         audioRef.current.play().catch(e => console.error("Error playing audio on src change:", e));
@@ -265,9 +274,12 @@ useEffect(() => {
   }, [currentTrackIndex, playlist.length, onTrackSelect]);
 
   const handlePlayPause = useCallback(() => {
-    if (playlist.length === 0 || isGeneratingMessage) return;
+    if (isGeneratingMessage) return;
+
+    if (currentStation && playlist.length === 0) return;
+    
     setIsPlaying(prev => !prev);
-  }, [playlist.length, isGeneratingMessage]);
+  }, [playlist.length, isGeneratingMessage, currentStation]);
 
   useEffect(() => {
     if (currentStation && playlist.length > 0) {
@@ -445,7 +457,7 @@ useEffect(() => {
                     </div>
                   </div>
                   
-                  <SpectrumAnalyzer isPlaying={isPlaying && currentStation !== null} audioRef={audioRef} className="h-24" />
+                  <SpectrumAnalyzer isPlaying={isPlaying} audioRef={audioRef} className="h-24" />
 
                   <div className="h-40 bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col justify-center items-center text-center backdrop-blur-sm shadow-lg shadow-orange-500/10">
                     {isLoading || isGeneratingMessage ? (
@@ -471,7 +483,7 @@ useEffect(() => {
                       </div>
                     )}
                   </div>
-                   {currentStation && playlist.length > 0 && (
+                   {(currentStation && playlist.length > 0) && (
                      <AudioPlayer 
                        track={currentTrack} 
                        isPlaying={isPlaying} 
