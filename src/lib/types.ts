@@ -2,12 +2,20 @@ export type DJCharacter = {
   id: string;
   name: string;
   description: string;
-  voice: {
-    name: string; // Google TTS voice name e.g., 'fr-FR-Wavenet-B'
-    pitch: number;
-    speed: number;
-  };
 };
+
+export type CustomDJCharacter = DJCharacter & {
+    voice: {
+        gender: string;
+        tone: string;
+        style: string;
+        speakingRate: number;
+    };
+    isCustom: true;
+    ownerId: string;
+    createdAt: string;
+};
+
 
 export type PlaylistItem = {
   id: string;

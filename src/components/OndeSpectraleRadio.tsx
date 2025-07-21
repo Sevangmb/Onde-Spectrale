@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
 import { getStationForFrequency, getInterference, updateUserFrequency } from '@/app/actions';
-import type { Station, PlaylistItem, DJCharacter } from '@/lib/types';
+import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
@@ -14,13 +14,12 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
-import { StationManagementSheet } from '@/components/StationManagementSheet';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, LayoutDashboard } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -43,7 +42,6 @@ export function OndeSpectraleRadio() {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Client-side only state to prevent hydration errors
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const [isClient, setIsClient] = useState(false);
@@ -53,33 +51,33 @@ export function OndeSpectraleRadio() {
   const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => playlist[currentTrackIndex], [playlist, currentTrackIndex]);
 
-  // État pour déterminer si la radio est "active" pour les alertes d'urgence
   const isRadioActive = useMemo(() => {
     return isClient && !isLoading && (currentStation !== null || !!interference);
   }, [isClient, isLoading, currentStation, interference]);
 
   useEffect(() => {
-    // This effect runs only on the client, after the initial render.
     setIsClient(true);
-
-    // Generate particle styles on the client
-    setParticleStyles(
-      Array.from({ length: 15 }, () => ({
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-        animationDelay: `${Math.random() * 5}s`,
-        animationDuration: `${3 + Math.random() * 4}s`,
-      }))
-    );
   }, []);
+  
+   useEffect(() => {
+    if (isClient) {
+      setParticleStyles(
+        Array.from({ length: 15 }, () => ({
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animationDelay: `${Math.random() * 5}s`,
+          animationDuration: `${3 + Math.random() * 4}s`,
+        }))
+      );
+    }
+  }, [isClient]);
 
   useEffect(() => {
-    // Generate signal strength on the client, and when station changes
     if (isClient) {
         if (currentStation) {
-            setSignalStrength(Math.floor(Math.random() * 20) + 80); // 80-100%
+            setSignalStrength(Math.floor(Math.random() * 20) + 80);
         } else {
-            setSignalStrength(Math.floor(Math.random() * 30) + 10); // 10-40%
+            setSignalStrength(Math.floor(Math.random() * 30) + 10);
         }
     }
   }, [currentStation, debouncedFrequency, isClient]);
@@ -111,11 +109,6 @@ export function OndeSpectraleRadio() {
     if (!currentStation) return null;
     return DJ_CHARACTERS.find(d => d.id === currentStation.djCharacterId) || null;
   }, [currentStation]);
-
-  const isOwner = useMemo(() => {
-    if (!user || !currentStation) return false;
-    return currentStation?.ownerId === user.uid;
-  }, [currentStation, user]);
 
   const handleFrequencyChange = (value: number[]) => {
     setFrequency(value[0]);
@@ -209,55 +202,41 @@ export function OndeSpectraleRadio() {
         onPlay={() => setIsPlaying(true)} 
         onPause={() => setIsPlaying(false)} 
       />
-      <div className="relative w-full min-h-screen overflow-hidden">
+      <div className="relative w-full min-h-[90vh] overflow-hidden">
         {/* Arrière-plan post-apocalyptique animé */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
         
-        {/* Effet de radiation/interference */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-red-700/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-yellow-500/30 rounded-full blur-xl animate-pulse delay-500"></div>
         </div>
         
-        {/* Grille futuriste déformée */}
         <div className="absolute inset-0 opacity-10">
           <div 
             className="w-full h-full"
             style={{
-              backgroundImage: `
-                radial-gradient(circle at 20% 50%, rgba(255, 165, 0, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(255, 69, 0, 0.2) 0%, transparent 50%),
-                linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
-                linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)
-              `,
-              backgroundSize: '100px 100px, 150px 150px, 50px 50px, 50px 50px',
+              backgroundImage: `linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
+                              linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)`,
+              backgroundSize: '50px 50px',
               animation: 'drift 20s linear infinite'
             }}
           />
         </div>
         
-        {/* Particules flottantes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {particleStyles.map((style, i) => (
-            <div
-              key={i}
-              className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float"
-              style={style}
-            />
-          ))}
-        </div>
+        {isClient && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {particleStyles.map((style, i) => (
+                <div key={i} className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float" style={style} />
+              ))}
+            </div>
+        )}
 
-        {/* Interface principale */}
-        <div className="relative z-10 flex min-h-screen w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
+        <div className="relative z-10 flex min-h-[90vh] w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
           <div className="w-full max-w-4xl mx-auto">
             <Card className="w-full border-2 border-orange-500/30 bg-black/80 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-              {/* Effet de scanline */}
               <div className="absolute inset-0 pointer-events-none">
                 <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
               </div>
-              
-              {/* Bordure intérieure avec effet électrique */}
               <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
               
               <CardHeader className="relative border-b-2 border-orange-500/30 pb-4 bg-gradient-to-r from-black/90 to-zinc-900/90">
@@ -272,33 +251,28 @@ export function OndeSpectraleRadio() {
                     </CardTitle>
                   </div>
                    <div className="flex items-center gap-2">
-                     {currentStation && isOwner && (
-                      <StationManagementSheet station={currentStation} dj={dj}>
-                        <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
-                          <Settings className="h-5 w-5 text-orange-300" />
+                     {user ? (
+                        <Button variant="outline" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push('/admin')}>
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          Admin
                         </Button>
-                      </StationManagementSheet>
-                    )}
-                     {!user && (
-                      <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
+                      ) : (
+                        <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50" onClick={() => router.push('/login')}>
                           <Rss className="mr-2 h-4 w-4" />
-                          Créer ou Gérer
-                      </Button>
+                          Connexion / Gérer
+                        </Button>
                      )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
                 <div className="flex flex-col gap-6">
-                  {/* Sélecteur de fréquence amélioré */}
                   <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-                    {/* Effet de tuning */}
                     <div className="absolute inset-0 opacity-20 pointer-events-none">
                       <div className={`w-full h-full bg-gradient-to-r from-transparent via-orange-400/30 to-transparent ${isScanning ? 'animate-scan' : ''}`}></div>
                     </div>
                     
                     <div className="relative z-10 space-y-4">
-                      {/* En-tête avec indicateur de signal */}
                       <div className="flex items-center justify-between">
                         <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider uppercase">
                           Syntoniseur
@@ -323,7 +297,6 @@ export function OndeSpectraleRadio() {
                         </div>
                       </div>
 
-                      {/* Affichage principal de la fréquence */}
                       <div className="text-center">
                         <div className="text-6xl font-headline font-bold text-orange-400 tracking-widest drop-shadow-lg relative">
                           <span className={`${currentStation ? 'animate-flicker-subtle' : 'animate-flicker'}`}>
@@ -331,13 +304,11 @@ export function OndeSpectraleRadio() {
                           </span>
                           <span className="text-3xl text-orange-300 ml-2">MHz</span>
                           
-                          {/* Indicateur de station trouvée */}
                           {currentStation && (
                             <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
                           )}
                         </div>
                         
-                        {/* Indicateur de scan */}
                         {isScanning && (
                           <div className="text-orange-300/60 text-sm mt-2 animate-pulse">
                             SCAN EN COURS...
@@ -345,36 +316,18 @@ export function OndeSpectraleRadio() {
                         )}
                       </div>
 
-                      {/* Contrôles de scan rapide */}
                       <div className="flex items-center justify-center gap-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleScanDown}
-                          disabled={frequency <= 87.0 || isScanning}
-                          className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 disabled:opacity-50"
-                        >
-                          <ChevronLeft className="h-4 w-4 mr-1" />
-                          SCAN
+                        <Button variant="ghost" size="sm" onClick={handleScanDown} disabled={frequency <= 87.0 || isScanning} className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50">
+                          <ChevronLeft className="h-4 w-4 mr-1" /> SCAN
                         </Button>
-                        
                         <div className="px-4 py-2 bg-black/60 border border-orange-500/20 rounded text-orange-300/80 text-xs font-mono">
                           87.0 - 108.0 MHz
                         </div>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleScanUp}
-                          disabled={frequency >= 108.0 || isScanning}
-                          className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 disabled:opacity-50"
-                        >
-                          SCAN
-                          <ChevronRight className="h-4 w-4 ml-1" />
+                        <Button variant="ghost" size="sm" onClick={handleScanUp} disabled={frequency >= 108.0 || isScanning} className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50">
+                          SCAN <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
                       </div>
 
-                      {/* Slider principal */}
                       <div className="space-y-2">
                         <Slider
                           id="frequency"
@@ -387,19 +340,11 @@ export function OndeSpectraleRadio() {
                           className="w-full"
                           disabled={!!error || isScanning}
                         />
-                        
-                        {/* Marqueurs de fréquence */}
                         <div className="flex justify-between text-xs text-orange-400/60 font-mono">
-                          <span>87.0</span>
-                          <span>90.0</span>
-                          <span>95.0</span>
-                          <span>100.0</span>
-                          <span>105.0</span>
-                          <span>108.0</span>
+                          <span>87.0</span><span>95.0</span><span>108.0</span>
                         </div>
                       </div>
 
-                      {/* Statut de la connexion */}
                       <div className="text-center">
                         {currentStation ? (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
@@ -416,12 +361,7 @@ export function OndeSpectraleRadio() {
                     </div>
                   </div>
                   
-                  {/* Analyseur de spectre */}
-                  <SpectrumAnalyzer 
-                    isPlaying={isPlaying && currentStation !== null} 
-                    audioRef={audioRef} 
-                    className="h-24 border border-orange-500/30 rounded-lg bg-black/50 backdrop-blur-sm"
-                  />
+                  <SpectrumAnalyzer isPlaying={isPlaying && currentStation !== null} audioRef={audioRef} className="h-24" />
 
                   <div className="h-40 bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col justify-center items-center text-center backdrop-blur-sm shadow-lg shadow-orange-500/10">
                     {isLoading ? (
@@ -456,7 +396,6 @@ export function OndeSpectraleRadio() {
                    )}
                 </div>
                 
-                {/* Playlist améliorée */}
                 <div className="flex flex-col">
                   <EnhancedPlaylist 
                     playlist={playlist}
@@ -470,12 +409,7 @@ export function OndeSpectraleRadio() {
             </Card>
           </div>
         </div>
-
-        {/* Système d'alertes d'urgence */}
-        <EmergencyAlertSystem 
-          isRadioActive={isRadioActive}
-          currentFrequency={frequency}
-        />
+        <EmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
       </div>
     </>
   );

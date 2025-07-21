@@ -122,6 +122,7 @@ export async function createStation(ownerId: string, formData: FormData) {
       ...newStationData
   }
 
+  revalidatePath('/admin/stations');
   revalidatePath('/admin');
   return { success: true, station: newStation };
 }

@@ -8,7 +8,6 @@ import {
   SheetTitle,
   SheetDescription,
   SheetTrigger,
-  SheetFooter
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,12 +18,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
-import type { Station, DJCharacter, PlaylistItem } from '@/lib/types';
+import type { Station, CustomDJCharacter, PlaylistItem } from '@/lib/types';
 import { MessageSquare, Music, Search, Plus, Loader2 } from 'lucide-react';
 
 interface StationManagementSheetProps {
   station: Station;
-  dj: DJCharacter | null;
+  dj: CustomDJCharacter | null;
   children: React.ReactNode;
 }
 
@@ -61,7 +60,7 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
   };
 
   const handleAddMusic = async (track: PlaylistItem) => {
-    const result = await addMusicToStation(station.id, track.id, track);
+    const result = await addMusicToStation(station.id, track);
      if (result.error) {
       toast({ variant: 'destructive', title: "Erreur", description: result.error });
     } else {
