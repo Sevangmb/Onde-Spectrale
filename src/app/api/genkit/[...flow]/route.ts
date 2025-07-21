@@ -1,17 +1,11 @@
 
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import { nextJSHandler } from '@genkit-ai/next';
-import { z } from 'zod';
+'use server';
 
+import { genkit } from '@genkit-ai/next';
+
+// Import all flows that you want to be exposed via the API route.
 import '@/ai/flows/generate-dj-audio';
 import '@/ai/flows/generate-custom-dj-audio';
 import '@/ai/flows/simulate-frequency-interference';
 
-genkit({
-  plugins: [googleAI()],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
-});
-
-export const POST = nextJSHandler();
+export const POST = genkit();
