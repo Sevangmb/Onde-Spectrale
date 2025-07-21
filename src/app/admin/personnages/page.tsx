@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAdminLayout } from '../layout';
 import { createCustomDj } from '@/app/actions';
 import { DJ_CHARACTERS } from '@/lib/data';
 
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ import {
   Sparkles,
   AlertTriangle,
   CheckCircle,
+  Loader2,
 } from 'lucide-react';
 
 
@@ -31,14 +33,15 @@ export default function PersonnagesManagement() {
   const { user, customCharacters, isLoading, stations } = useAdminLayout();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: '',
     background: '',
     gender: 'male',
-    tone: 'medium', // Changed from neutral to match schema
-    style: 'calm', // Changed from conversational
+    tone: 'medium',
+    style: 'calm',
     speakingRate: 1.0
   });
 
@@ -47,7 +50,7 @@ export default function PersonnagesManagement() {
     if (!user) return;
 
     setIsCreating(true);
-    setCreateError(null);
+    setFormError(null);
 
     try {
       const form = new FormData();
@@ -59,19 +62,22 @@ export default function PersonnagesManagement() {
 
       if (result.error) {
         if (result.error.general) {
-          setCreateError(result.error.general);
+          setFormError(result.error.general);
         } else {
-            console.log(result.error);
-          setCreateError('Erreur de validation. Vérifiez les champs.');
+          setFormError('Erreur de validation. Vérifiez les champs.');
         }
       } else {
+        toast({
+          title: 'DJ Créé !',
+          description: `Le personnage ${formData.name} est prêt à prendre l'antenne.`,
+          variant: 'default',
+        });
         setIsCreateModalOpen(false);
         setFormData({ name: '', background: '', gender: 'male', tone: 'medium', style: 'calm', speakingRate: 1.0 });
-        // Data will be revalidated by the layout.
       }
     } catch (err: any) {
       console.error('Erreur de création:', err);
-      setCreateError('Une erreur inattendue est survenue.');
+      setFormError('Une erreur inattendue est survenue.');
     } finally {
       setIsCreating(false);
     }
@@ -133,10 +139,10 @@ export default function PersonnagesManagement() {
                     <DialogTitle>Créer un DJ Personnalisé</DialogTitle>
                   </DialogHeader>
                   
-                  {createError && (
+                  {formError && (
                     <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                      {createError}
+                      {formError}
                     </div>
                   )}
 
@@ -218,6 +224,7 @@ export default function PersonnagesManagement() {
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="ghost" onClick={() => setIsCreateModalOpen(false)} disabled={isCreating}>Annuler</Button>
                       <Button type="submit" disabled={isCreating}>
+                        {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                         {isCreating ? 'Création...' : 'Créer DJ'}
                       </Button>
                     </div>

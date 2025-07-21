@@ -23,7 +23,7 @@ function serializeStation(doc: any): Station {
     return {
         id: doc.id,
         ...data,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
         playlist: data.playlist || [],
     } as Station;
 }
@@ -102,12 +102,11 @@ export async function createStation(ownerId: string, formData: FormData) {
     djCharacterId,
     ownerId,
     playlist: [],
-    createdAt: new Date().toISOString(),
+    createdAt: serverTimestamp(),
   };
   
   const docRef = await addDoc(collection(db, 'stations'), newStationData);
 
-  // Increment user's station count
   const userRef = doc(db, 'users', ownerId);
   const userDoc = await getDoc(userRef);
   if (userDoc.exists()) {
@@ -115,19 +114,13 @@ export async function createStation(ownerId: string, formData: FormData) {
         stationsCreated: increment(1)
     });
   }
-
-
-  const newStation: Station = {
-      id: docRef.id,
-      ...newStationData
-  }
-
+  
   revalidatePath('/admin/stations');
   revalidatePath('/admin');
-  return { success: true, station: newStation };
+  return { success: true, stationId: docRef.id };
 }
 
-export async function addMessageToStation(stationId: string, message: string) {
+export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
     const stationRef = doc(db, 'stations', stationId);
     const stationDoc = await getDoc(stationRef);
 
@@ -143,23 +136,27 @@ export async function addMessageToStation(stationId: string, message: string) {
 
     let audio;
 
-    if (officialCharacter) {
-         audio = await generateDjAudio({
-            message,
-            characterId: officialCharacter.id
-        });
-    } else {
-        // It's a custom character, fetch from Firestore
-        const customCharRef = doc(db, 'users', station.ownerId, 'characters', station.djCharacterId);
-        const customCharDoc = await getDoc(customCharRef);
-        if (!customCharDoc.exists()) {
-            return { error: "Personnage DJ personnalisé non trouvé." };
-        }
-        const customChar = customCharDoc.data() as CustomDJCharacter;
-        audio = await generateCustomDjAudio({
-            message,
-            voice: customChar.voice
-        });
+    try {
+      if (officialCharacter) {
+          audio = await generateDjAudio({
+              message,
+              characterId: officialCharacter.id
+          });
+      } else {
+          const customCharRef = doc(db, 'users', station.ownerId, 'characters', station.djCharacterId);
+          const customCharDoc = await getDoc(customCharRef);
+          if (!customCharDoc.exists()) {
+              return { error: "Personnage DJ personnalisé non trouvé." };
+          }
+          const customChar = customCharDoc.data() as CustomDJCharacter;
+          audio = await generateCustomDjAudio({
+              message,
+              voice: customChar.voice
+          });
+      }
+    } catch(err) {
+      console.error(err);
+      return { error: "La génération de la voix IA a échoué. Réessayez." };
     }
     
     const newPlaylistItem: PlaylistItem = {
@@ -168,6 +165,8 @@ export async function addMessageToStation(stationId: string, message: string) {
         title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
         url: audio.audioUrl,
         duration: 15, // Mock duration, could be calculated from audio file
+        artist: station.djCharacterId,
+        addedAt: new Date().toISOString(),
     };
 
     await updateDoc(stationRef, {
@@ -180,34 +179,41 @@ export async function addMessageToStation(stationId: string, message: string) {
 }
 
 
-export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
-    if (!searchTerm) return [];
+export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistItem[], error?: string}> {
+    if (!searchTerm) return {data:[]};
 
-    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,avg_rating&sort=avg_rating%20desc&rows=10&page=1&output=json`;
+    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=20&page=1&output=json`;
     
     try {
-        const response = await fetch(searchUrl);
+        const response = await fetch(searchUrl, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
         if (!response.ok) {
             console.error('Archive.org API error:', response.statusText);
-            return [];
+            return {error: `Erreur Archive.org: ${response.statusText}`};
         }
         const data = await response.json();
         const docs = data.response.docs;
 
-        const searchResults: PlaylistItem[] = docs.map((doc: any) => ({
+        const searchResults: PlaylistItem[] = docs
+          .filter((doc: any) => doc.identifier && doc.title)
+          .map((doc: any) => ({
             id: doc.identifier,
             type: 'music',
             title: doc.title || 'Titre inconnu',
             artist: doc.creator || 'Artiste inconnu',
             url: `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp3`,
-            duration: 180, // Mock duration
+            duration: Math.round(doc.duration || 180),
+            addedAt: new Date().toISOString(),
         }));
         
-        return searchResults;
+        return {data: searchResults};
 
     } catch (error) {
         console.error('Failed to fetch from Archive.org:', error);
-        return [];
+        return {error: "La recherche sur Archive.org a échoué."};
     }
 }
 
@@ -223,12 +229,17 @@ export async function addMusicToStation(stationId: string, musicTrack: PlaylistI
         return { error: "Musique non trouvée. Essayez une nouvelle recherche." };
     }
 
+    const newTrack = {
+      ...musicTrack,
+      addedAt: new Date().toISOString(),
+    }
+
     await updateDoc(stationRef, {
-        playlist: arrayUnion(musicTrack)
+        playlist: arrayUnion(newTrack)
     });
     
     revalidatePath(`/admin/stations/${stationId}`);
-    return { success: true, playlistItem: musicTrack };
+    return { success: true, playlistItem: newTrack };
 }
 
 
@@ -242,6 +253,7 @@ export async function updateUserOnLogin(userId: string, email: string | null) {
       stationsCreated: 0,
       lastFrequency: 92.1,
       createdAt: serverTimestamp(),
+      lastLogin: serverTimestamp(),
     });
   } else {
      await updateDoc(userRef, {
@@ -345,7 +357,7 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
       voice: data.voice,
       isCustom: true,
       ownerId: data.ownerId,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
     };
   });
 }

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { createStation } from '@/app/actions';
 import type { CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import {
   Zap,
   AlertTriangle,
   CheckCircle,
+  Loader2,
 } from 'lucide-react';
 
 
@@ -33,7 +35,8 @@ export default function StationsManagement() {
   const router = useRouter();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const allDjs = [...DJ_CHARACTERS, ...customCharacters];
 
@@ -48,7 +51,7 @@ export default function StationsManagement() {
     if (!user) return;
 
     setIsCreating(true);
-    setCreateError(null);
+    setFormError(null);
 
     try {
       const form = new FormData();
@@ -60,19 +63,22 @@ export default function StationsManagement() {
 
       if (result.error) {
         if (result.error.general) {
-          setCreateError(result.error.general);
+          setFormError(result.error.general);
         } else {
-          setCreateError('Erreur de validation. Vérifiez les champs.');
+          setFormError('Erreur de validation. Vérifiez les champs.');
         }
       } else {
+        toast({
+          title: 'Station créée !',
+          description: `La station ${formData.name} est maintenant en ligne sur ${formData.frequency} MHz.`,
+        });
         setIsCreateModalOpen(false);
         setFormData({ name: '', frequency: 92.1, djCharacterId: '' });
-        // The layout will refetch the data, so no need to do it here.
-        // We might need to trigger a revalidation if the layout data isn't fresh.
+        router.push(`/admin/stations/${result.stationId}`);
       }
     } catch (err: any) {
       console.error('Erreur de création:', err);
-      setCreateError('Une erreur inattendue est survenue.');
+      setFormError('Une erreur inattendue est survenue.');
     } finally {
       setIsCreating(false);
     }
@@ -124,10 +130,10 @@ export default function StationsManagement() {
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle station</DialogTitle>
               </DialogHeader>
-              {createError && (
+              {formError && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  {createError}
+                  {formError}
                 </div>
               )}
               <form onSubmit={handleCreateStation} className="space-y-4">
@@ -176,7 +182,7 @@ export default function StationsManagement() {
                     <SelectContent>
                       {allDjs.map((dj) => (
                         <SelectItem key={dj.id} value={dj.id}>
-                           {dj.name} - {dj.description}
+                           {dj.name} {dj.isCustom ? "(Perso)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -187,6 +193,7 @@ export default function StationsManagement() {
                     Annuler
                   </Button>
                   <Button type="submit" disabled={isCreating}>
+                    {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     {isCreating ? 'Création...' : 'Créer Station'}
                   </Button>
                 </div>

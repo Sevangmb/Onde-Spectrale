@@ -2,6 +2,7 @@ export type DJCharacter = {
   id: string;
   name: string;
   description: string;
+  isCustom?: boolean;
 };
 
 export type CustomDJCharacter = DJCharacter & {
@@ -24,6 +25,7 @@ export type PlaylistItem = {
   artist?: string;
   url: string; // URL to the audio file in Firebase Storage or Archive.org
   duration: number; // in seconds
+  addedAt?: string; // ISO string
 };
 
 export type Station = {
@@ -41,4 +43,6 @@ export type User = {
   email: string | null;
   stationsCreated: number;
   lastFrequency: number;
+  createdAt: string;
+  lastLogin: string;
 };
