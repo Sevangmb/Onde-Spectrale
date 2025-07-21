@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
 
 const SimulateFrequencyInterferenceInputSchema = z.object({
   frequency: z
@@ -63,7 +64,7 @@ const simulateFrequencyInterferenceFlow = ai.defineFlow(
     outputSchema: SimulateFrequencyInterferenceOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
+    const {output} = await prompt(input, { model: googleAI.model('gemini-1.5-flash-latest') });
     return output!;
   }
 );
