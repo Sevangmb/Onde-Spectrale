@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function StationDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { user, customCharacters } = useAdminLayout();
   const router = useRouter();
   const { toast } = useToast();
@@ -65,8 +67,10 @@ export default function StationDetailPage({ params }: { params: { id: string } }
   }, []);
 
   useEffect(() => {
-    fetchStation(params.id);
-  }, [params.id, fetchStation]);
+    if (id) {
+      fetchStation(id);
+    }
+  }, [id, fetchStation]);
 
   const handleGenerateMessage = async () => {
     if (!station || message.trim().length < 5) {
