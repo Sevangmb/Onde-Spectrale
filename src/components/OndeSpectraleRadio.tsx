@@ -18,7 +18,8 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
-import { LayoutDashboard, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, RadioTower, Loader2 } from 'lucide-react';
+
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -320,16 +321,18 @@ export function OndeSpectraleRadio() {
                     </CardTitle>
                   </div>
                    <div className="flex items-center gap-2">
-                     {user ? (
-                        <Button variant="outline" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push('/admin')}>
-                          <LayoutDashboard className="mr-2 h-4 w-4" />
-                          Admin
+                     {currentStation && isOwner && (
+                      <StationManagementSheet station={currentStation} dj={dj}>
+                        <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
+                          <Settings className="h-5 w-5 text-orange-300" />
                         </Button>
-                      ) : (
-                        <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50" onClick={() => router.push('/login')}>
+                      </StationManagementSheet>
+                    )}
+                     {!user && (
+                      <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
                           <Rss className="mr-2 h-4 w-4" />
                           Créer ou Gérer
-                        </Button>
+                      </Button>
                      )}
                   </div>
                 </div>
