@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { useAdminLayout } from '../layout';
 import { createCustomDj } from '@/app/actions';
 import { DJ_CHARACTERS } from '@/lib/data';
+import type { CustomDJCharacter } from '@/lib/types';
 
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +14,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AudioPreviewer } from '@/components/AudioPreviewer';
 
 import { 
   Users, 
@@ -26,6 +28,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
+  Play,
 } from 'lucide-react';
 
 
@@ -258,7 +261,7 @@ export default function PersonnagesManagement() {
                 <div className="grid gap-4">
                   {customCharacters.map((character) => (
                     <div key={character.id} className="p-4 border rounded-lg flex items-start justify-between">
-                       <div>
+                       <div className="flex-grow">
                          <h3 className="font-semibold text-lg">{character.name}</h3>
                          <p className="text-muted-foreground text-sm mb-2">{character.description}</p>
                          <div className="flex flex-wrap gap-2 text-xs">
@@ -267,7 +270,24 @@ export default function PersonnagesManagement() {
                             <Badge variant="secondary">Style: {character.voice.style}</Badge>
                          </div>
                        </div>
-                       <div>
+                       <div className="flex flex-col items-end gap-2 pl-4">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <Play className="mr-2 h-4 w-4" />
+                                        Prévisualiser
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Prévisualisation de {character.name}</DialogTitle>
+                                        <DialogDescription>
+                                            Écoutez la voix de votre DJ en temps réel.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <AudioPreviewer character={character} />
+                                </DialogContent>
+                            </Dialog>
                             <Badge variant="outline" className="border-green-600 text-green-600">
                                 <CheckCircle className="mr-1 h-3 w-3"/>
                                 Utilisé par {stations.filter(s => s.djCharacterId === character.id).length} station(s)

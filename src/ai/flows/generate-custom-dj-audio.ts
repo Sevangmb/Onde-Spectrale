@@ -51,6 +51,7 @@ export type GenerateCustomDjAudioInput = z.infer<typeof GenerateCustomDjAudioInp
 
 const GenerateCustomDjAudioOutputSchema = z.object({
   audioUrl: z.string().describe('The URL of the generated audio clip.'),
+  rawPcm: z.string().optional().describe('Raw PCM audio data, base64 encoded.'),
 });
 export type GenerateCustomDjAudioOutput = z.infer<typeof GenerateCustomDjAudioOutputSchema>;
 
@@ -88,13 +89,13 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
     inputSchema: GenerateCustomDjAudioInputSchema,
     outputSchema: GenerateCustomDjAudioOutputSchema,
   },
-  async input => {
+  async (input, streamingCallback) => {
     const { voice, message } = input;
     
     // Prioritize style, then tone for voice mapping
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'Antares'; // Default to a neutral voice
 
-    const {media} = await ai.generate({
+    const {media, "response": responsePromise} = await ai.generateStream({
       model: googleAI.model('gemini-2.5-flash-preview-tts'),
       config: {
         responseModalities: ['AUDIO'],
@@ -107,17 +108,35 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
       prompt: message,
     });
 
-    if (!media) {
+    if (streamingCallback) {
+        for await (const chunk of media) {
+            if (chunk.media) {
+                const audioBuffer = Buffer.from(
+                    chunk.media.url.substring(chunk.media.url.indexOf(',') + 1),
+                    'base64'
+                );
+                streamingCallback(audioBuffer.toString('base64'));
+            }
+        }
+    }
+    
+    const finalResponse = await responsePromise;
+    const finalMedia = finalResponse.media;
+
+    if (!finalMedia) {
       throw new Error('No media was returned from the TTS service.');
     }
 
     const audioBuffer = Buffer.from(
-      media.url.substring(media.url.indexOf(',') + 1),
+      finalMedia.url.substring(finalMedia.url.indexOf(',') + 1),
       'base64'
     );
+    
+    const wavData = await toWav(audioBuffer);
 
     return {
-      audioUrl: 'data:audio/wav;base64,' + (await toWav(audioBuffer)),
+      audioUrl: 'data:audio/wav;base64,' + wavData,
+      rawPcm: audioBuffer.toString('base64'),
     };
   }
 );

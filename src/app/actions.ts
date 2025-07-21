@@ -9,7 +9,7 @@ import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudioFlow, type GenerateDjAudioOutput } from '@/ai/flows/generate-dj-audio';
-import { generateCustomDjAudioFlow, type GenerateCustomDjAudioOutput } from '@/ai/flows/generate-custom-dj-audio';
+import { generateCustomDjAudioFlow, type GenerateCustomDjAudioOutput, type GenerateCustomDjAudioInput } from '@/ai/flows/generate-custom-dj-audio';
 
 
 const CreateStationSchema = z.object({
@@ -121,6 +121,25 @@ export async function createStation(ownerId: string, formData: FormData) {
   return { success: true, stationId: docRef.id };
 }
 
+export async function streamCustomDjAudio(input: GenerateCustomDjAudioInput) {
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        await generateCustomDjAudioFlow(input, (chunk) => {
+          const encoder = new TextEncoder();
+          controller.enqueue(encoder.encode(chunk));
+        });
+        controller.close();
+      } catch (e: any) {
+        console.error("Streaming error in streamCustomDjAudio:", e);
+        controller.error(new Error("Failed to stream audio."));
+      }
+    },
+  });
+
+  return stream;
+}
+
 export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
     const stationRef = doc(db, 'stations', stationId);
     const stationDoc = await getDoc(stationRef);
@@ -230,7 +249,11 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
             return {error: `Erreur Archive.org: ${response.statusText}`};
         }
         const data = await response.json();
-        const docs = data.response.docs;
+        const responseData = data.response;
+        if (!responseData || !responseData.docs) {
+          return { data: [] };
+        }
+        const docs = responseData.docs;
 
         const searchResults: PlaylistItem[] = docs
           .filter((doc: any) => doc.identifier && doc.title)
@@ -240,7 +263,7 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
             title: doc.title || 'Titre inconnu',
             artist: doc.creator || 'Artiste inconnu',
             url: `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp3`,
-            duration: Math.round(doc.duration || 180),
+            duration: Math.round(parseFloat(doc.duration) || 180),
             addedAt: new Date().toISOString(),
         }));
         

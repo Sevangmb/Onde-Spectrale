@@ -1,9 +1,9 @@
+
 'use client';
 
 import type React from 'react';
 import { Play, Pause, Rewind, FastForward, Music, MessageSquare, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { PlaylistItem } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
@@ -42,7 +42,8 @@ export function AudioPlayer({
     const audio = audioRef.current;
     if (!audio || !duration) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
+    const progressBar = e.currentTarget;
+    const rect = progressBar.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const clickedTime = (x / rect.width) * duration;
     
@@ -50,6 +51,7 @@ export function AudioPlayer({
     setCurrentTime(clickedTime);
     setProgress((clickedTime / duration) * 100);
   }, [audioRef, duration]);
+
 
   const handleVolumeChange = useCallback((value: number[]) => {
     const newVolume = value[0];
@@ -92,7 +94,7 @@ export function AudioPlayer({
     if (!audio) return;
     
     const updateProgress = () => {
-      if (audio.duration && audio.duration > 0) {
+      if (audio.duration && audio.duration > 0 && isFinite(audio.currentTime) && isFinite(audio.duration)) {
         const current = audio.currentTime;
         const total = audio.duration;
         setCurrentTime(current);
