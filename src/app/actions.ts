@@ -32,14 +32,29 @@ function serializeStation(doc: any): Station {
 
 export async function getStationForFrequency(frequency: number): Promise<Station | null> {
     const stationsCol = collection(db, 'stations');
-    const q = query(stationsCol, where('frequency', '==', frequency));
+    
+    // Utiliser une petite marge pour la recherche pour éviter les problèmes de virgule flottante
+    const margin = 0.01;
+    const lowerBound = frequency - margin;
+    const upperBound = frequency + margin;
+
+    const q = query(
+        stationsCol, 
+        where('frequency', '>=', lowerBound),
+        where('frequency', '<=', upperBound)
+    );
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
         return null;
     }
 
-    const stationDoc = querySnapshot.docs[0];
+    // Il pourrait y avoir plusieurs correspondances si les marges se chevauchent.
+    // On prend la plus proche.
+    const stationDoc = querySnapshot.docs.sort((a, b) => 
+        Math.abs(a.data().frequency - frequency) - Math.abs(b.data().frequency - frequency)
+    )[0];
+    
     return serializeStation(stationDoc);
 }
 
