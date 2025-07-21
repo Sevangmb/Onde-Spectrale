@@ -2,7 +2,7 @@
 'use client';
 
 import type React from 'react';
-import { Play, Pause, Rewind, FastForward, Music, MessageSquare, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, Music, MessageSquare, Volume2, VolumeX, Volume1, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { PlaylistItem } from '@/lib/types';
@@ -103,12 +103,17 @@ export function AudioPlayer({
       if (audio.duration && isFinite(audio.currentTime) && isFinite(audio.duration) && audio.duration > 0) {
         setCurrentTime(audio.currentTime);
         setProgress((audio.currentTime / audio.duration) * 100);
+      } else {
+        setCurrentTime(0);
+        setProgress(0);
       }
     };
 
     const handleLoadedMetadata = () => {
       if (isFinite(audio.duration)) {
         setDuration(audio.duration);
+      } else {
+        setDuration(0);
       }
       updateProgress();
     };
@@ -116,8 +121,15 @@ export function AudioPlayer({
     const handleCanPlay = () => {
       if (isFinite(audio.duration)) {
         setDuration(audio.duration);
+      } else {
+        setDuration(0);
       }
     }
+    
+    // Reset state when track changes
+    setDuration(0);
+    setCurrentTime(0);
+    setProgress(0);
 
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -134,12 +146,7 @@ export function AudioPlayer({
     };
   }, [audioRef, track]);
 
-  if (!track) {
-    return null;
-  }
-  
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
-
 
   return (
     <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
@@ -152,22 +159,25 @@ export function AudioPlayer({
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
           <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3 shadow-lg shadow-orange-500/10">
-            {track.type === 'music' ? 
+            { !track ? <Radio className="h-8 w-8 text-orange-400 animate-pulse" /> :
+              track.type === 'music' ? 
               <Music className="h-8 w-8 text-orange-400 animate-pulse" /> : 
               <MessageSquare className="h-8 w-8 text-orange-400 animate-pulse" />
             }
           </div>
           <div className="flex-grow overflow-hidden">
             <p className="text-lg font-medium text-orange-100 truncate drop-shadow-lg animate-flicker-subtle">
-              {track.title}
+              {track ? track.title : "Statique"}
             </p>
-            {track.artist && (
+            {track?.artist && (
               <p className="text-sm text-orange-300/80 truncate">
                 {track.artist}
               </p>
             )}
-            <p className="text-xs text-orange-400/60 uppercase tracking-wider">
-              {track.type === 'music' ? 'MUSIQUE' : 'MESSAGE'}
+             <p className="text-xs text-orange-400/60 uppercase tracking-wider">
+              { !track ? 'INTERFÉRENCE' :
+                track.type === 'music' ? 'MUSIQUE' : 'MESSAGE'
+              }
             </p>
           </div>
           

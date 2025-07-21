@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
-import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
 import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
@@ -168,7 +167,6 @@ export function OndeSpectraleRadio() {
       return;
     }
     
-    // Function to handle playing the audio once it's ready
     const handleCanPlay = () => {
       if (isPlaying) {
         audio.play().catch(e => {
@@ -179,26 +177,21 @@ export function OndeSpectraleRadio() {
             }
         });
       }
-      // Remove listener after it has been used to avoid multiple plays
       audio.removeEventListener('canplay', handleCanPlay);
     };
 
-    // Attach the event listener
     audio.addEventListener('canplay', handleCanPlay);
-
-    // Set the source and load it. The event listener will handle the play.
+    
     if (audio.src !== url) {
         audio.src = url;
         audio.load();
     } else if (isPlaying) {
-        // if src is same and we want to play (e.g. unpausing)
         audio.play().catch(e => console.error("Error resuming play:", e));
     }
 
   }, [isPlaying]);
 
 
-  // Effect 1: Fetch station data on frequency change
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -216,7 +209,6 @@ export function OndeSpectraleRadio() {
             selectNextTrack();
             setIsPlaying(true);
           } else {
-            // Station exists but playlist is empty
              loadAndPlayAudio(undefined);
           }
         } else {
@@ -237,14 +229,6 @@ export function OndeSpectraleRadio() {
 
     fetchData();
   }, [debouncedFrequency, selectNextTrack, loadAndPlayAudio]);
-
-  const onTrackSelect = useCallback((index: number) => {
-    if (playlist.length === 0 || index < 0 || index >= playlist.length) return;
-    
-    setCurrentTrackIndex(index);
-    setLastTrackWasMessage(playlist[index].type === 'message');
-    setIsPlaying(true);
-  }, [playlist]);
   
   const onEnded = useCallback(() => {
     if (audioRef.current && audioRef.current.loop) return;
@@ -253,7 +237,6 @@ export function OndeSpectraleRadio() {
   }, [selectNextTrack]);
 
 
-  // Effect 2: Prepare Audio URL when track changes and initiate playback
   useEffect(() => {
     const prepareAudio = async () => {
         if (currentBlobUrl.current) {
@@ -262,8 +245,10 @@ export function OndeSpectraleRadio() {
         }
 
         if (!currentTrack) {
-            if (!currentStation) { // Only play static if there is no station
+            if (!currentStation) { 
               loadAndPlayAudio('/audio/static.mp3', true);
+            } else {
+              loadAndPlayAudio(undefined, false);
             }
             return;
         }
@@ -281,7 +266,6 @@ export function OndeSpectraleRadio() {
             }
 
             setIsGeneratingMessage(true);
-
             const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
             
             if (result.audioBase64) {
@@ -318,12 +302,11 @@ export function OndeSpectraleRadio() {
     };
   }, [currentTrack, currentStation, user, loadAndPlayAudio]);
 
-  // Effect 3: Handle play/pause state changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     
-    if (isPlaying && audio.src && audio.readyState >= 2) { // HAVE_CURRENT_DATA
+    if (isPlaying && audio.src && audio.readyState >= 2) {
         audio.play().catch(e => {
             if (e.name !== 'AbortError') console.error("Error on play:", e);
         });
@@ -346,13 +329,25 @@ export function OndeSpectraleRadio() {
   const handlePlayPause = useCallback(() => {
     if (isGeneratingMessage) return;
 
-    if (!audioRef.current?.src) {
-        setIsPlaying(false);
-        return;
+    if (!audioRef.current?.src && !currentStation) {
+      loadAndPlayAudio('/audio/static.mp3', true);
+      setIsPlaying(true);
+      return;
     }
     
+    if (!audioRef.current?.src && currentStation && playlist.length === 0) {
+      setIsPlaying(false);
+      return;
+    }
+    
+    if (!audioRef.current?.src && currentStation && playlist.length > 0) {
+      selectNextTrack();
+      setIsPlaying(true);
+      return;
+    }
+
     setIsPlaying(prev => !prev);
-  }, [isGeneratingMessage]);
+  }, [isGeneratingMessage, currentStation, playlist, selectNextTrack, loadAndPlayAudio]);
 
 
   return (
@@ -392,7 +387,7 @@ export function OndeSpectraleRadio() {
         )}
 
         <div className="relative z-10 flex min-h-[90vh] w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
-          <div className="w-full max-w-4xl mx-auto">
+          <div className="w-full max-w-xl mx-auto">
             <Card className="w-full border-2 border-orange-500/30 bg-black/80 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
               <div className="absolute inset-0 pointer-events-none">
                 <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
@@ -425,7 +420,7 @@ export function OndeSpectraleRadio() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="grid md:grid-cols-2 gap-8 p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
+              <CardContent className="p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
                 <div className="flex flex-col gap-6">
                   <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
                     <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -547,7 +542,7 @@ export function OndeSpectraleRadio() {
                       </div>
                     )}
                   </div>
-                   {(currentStation && playlist.length > 0) && (
+                   {(currentStation && playlist.length > 0) || !currentStation ? (
                      <AudioPlayer 
                        track={currentTrack} 
                        isPlaying={isPlaying} 
@@ -556,17 +551,7 @@ export function OndeSpectraleRadio() {
                        onPrev={handlePrev} 
                        audioRef={audioRef} 
                      />
-                   )}
-                </div>
-                
-                <div className="flex flex-col">
-                  <EnhancedPlaylist 
-                    playlist={playlist}
-                    currentTrackIndex={currentTrackIndex}
-                    isPlaying={isPlaying}
-                    isLoading={isLoading}
-                    onTrackSelect={onTrackSelect}
-                  />
+                   ) : null }
                 </div>
               </CardContent>
             </Card>
