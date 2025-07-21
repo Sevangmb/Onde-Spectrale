@@ -63,7 +63,7 @@ const generatePlaylistFlow = ai.defineFlow(
     outputSchema: GeneratePlaylistOutputSchema,
   },
   async (input) => {
-    const { output } = await playlistPrompt({ input, model: 'googleai/gemini-1.5-flash-latest' });
+    const { output } = await playlistPrompt({ input, model: googleAI.model('gemini-1.5-flash-latest') });
     if (!output) {
       throw new Error("L'IA n'a pas réussi à générer de script pour la playlist.");
     }
