@@ -97,7 +97,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'Antares'; // Default to a neutral voice
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
+      model: 'gemini-2.5-flash-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
@@ -106,7 +106,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
           },
         },
       },
-      prompt: message,
+      prompt: { text: message },
     });
 
     if (!media) {

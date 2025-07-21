@@ -104,7 +104,7 @@ const generateDjAudioFlow = ai.defineFlow({
     const character = await getDjCharacter(input);
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
+      model: 'gemini-2.5-flash-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
@@ -113,7 +113,7 @@ const generateDjAudioFlow = ai.defineFlow({
           },
         },
       },
-      prompt: input.message,
+      prompt: { text: input.message },
     });
 
     if (!media) {
