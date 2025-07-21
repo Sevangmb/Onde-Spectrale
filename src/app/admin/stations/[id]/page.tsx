@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminLayout } from '../../layout';
-import { getStationById, addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
+import { getStationById, addMessageToStation, addMusicToStation, searchMusic, generateAndAddPlaylist } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -33,7 +33,8 @@ import {
   ListMusic,
   Clock,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 export default function StationDetailPage() {
@@ -55,6 +56,9 @@ export default function StationDetailPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   
   const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
+
+  const [playlistTheme, setPlaylistTheme] = useState('Annonces optimistes et conseils de survie');
+  const [isGeneratingPlaylist, setIsGeneratingPlaylist] = useState(false);
 
 
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
@@ -117,6 +121,24 @@ export default function StationDetailPage() {
     }
     setAddingTrackId(null);
   }
+
+  const handleGeneratePlaylist = async () => {
+    if (!station || !playlistTheme.trim()) {
+        toast({ variant: 'destructive', title: "Erreur", description: "Le thème de la playlist ne peut pas être vide." });
+        return;
+    }
+    setIsGeneratingPlaylist(true);
+    const result = await generateAndAddPlaylist(station.id, playlistTheme);
+    
+    if (result.error) {
+        toast({ variant: 'destructive', title: "Erreur de génération", description: result.error });
+    } else {
+        toast({ title: "Playlist Générée !", description: `${result.playlist.length} pistes ont été ajoutées à votre station.` });
+        setStation(prev => prev ? { ...prev, playlist: result.playlist } : null);
+    }
+    
+    setIsGeneratingPlaylist(false);
+  };
 
   const sortedPlaylist = useMemo(() => {
     if (!station?.playlist) return [];
@@ -199,8 +221,33 @@ export default function StationDetailPage() {
 
          <Card className="lg:col-span-2">
             <CardHeader>
-                <CardTitle>Gérer la Playlist</CardTitle>
-                 <CardDescription>Ajoutez des messages de votre DJ ou des musiques d'ambiance.</CardDescription>
+                <CardTitle>Générateur de Playlist IA</CardTitle>
+                 <CardDescription>Laissez l'IA créer une émission complète pour vous !</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="playlist-theme">Thème de l'émission</Label>
+                    <Input
+                        id="playlist-theme"
+                        value={playlistTheme}
+                        onChange={(e) => setPlaylistTheme(e.target.value)}
+                        placeholder="Ex: Histoires d'espoir, chroniques des anciens temps..."
+                    />
+                     <p className="text-xs text-muted-foreground">
+                        L'IA générera des messages et ajoutera des musiques en fonction de ce thème.
+                     </p>
+                </div>
+                <Button onClick={handleGeneratePlaylist} disabled={isGeneratingPlaylist} className="w-full">
+                    {isGeneratingPlaylist ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
+                    {isGeneratingPlaylist ? 'Génération en cours...' : 'Générer et remplacer la playlist'}
+                </Button>
+            </CardContent>
+         </Card>
+      </div>
+       <Card>
+            <CardHeader>
+                <CardTitle>Ajout Manuel</CardTitle>
+                 <CardDescription>Ajoutez des messages ou des musiques spécifiques à la suite de la playlist actuelle.</CardDescription>
             </CardHeader>
             <CardContent>
                <Tabs defaultValue="message">
@@ -220,8 +267,8 @@ export default function StationDetailPage() {
                         className="min-h-[120px]"
                       />
                       <Button onClick={handleGenerateMessage} disabled={isGenerating || !message} className="w-full">
-                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                        Générer et ajouter à la playlist
+                        {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                        Ajouter à la playlist
                       </Button>
                     </div>
                   </TabsContent>
@@ -276,7 +323,6 @@ export default function StationDetailPage() {
                </Tabs>
             </CardContent>
          </Card>
-      </div>
       
        <Card>
           <CardHeader>
@@ -300,7 +346,7 @@ export default function StationDetailPage() {
                                     <Clock className="h-4 w-4"/>
                                     <span>{formatDuration(item.duration)}</span>
                                 </div>
-                                 {item.type === 'music' && (
+                                 {item.type === 'music' && item.id.startsWith('ftr-') === false && (
                                      <Button asChild variant="ghost" size="icon">
                                         <a href={`https://archive.org/details/${item.id}`} target="_blank" rel="noopener noreferrer" title="Voir sur Archive.org">
                                            <ExternalLink className="h-4 w-4"/>
@@ -315,7 +361,7 @@ export default function StationDetailPage() {
                 <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
                     <ListMusic className="mx-auto h-12 w-12 mb-4" />
                     <h3 className="text-lg font-semibold">La playlist est vide</h3>
-                    <p>Ajoutez des messages ou de la musique pour commencer.</p>
+                    <p>Utilisez le générateur IA pour commencer ou ajoutez des pistes manuellement.</p>
                 </div>
             )}
           </CardContent>

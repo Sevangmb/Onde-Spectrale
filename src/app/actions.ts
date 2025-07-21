@@ -6,10 +6,11 @@ import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
 import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
-import { DJ_CHARACTERS } from '@/lib/data';
+import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
+import { generatePlaylist, type GeneratePlaylistInput, type GeneratePlaylistOutput } from '@/ai/flows/generate-playlist-flow';
 
 
 const CreateStationSchema = z.object({
@@ -142,38 +143,29 @@ export async function addMessageToStation(stationId: string, message: string): P
         return { error: "Station non trouvée." };
     }
     
-    const officialCharacter = DJ_CHARACTERS.find(c => c.id === station.djCharacterId);
+    const allDjs = await getCustomCharactersForUser(station.ownerId);
+    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+    const dj = fullDjList.find(d => d.id === station.djCharacterId);
 
-    let audio;
-    let base64Data: string;
+    if (!dj) {
+      return { error: "Personnage DJ non trouvé." };
+    }
+
+    let audioResult;
 
     try {
-      if (officialCharacter) {
-          audio = await generateDjAudio({
-              message,
-              characterId: officialCharacter.id
-          });
-          base64Data = audio.audioUrl.split(',')[1];
+      if ('isCustom' in dj && dj.isCustom) {
+          audioResult = await generateCustomDjAudio({ message, voice: dj.voice });
       } else {
-          const customCharRef = doc(db, 'users', station.ownerId, 'characters', station.djCharacterId);
-          const customCharDoc = await getDoc(customCharRef);
-          if (!customCharDoc.exists()) {
-              return { error: "Personnage DJ personnalisé non trouvé." };
-          }
-          const customChar = customCharDoc.data() as CustomDJCharacter;
-          const result = await generateCustomDjAudio({
-              message,
-              voice: customChar.voice
-          });
-          base64Data = result.audioBase64;
+          audioResult = await generateDjAudio({ message, characterId: dj.id });
       }
 
-      if (!base64Data) {
+      if (!audioResult || !audioResult.audioBase64) {
         throw new Error('Données audio base64 invalides ou vides.');
       }
 
     } catch(err: any) {
-      return { error: "La génération de la voix IA a échoué. Vérifiez la console pour les détails." };
+      return { error: `La génération de la voix IA a échoué: ${err.message}` };
     }
     
     // Upload audio to Firebase Storage
@@ -183,21 +175,21 @@ export async function addMessageToStation(stationId: string, message: string): P
     let downloadUrl = '';
 
     try {
-        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+        const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', {
             contentType: 'audio/wav'
         });
         downloadUrl = await getDownloadURL(snapshot.ref);
-    } catch (storageError) {
-        return { error: "L'enregistrement du fichier audio a échoué. Vérifiez la console." };
+    } catch (storageError: any) {
+        return { error: `L'enregistrement du fichier audio a échoué: ${storageError.message}` };
     }
 
     const newPlaylistItem: PlaylistItem = {
         id: messageId,
         type: 'message',
         title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
-        url: downloadUrl, // Use the public URL from Firebase Storage
+        url: downloadUrl, 
         duration: 15, // Mock duration, could be calculated from audio file
-        artist: station.djCharacterId,
+        artist: dj.name,
         addedAt: new Date().toISOString(),
     };
     
@@ -398,4 +390,101 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
   });
 }
 
+export async function generateAndAddPlaylist(stationId: string, theme: string): Promise<{ success: true, playlist: PlaylistItem[] } | { error: string }> {
+    const stationRef = doc(db, 'stations', stationId);
+    const stationDoc = await getDoc(stationRef);
+    if (!stationDoc.exists()) {
+        return { error: "Station non trouvée." };
+    }
+    const station = await getStationById(stationId);
+    if (!station) {
+        return { error: "Station non trouvée." };
+    }
+
+    const allDjs = await getCustomCharactersForUser(station.ownerId);
+    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+    const dj = fullDjList.find(d => d.id === station.djCharacterId);
+
+    if (!dj) {
+      return { error: "Personnage DJ non trouvé." };
+    }
+
+    // 1. Generate script from AI
+    let playlistScript: GeneratePlaylistOutput;
+    try {
+        playlistScript = await generatePlaylist({
+            stationName: station.name,
+            djName: dj.name,
+            djDescription: 'description' in dj ? dj.description : 'Un DJ mystérieux',
+            theme: theme,
+        });
+    } catch (e: any) {
+        return { error: `L'IA n'a pas pu générer de playlist: ${e.message}` };
+    }
     
+    if (!playlistScript || !playlistScript.items) {
+      return { error: "L'IA n'a pas pu générer de playlist. Essayez un autre thème." };
+    }
+    
+    const newPlaylist: PlaylistItem[] = [];
+
+    // 2. Process each item
+    for (const item of playlistScript.items) {
+        if (item.type === 'message') {
+            let audioResult;
+            try {
+                if ('isCustom' in dj && dj.isCustom) {
+                    audioResult = await generateCustomDjAudio({ message: item.content, voice: dj.voice });
+                } else {
+                    audioResult = await generateDjAudio({ message: item.content, characterId: dj.id });
+                }
+
+                if (!audioResult || !audioResult.audioBase64) {
+                    throw new Error('Données audio générées vides.');
+                }
+            } catch (e: any) {
+                console.error(`Skipping message due to TTS error: ${e.message}`);
+                continue; // Skip this item and continue with the next
+            }
+            
+            const messageId = `msg-${Date.now()}-${Math.random()}`;
+            const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
+            const storageRef = ref(storage, audioPath);
+            let downloadUrl: string;
+            
+            try {
+                const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', { contentType: 'audio/wav' });
+                downloadUrl = await getDownloadURL(snapshot.ref);
+            } catch(e) {
+                 console.error(`Skipping message due to upload error: ${e}`);
+                 continue;
+            }
+
+            newPlaylist.push({
+                id: messageId,
+                type: 'message',
+                title: item.content.substring(0, 40) + '...',
+                url: downloadUrl,
+                duration: 15, // MOCK DURATION
+                artist: dj.name,
+                addedAt: new Date().toISOString(),
+            });
+
+        } else if (item.type === 'music') {
+            const randomTrack = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+            newPlaylist.push({
+                ...randomTrack,
+                id: `${randomTrack.id}-${Date.now()}-${Math.random()}`, // Ensure unique ID for each playlist instance
+                addedAt: new Date().toISOString(),
+            });
+        }
+    }
+    
+    // 3. Update Firestore with the new playlist
+    await updateDoc(stationRef, {
+        playlist: newPlaylist // Replace the entire playlist
+    });
+
+    revalidatePath(`/admin/stations/${stationId}`);
+    return { success: true, playlist: newPlaylist };
+}
