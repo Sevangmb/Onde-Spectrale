@@ -20,7 +20,7 @@ const GenerateDjAudioInputSchema = z.object({
 type GenerateDjAudioInput = z.infer<typeof GenerateDjAudioInputSchema>;
 
 const GenerateDjAudioOutputSchema = z.object({
-  audioUrl: z.string().describe('The URL of the generated audio clip.'),
+  audioBase64: z.string().describe('The base64 encoded WAV audio data.'),
 });
 type GenerateDjAudioOutput = z.infer<typeof GenerateDjAudioOutputSchema>;
 
@@ -45,17 +45,17 @@ async (input) => {
       case 'marcus':
         return {
           name: 'Marcus',
-          voiceName: 'Mizar',
+          voiceName: 'rasalgethi', // Voix masculine grave et autoritaire
         };
       case 'sarah':
         return {
           name: 'Sarah',
-          voiceName: 'Alhena',
+          voiceName: 'autonoe', // Voix féminine douce et posée
         };
       case 'tommy':
         return {
           name: 'Tommy',
-          voiceName: 'Antares',
+          voiceName: 'zephyr', // Voix masculine joviale et énergique
         };
       default:
         throw new Error(`Unknown character ID: ${input.characterId}`);
@@ -121,7 +121,7 @@ const generateDjAudioFlow = ai.defineFlow({
     );
 
     return {
-      audioUrl: 'data:audio/wav;base64,' + (await toWav(audioBuffer)),
+      audioBase64: await toWav(audioBuffer),
     };
   }
 );
