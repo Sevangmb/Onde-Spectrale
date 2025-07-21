@@ -13,21 +13,6 @@ import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist } from '@/ai/flows/generate-playlist-flow';
 
-// Define types locally as they are not exported from the flow file
-type GeneratePlaylistInput = {
-    stationName: string;
-    djName: string;
-    djDescription: string;
-    theme: string;
-};
-
-type GeneratePlaylistOutput = {
-    items: {
-        type: 'message' | 'music';
-        content: string;
-    }[];
-};
-
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
   frequency: z.number(),
@@ -366,6 +351,20 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
     };
   });
 }
+
+type GeneratePlaylistInput = {
+    stationName: string;
+    djName: string;
+    djDescription: string;
+    theme: string;
+};
+
+type GeneratePlaylistOutput = {
+    items: {
+        type: 'message' | 'music';
+        content: string;
+    }[];
+};
 
 export async function generateAndAddPlaylist(stationId: string, theme: string): Promise<{ success: true, playlist: PlaylistItem[] } | { error: string }> {
     const station = await getStationById(stationId);
