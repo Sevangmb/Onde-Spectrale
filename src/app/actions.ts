@@ -11,7 +11,7 @@ import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
-import { generateThemedMessage } from '@/ai/flows/generate-themed-message';
+import { generateThemedMessage, type GenerateThemedMessageInput } from '@/ai/flows/generate-themed-message';
 
 
 const CreateStationSchema = z.object({
@@ -390,17 +390,16 @@ export async function addThemedMessageToStation(stationId: string, theme: string
     let generatedMessage: { message: string; } | undefined;
     
     try {
-        const input = {
+        const input: GenerateThemedMessageInput = {
             djName: dj.name,
             djDescription: 'description' in dj ? dj.description : 'Un DJ mystérieux',
             theme: theme,
         };
         generatedMessage = await generateThemedMessage(input);
     } catch (e: any) {
-        let errorMessage = e.message;
-        if (e.message.includes('503')) {
-           errorMessage = "Les serveurs de l'IA sont actuellement surchargés. Veuillez réessayer dans quelques instants.";
-        }
+        const errorMessage = e.message.includes('503') 
+            ? "Les serveurs de l'IA sont actuellement surchargés. Veuillez réessayer dans quelques instants."
+            : e.message;
        return { error: `L'IA n'a pas pu générer de message: ${errorMessage}` };
     }
     

@@ -3,6 +3,7 @@
 
 /**
  * @fileOverview This file defines a Genkit flow for generating a single, themed DJ message.
+ * It includes a retry mechanism to handle temporary server overloads.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,10 +15,14 @@ const GenerateThemedMessageInputSchema = z.object({
   djDescription: z.string().describe('Une brève description de la personnalité du DJ.'),
   theme: z.string().describe("Le thème général du message (ex: espoir, survie, humour noir)."),
 });
+export type GenerateThemedMessageInput = z.infer<typeof GenerateThemedMessageInputSchema>;
+
 
 const GenerateThemedMessageOutputSchema = z.object({
   message: z.string().describe("Le message thématique généré pour le DJ."),
 });
+export type GenerateThemedMessageOutput = z.infer<typeof GenerateThemedMessageOutputSchema>;
+
 
 const themedMessagePrompt = ai.definePrompt({
   name: 'generateThemedMessagePrompt',
@@ -39,12 +44,39 @@ const themedMessagePrompt = ai.definePrompt({
   `,
 });
 
-export async function generateThemedMessage(
-  input: z.infer<typeof GenerateThemedMessageInputSchema>
-): Promise<z.infer<typeof GenerateThemedMessageOutputSchema>> {
-  const { output } = await themedMessagePrompt(input, { model: googleAI.model('gemini-1.5-flash-latest') });
-  if (!output || !output.message) {
-    throw new Error("L'IA n'a pas réussi à générer de message.");
+
+const generateThemedMessageFlow = ai.defineFlow(
+  {
+    name: 'generateThemedMessageFlow',
+    inputSchema: GenerateThemedMessageInputSchema,
+    outputSchema: GenerateThemedMessageOutputSchema,
+  },
+  async (input) => {
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const { output } = await themedMessagePrompt(input, { model: googleAI.model('gemini-1.5-flash-latest') });
+        if (!output || !output.message) {
+          throw new Error("L'IA n'a pas réussi à générer de message.");
+        }
+        return output;
+      } catch (e: any) {
+        attempts++;
+        if (e.message.includes('503') && attempts < 3) {
+          console.log(`Attempt ${attempts} failed with 503 error. Retrying in 1.5s...`);
+          await new Promise(resolve => setTimeout(resolve, 1500)); // wait 1.5s
+          continue;
+        }
+        // Re-throw other errors or if max attempts reached
+        throw e;
+      }
+    }
+    // This part should be unreachable if the loop logic is correct
+    throw new Error("Impossible de générer le message après plusieurs tentatives.");
   }
-  return output;
+);
+
+
+export async function generateThemedMessage(input: GenerateThemedMessageInput): Promise<GenerateThemedMessageOutput> {
+  return generateThemedMessageFlow(input);
 }
