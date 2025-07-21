@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/simulate-frequency-interference.ts';
+// Keep only the audio generation flows
 import '@/ai/flows/generate-dj-audio.ts';
 import '@/ai/flows/generate-custom-dj-audio.ts';

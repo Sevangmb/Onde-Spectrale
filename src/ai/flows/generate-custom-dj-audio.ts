@@ -22,11 +22,17 @@ const voiceMap: { [key: string]: { [key: string]: string } } = {
     calm: 'Encke',
     energetic: 'Talitha',
     joker: 'Mizar',
+    deep: 'Encke', // map deep to a specific voice
+    medium: 'Talitha',
+    high: 'Mizar'
   },
   female: {
     calm: 'Alhena',
     energetic: 'Regulus',
     joker: 'Caph',
+    deep: 'Alhena',
+    medium: 'Regulus',
+    high: 'Caph'
   },
 };
 
@@ -34,7 +40,6 @@ const VoiceInputSchema = z.object({
   gender: z.string().describe('The gender of the voice (e.g., "male", "female").'),
   tone: z.string().describe('The tone of the voice (e.g., "deep", "medium", "high").'),
   style: z.string().describe('The speaking style (e.g., "calm", "energetic", "joker").'),
-  speakingRate: z.number().describe('The speaking rate, from 0.25 to 4.0.'),
 });
 
 const GenerateCustomDjAudioInputSchema = z.object({
@@ -88,10 +93,11 @@ const generateCustomDjAudioFlow = ai.defineFlow({
   async input => {
     const { voice, message } = input;
     
-    const voiceName = voiceMap[voice.gender]?.[voice.style] || 'Antares'; // Default to a neutral voice
+    // Prioritize style, then tone for voice mapping
+    const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'Antares'; // Default to a neutral voice
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.5-pro-preview-tts',
+      model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {

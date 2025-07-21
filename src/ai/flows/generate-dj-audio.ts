@@ -33,8 +33,6 @@ export async function generateDjAudio(input: GenerateDjAudioInput): Promise<Gene
 const DjCharacterSchema = z.object({
   name: z.string(),
   voiceName: z.string(),
-  pitch: z.number(),
-  speakingRate: z.number(),
 });
 
 const getDjCharacter = ai.defineTool({
@@ -53,22 +51,16 @@ async (input) => {
         return {
           name: 'Marcus',
           voiceName: 'Mizar', // Corrected for Gemini TTS
-          pitch: -2,
-          speakingRate: 0.9,
         };
       case 'sarah':
         return {
           name: 'Sarah',
           voiceName: 'Alhena', // Corrected for Gemini TTS
-          pitch: 1,
-          speakingRate: 1.1,
         };
       case 'tommy':
         return {
           name: 'Tommy',
           voiceName: 'Antares', // Corrected for Gemini TTS
-          pitch: 0,
-          speakingRate: 1.0,
         };
       default:
         throw new Error(`Unknown character ID: ${input.characterId}`);
@@ -112,7 +104,7 @@ const generateDjAudioFlow = ai.defineFlow({
     const character = await getDjCharacter(input);
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.5-pro-preview-tts',
+      model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
