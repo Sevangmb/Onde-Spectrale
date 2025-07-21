@@ -65,10 +65,8 @@ export default function StationDetailPage({ params }: { params: { id: string } }
   }, [params.id]);
 
   useEffect(() => {
-    if (params.id) {
-      fetchStation();
-    }
-  }, [params.id, fetchStation]);
+    fetchStation();
+  }, [fetchStation]);
 
   const handleGenerateMessage = async () => {
     if (!station || message.trim().length < 5) {
