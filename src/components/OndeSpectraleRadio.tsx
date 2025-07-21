@@ -4,8 +4,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
 import { getStationForFrequency, getInterference, updateUserFrequency, getAudioForMessage } from '@/app/actions';
-import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
-import { DJ_CHARACTERS } from '@/lib/data';
+import type { Station, PlaylistItem } from '@/lib/types';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -18,7 +17,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
+import { RadioTower, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2, UserCog } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -41,8 +40,6 @@ export function OndeSpectraleRadio() {
   const [currentTrackIndex, setCurrentTrackIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
-  const [lastTrackWasMessage, setLastTrackWasMessage] = useState(false);
-
 
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
@@ -51,12 +48,18 @@ export function OndeSpectraleRadio() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
 
+  const messagePlaylist = useMemo(() => {
+    if (!currentStation?.playlist) return [];
+    // Filter for messages and store original index
+    return currentStation.playlist
+      .map((item, index) => ({ ...item, originalIndex: index }))
+      .filter(item => item.type === 'message');
+  }, [currentStation]);
 
-  const playlist = useMemo(() => currentStation?.playlist || [], [currentStation]);
   const currentTrack = useMemo(() => {
-    if (currentTrackIndex === -1 || !playlist[currentTrackIndex]) return undefined;
-    return playlist[currentTrackIndex];
-  }, [playlist, currentTrackIndex]);
+    if (!currentStation?.playlist || currentTrackIndex < 0) return undefined;
+    return currentStation.playlist[currentTrackIndex];
+  }, [currentStation, currentTrackIndex]);
 
   const isRadioActive = useMemo(() => {
     return isClient && !isLoading && (currentStation !== null || !!interference);
@@ -112,12 +115,6 @@ export function OndeSpectraleRadio() {
     return () => unsubscribe();
   }, []);
 
-  const dj = useMemo(() => {
-    if (!currentStation) return null;
-    const allDjs: (CustomDJCharacter | (typeof DJ_CHARACTERS[0]))[] = [...DJ_CHARACTERS];
-    return allDjs.find(d => d.id === currentStation.djCharacterId) || null;
-  }, [currentStation]);
-
   const handleFrequencyChange = (value: number[]) => {
     setFrequency(value[0]);
   };
@@ -129,43 +126,18 @@ export function OndeSpectraleRadio() {
   }
 
   const selectNextTrack = useCallback(() => {
-    if (!playlist || playlist.length === 0) {
+    if (messagePlaylist.length === 0) {
       setCurrentTrackIndex(-1);
       return;
     }
-
-    const musicTracks = playlist.map((p, i) => ({...p, originalIndex: i})).filter(p => p.type === 'music');
-    const messageTracks = playlist.map((p, i) => ({...p, originalIndex: i})).filter(p => p.type === 'message');
-
-    // Decide whether to play a message
-    if (!lastTrackWasMessage && messageTracks.length > 0 && Math.random() < 0.3) { // 30% chance to play a message
-      const randomMessageIndex = Math.floor(Math.random() * messageTracks.length);
-      setCurrentTrackIndex(messageTracks[randomMessageIndex].originalIndex);
-      setLastTrackWasMessage(true);
-    } else {
-      if (musicTracks.length > 0) {
-        const randomMusicIndex = Math.floor(Math.random() * musicTracks.length);
-        setCurrentTrackIndex(musicTracks[randomMusicIndex].originalIndex);
-        setLastTrackWasMessage(false);
-      } else { // No music, just play messages
-        const randomMessageIndex = Math.floor(Math.random() * messageTracks.length);
-        setCurrentTrackIndex(messageTracks[randomMessageIndex].originalIndex);
-        setLastTrackWasMessage(true);
-      }
-    }
-  }, [playlist, lastTrackWasMessage]);
+    const randomIndex = Math.floor(Math.random() * messagePlaylist.length);
+    const originalIndex = messagePlaylist[randomIndex].originalIndex;
+    setCurrentTrackIndex(originalIndex);
+  }, [messagePlaylist]);
   
-  const loadAndPlayAudio = useCallback((url: string | undefined, loop = false) => {
+  const loadAndPlayAudio = useCallback((url: string) => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    audio.loop = loop;
-
-    if (!url) {
-      audio.pause();
-      audio.removeAttribute('src');
-      return;
-    }
     
     const handleCanPlay = () => {
       if (isPlaying) {
@@ -182,15 +154,10 @@ export function OndeSpectraleRadio() {
 
     audio.addEventListener('canplay', handleCanPlay);
     
-    if (audio.src !== url) {
-        audio.src = url;
-        audio.load();
-    } else if (isPlaying) {
-        audio.play().catch(e => console.error("Error resuming play:", e));
-    }
+    audio.src = url;
+    audio.load();
 
   }, [isPlaying]);
-
 
   useEffect(() => {
     const fetchData = async () => {
@@ -205,18 +172,16 @@ export function OndeSpectraleRadio() {
         
         if (station) {
           setInterference(null);
-          if (station.playlist.length > 0) {
+          if (station.playlist.some(p => p.type === 'message')) {
             selectNextTrack();
             setIsPlaying(true);
           } else {
-             loadAndPlayAudio(undefined);
+            setInterference("Cette station est silencieuse... Aucun message à diffuser.");
           }
         } else {
           setInterference(null);
           const interferenceText = await getInterference(debouncedFrequency);
           setInterference(interferenceText);
-          loadAndPlayAudio('/audio/static.mp3', true);
-          setIsPlaying(true);
         }
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}. Vérifiez les règles Firestore.`);
@@ -228,10 +193,9 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, selectNextTrack, loadAndPlayAudio]);
+  }, [debouncedFrequency, selectNextTrack]);
   
   const onEnded = useCallback(() => {
-    if (audioRef.current && audioRef.current.loop) return;
     selectNextTrack();
     setIsPlaying(true);
   }, [selectNextTrack]);
@@ -244,52 +208,44 @@ export function OndeSpectraleRadio() {
             currentBlobUrl.current = null;
         }
 
-        if (!currentTrack) {
-            if (!currentStation) { 
-              loadAndPlayAudio('/audio/static.mp3', true);
-            } else {
-              loadAndPlayAudio(undefined, false);
-            }
+        const audio = audioRef.current;
+        if(audio) audio.src = '';
+
+
+        if (!currentTrack || currentTrack.type !== 'message') {
             return;
         }
 
-        if (currentTrack.type === 'music') {
-            loadAndPlayAudio(currentTrack.url);
+        if (!currentStation || !user) {
+            setError("Connexion requise pour les messages DJ.");
+            setIsPlaying(false);
             return;
         }
 
-        if (currentTrack.type === 'message') {
-            if (!currentStation || !user) {
-                setError("Connexion requise pour les messages DJ.");
-                setIsPlaying(false);
-                return;
-            }
-
-            setIsGeneratingMessage(true);
-            const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
-            
-            if (result.audioBase64) {
-                try {
-                    const byteCharacters = atob(result.audioBase64);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: 'audio/wav' });
-                    const url = URL.createObjectURL(blob);
-                    currentBlobUrl.current = url;
-                    loadAndPlayAudio(url);
-                } catch (e) {
-                    setError("Échec du traitement des données audio.");
-                    setIsPlaying(false);
+        setIsGeneratingMessage(true);
+        const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
+        
+        if (result.audioBase64) {
+            try {
+                const byteCharacters = atob(result.audioBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
                 }
-            } else {
-                setError(result.error || "Échec de la génération audio du message.");
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                currentBlobUrl.current = url;
+                loadAndPlayAudio(url);
+            } catch (e) {
+                setError("Échec du traitement des données audio.");
                 setIsPlaying(false);
             }
-            setIsGeneratingMessage(false);
+        } else {
+            setError(result.error || "Échec de la génération audio du message.");
+            setIsPlaying(false);
         }
+        setIsGeneratingMessage(false);
     };
 
     prepareAudio();
@@ -306,7 +262,7 @@ export function OndeSpectraleRadio() {
     const audio = audioRef.current;
     if (!audio) return;
     
-    if (isPlaying && audio.src && audio.readyState >= 2) {
+    if (isPlaying && audio.src) {
         audio.play().catch(e => {
             if (e.name !== 'AbortError') console.error("Error on play:", e);
         });
@@ -315,13 +271,7 @@ export function OndeSpectraleRadio() {
     }
   }, [isPlaying]);
 
-
   const handleNext = useCallback(() => {
-    selectNextTrack();
-    setIsPlaying(true);
-  }, [selectNextTrack]);
-
-  const handlePrev = useCallback(() => {
     selectNextTrack();
     setIsPlaying(true);
   }, [selectNextTrack]);
@@ -329,25 +279,14 @@ export function OndeSpectraleRadio() {
   const handlePlayPause = useCallback(() => {
     if (isGeneratingMessage) return;
 
-    if (!audioRef.current?.src && !currentStation) {
-      loadAndPlayAudio('/audio/static.mp3', true);
-      setIsPlaying(true);
-      return;
-    }
-    
-    if (!audioRef.current?.src && currentStation && playlist.length === 0) {
-      setIsPlaying(false);
-      return;
-    }
-    
-    if (!audioRef.current?.src && currentStation && playlist.length > 0) {
+    if (!currentTrack && messagePlaylist.length > 0) {
       selectNextTrack();
       setIsPlaying(true);
       return;
     }
 
     setIsPlaying(prev => !prev);
-  }, [isGeneratingMessage, currentStation, playlist, selectNextTrack, loadAndPlayAudio]);
+  }, [isGeneratingMessage, currentTrack, messagePlaylist, selectNextTrack]);
 
 
   return (
@@ -358,7 +297,6 @@ export function OndeSpectraleRadio() {
         crossOrigin="anonymous"
       />
       <div className="relative w-full min-h-[90vh] overflow-hidden">
-        {/* Arrière-plan post-apocalyptique animé */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
         
         <div className="absolute inset-0 opacity-30">
@@ -517,41 +455,16 @@ export function OndeSpectraleRadio() {
                   </div>
                   
                   <SpectrumAnalyzer isPlaying={isPlaying} audioRef={audioRef} className="h-24" />
+                  
+                  <AudioPlayer 
+                    track={currentTrack} 
+                    isPlaying={isPlaying} 
+                    onPlayPause={handlePlayPause} 
+                    onNext={handleNext} 
+                    onPrev={handleNext} // Using next for prev as it's random anyway
+                    audioRef={audioRef} 
+                  />
 
-                  <div className="h-40 bg-black/70 border border-orange-500/40 rounded-lg p-4 flex flex-col justify-center items-center text-center backdrop-blur-sm shadow-lg shadow-orange-500/10">
-                    {isLoading || isGeneratingMessage ? (
-                      <div className="flex flex-col items-center gap-2 text-orange-300">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="font-semibold">{isLoading ? 'Syntonisation...' : 'Génération du message...'}</p>
-                      </div>
-                    ) : error ? (
-                       <div className="text-red-400 flex flex-col items-center gap-2">
-                          <AlertTriangle className="h-8 w-8 text-red-500 animate-pulse" />
-                          <p className="font-semibold">Erreur de connexion</p>
-                          <p className="text-sm text-red-300/80">{error}</p>
-                       </div>
-                    ) : currentStation ? (
-                      <>
-                        <RadioTower className="h-6 w-6 text-orange-400 mb-2 animate-pulse" />
-                        <h3 className="font-headline text-2xl text-orange-100 drop-shadow-lg">{currentStation.name}</h3>
-                        <p className="text-orange-300/80">DJ: {dj?.name || 'Inconnu'}</p>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center text-center">
-                        <p className="text-lg text-orange-300/70 animate-glitch break-words">{interference || 'Statique...'}</p>
-                      </div>
-                    )}
-                  </div>
-                   {(currentStation && playlist.length > 0) || !currentStation ? (
-                     <AudioPlayer 
-                       track={currentTrack} 
-                       isPlaying={isPlaying} 
-                       onPlayPause={handlePlayPause} 
-                       onNext={handleNext} 
-                       onPrev={handlePrev} 
-                       audioRef={audioRef} 
-                     />
-                   ) : null }
                 </div>
               </CardContent>
             </Card>
@@ -562,3 +475,5 @@ export function OndeSpectraleRadio() {
     </>
   );
 }
+
+    
