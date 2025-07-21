@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useAdminLayout } from '../../layout';
 import { getStationById, addMessageToStation, addMusicToStation, searchMusic, generateAndAddPlaylist } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 import { 
   ArrowLeft,
@@ -33,14 +32,13 @@ import {
   ListMusic,
   Clock,
   ExternalLink,
-  AlertTriangle,
   Sparkles,
 } from 'lucide-react';
 
 export default function StationDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { user, customCharacters } = useAdminLayout();
+  const { customCharacters } = useAdminLayout();
   const router = useRouter();
   const { toast } = useToast();
   

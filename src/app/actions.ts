@@ -132,33 +132,6 @@ export async function previewCustomDjAudio(input: { message: string, voice: any 
   }
 }
 
-// Helper function to upload audio buffer to Firebase Storage
-async function uploadAudioToStorage(buffer: Buffer, path: string): Promise<string> {
-  const storageRef = ref(storage, path);
-  const metadata = { contentType: 'audio/wav' };
-
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, buffer, metadata);
-
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        // Optional: handle progress
-      },
-      (error) => {
-        reject(error);
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(downloadURL);
-        } catch (error) {
-          reject(error);
-        }
-      }
-    );
-  });
-}
-
 export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
     const station = await getStationById(stationId);
     if (!station) {
@@ -173,39 +146,13 @@ export async function addMessageToStation(stationId: string, message: string): P
       return { error: "Personnage DJ non trouvé." };
     }
 
-    let audioResult;
-    try {
-      if ('isCustom' in dj && dj.isCustom) {
-          audioResult = await generateCustomDjAudio({ message, voice: dj.voice });
-      } else {
-          audioResult = await generateDjAudio({ message, characterId: dj.id });
-      }
-
-      if (!audioResult || !audioResult.audioBase64) {
-        throw new Error('Données audio base64 invalides ou vides.');
-      }
-    } catch(err: any) {
-      return { error: `La génération de la voix IA a échoué: ${err.message}` };
-    }
-    
-    // Upload audio to Firebase Storage
     const messageId = `msg-${Date.now()}`;
-    const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
-    let downloadUrl = '';
-
-    try {
-        const audioBuffer = Buffer.from(audioResult.audioBase64, 'base64');
-        downloadUrl = await uploadAudioToStorage(audioBuffer, audioPath);
-    } catch (storageError: any) {
-        return { error: `L'enregistrement du fichier audio a échoué: ${storageError.message}` };
-    }
-
     const newPlaylistItem: PlaylistItem = {
         id: messageId,
         type: 'message',
         title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
-        url: downloadUrl, 
-        duration: 15, // Mock duration, could be calculated from audio file
+        url: message, // Store the raw text
+        duration: 15, // Mock duration, will be dynamic on client
         artist: dj.name,
         addedAt: new Date().toISOString(),
     };
@@ -420,7 +367,6 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
       return { error: "Personnage DJ non trouvé." };
     }
 
-    // 1. Generate script from AI
     let playlistScript: GeneratePlaylistOutput;
     try {
         playlistScript = await generatePlaylist({
@@ -439,17 +385,15 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
     
     const newPlaylist: PlaylistItem[] = [];
 
-    // 2. Process each item from the script
     for (const item of playlistScript.items) {
         if (item.type === 'message') {
             const messageId = `msg-${Date.now()}-${Math.random()}`;
             newPlaylist.push({
                 id: messageId,
                 type: 'message',
-                // Store the text content directly in the URL field
                 url: item.content, 
                 title: item.content.substring(0, 40) + '...',
-                duration: 15, // MOCK DURATION
+                duration: 15,
                 artist: dj.name,
                 addedAt: new Date().toISOString(),
             });
@@ -464,10 +408,9 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
         }
     }
     
-    // 3. Update Firestore with the new playlist
     const stationRef = doc(db, 'stations', stationId);
     await updateDoc(stationRef, {
-        playlist: newPlaylist // Replace the entire playlist
+        playlist: newPlaylist
     });
 
     revalidatePath(`/admin/stations/${stationId}`);

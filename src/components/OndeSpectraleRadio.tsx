@@ -13,7 +13,6 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
@@ -113,7 +112,6 @@ export function OndeSpectraleRadio() {
   const dj = useMemo(() => {
     if (!currentStation) return null;
     const allDjs: (CustomDJCharacter | (typeof DJ_CHARACTERS[0]))[] = [...DJ_CHARACTERS];
-    // In a real app, you would also fetch and merge custom characters here if needed
     return allDjs.find(d => d.id === currentStation.djCharacterId) || null;
   }, [currentStation]);
 
@@ -177,56 +175,66 @@ export function OndeSpectraleRadio() {
     }
   }, [currentTrackIndex, playlist.length]);
 
-    // Effect to generate audio for messages on the fly
   useEffect(() => {
-    if (currentTrack?.type === 'music') {
-      setAudioUrl(currentTrack.url);
-      return;
-    }
+    const handleAudio = async () => {
+        if (!isPlaying) return;
 
-    if (currentTrack?.type === 'message' && isPlaying) {
-      const generateAudio = async () => {
-        if (!currentStation || !user) return;
-        setIsGeneratingMessage(true);
-        if (currentAudioUrlRef.current) {
-          URL.revokeObjectURL(currentAudioUrlRef.current);
-          currentAudioUrlRef.current = null;
+        if (currentTrack?.type === 'music') {
+            setAudioUrl(currentTrack.url);
+            return;
         }
 
-        const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
-        
-        if (result.audioBase64) {
-          try {
-            const byteCharacters = atob(result.audioBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
+        if (currentTrack?.type === 'message') {
+            if (!currentStation || !user) {
+                setError("Connexion requise pour les messages DJ.");
+                setIsPlaying(false);
+                return;
             }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'audio/wav' });
-            const url = URL.createObjectURL(blob);
-            setAudioUrl(url);
-            currentAudioUrlRef.current = url;
-          } catch (e) {
-            setError("Failed to process audio data.");
-          }
-        } else {
-          setError(result.error || "Failed to generate message audio.");
-        }
-        setIsGeneratingMessage(false);
-      };
 
-      generateAudio();
-    }
-    
-    // Cleanup Object URL
-    return () => {
-      if (currentAudioUrlRef.current) {
-        URL.revokeObjectURL(currentAudioUrlRef.current);
-        currentAudioUrlRef.current = null;
-      }
+            setIsGeneratingMessage(true);
+            
+            // Revoke previous blob URL if it exists
+            if (currentAudioUrlRef.current) {
+                URL.revokeObjectURL(currentAudioUrlRef.current);
+                currentAudioUrlRef.current = null;
+            }
+
+            const result = await getAudioForMessage(currentTrack.url, currentStation.djCharacterId, user.uid);
+            
+            if (result.audioBase64) {
+                try {
+                    const byteCharacters = atob(result.audioBase64);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'audio/wav' });
+                    const url = URL.createObjectURL(blob);
+                    setAudioUrl(url);
+                    currentAudioUrlRef.current = url;
+                } catch (e) {
+                    setError("Échec du traitement des données audio.");
+                    setIsPlaying(false);
+                }
+            } else {
+                setError(result.error || "Échec de la génération audio du message.");
+                setIsPlaying(false);
+            }
+            setIsGeneratingMessage(false);
+        }
     };
-  }, [currentTrack, isPlaying, currentStation, user]);
+
+    handleAudio();
+
+    // Cleanup Object URL on component unmount or track change
+    return () => {
+        if (currentAudioUrlRef.current) {
+            URL.revokeObjectURL(currentAudioUrlRef.current);
+            currentAudioUrlRef.current = null;
+        }
+    };
+}, [currentTrack, isPlaying, currentStation, user]);
 
 
   const handleNext = useCallback(() => {
