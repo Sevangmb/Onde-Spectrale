@@ -51,7 +51,6 @@ export type GenerateCustomDjAudioInput = z.infer<typeof GenerateCustomDjAudioInp
 
 const GenerateCustomDjAudioOutputSchema = z.object({
   audioUrl: z.string().describe('The URL of the generated audio clip.'),
-  rawPcm: z.string().optional().describe('Raw PCM audio data, base64 encoded.'),
 });
 export type GenerateCustomDjAudioOutput = z.infer<typeof GenerateCustomDjAudioOutputSchema>;
 
@@ -92,10 +91,9 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
   async (input, streamingCallback) => {
     const { voice, message } = input;
     
-    // Prioritize style, then tone for voice mapping
-    const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix'; // Default to a neutral voice
+    const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix';
 
-    const {stream: media, response: responsePromise} = ai.generateStream({
+    const {stream: mediaStream, response: responsePromise} = ai.generateStream({
       model: googleAI.model('gemini-2.5-flash-preview-tts'),
       config: {
         responseModalities: ['AUDIO'],
@@ -108,35 +106,33 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
       prompt: message,
     });
 
-    if (streamingCallback) {
-        for await (const chunk of media) {
-            if (chunk.media) {
-                const audioBuffer = Buffer.from(
-                    chunk.media.url.substring(chunk.media.url.indexOf(',') + 1),
-                    'base64'
-                );
+    const audioChunks: Buffer[] = [];
+
+    for await (const chunk of mediaStream) {
+        if (chunk.media) {
+            const audioBuffer = Buffer.from(
+                chunk.media.url.substring(chunk.media.url.indexOf(',') + 1),
+                'base64'
+            );
+            audioChunks.push(audioBuffer);
+            if (streamingCallback) {
                 streamingCallback(audioBuffer.toString('base64'));
             }
         }
     }
     
-    const finalResponse = await responsePromise;
-    const finalMedia = finalResponse.media;
+    // Ensure the stream has fully completed
+    await responsePromise;
 
-    if (!finalMedia) {
+    if (audioChunks.length === 0) {
       throw new Error('No media was returned from the TTS service.');
     }
 
-    const audioBuffer = Buffer.from(
-      finalMedia.url.substring(finalMedia.url.indexOf(',') + 1),
-      'base64'
-    );
-    
-    const wavData = await toWav(audioBuffer);
+    const fullAudioBuffer = Buffer.concat(audioChunks);
+    const wavData = await toWav(fullAudioBuffer);
 
     return {
       audioUrl: 'data:audio/wav;base64,' + wavData,
-      rawPcm: audioBuffer.toString('base64'),
     };
   }
 );
