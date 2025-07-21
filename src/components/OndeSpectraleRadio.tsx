@@ -17,7 +17,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Rss, ChevronLeft, ChevronRight, Zap, UserCog } from 'lucide-react';
+import { RadioTower, Rss, ChevronLeft, ChevronRight, Zap, UserCog, Settings } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -37,7 +37,7 @@ export function OndeSpectraleRadio() {
   const router = useRouter();
 
   const [currentTrack, setCurrentTrack] = useState<PlaylistItem | undefined>(undefined);
-  const [isPlaying, setIsPlaying] = useState(false); // Used for visualizer
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
 
   const [signalStrength, setSignalStrength] = useState(0);
@@ -47,10 +47,10 @@ export function OndeSpectraleRadio() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
   const stationMessages = useRef<PlaylistItem[]>([]);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
     setIsClient(true);
-    // Generate particles
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
         left: `${Math.random() * 100}%`,
@@ -61,33 +61,38 @@ export function OndeSpectraleRadio() {
     );
   }, []);
 
-  const playNextMessage = useCallback(async () => {
+  const cleanupAudio = useCallback(() => {
+    if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+    }
     if (currentBlobUrl.current) {
         URL.revokeObjectURL(currentBlobUrl.current);
         currentBlobUrl.current = null;
     }
-    
-    if (stationMessages.current.length === 0) {
-        setIsPlaying(false);
-        setCurrentTrack(undefined);
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    setCurrentTrack(undefined);
+  }, []);
+  
+  const playNextMessage = useCallback(async () => {
+    if (isGeneratingMessage || !currentStation || !user) {
         return;
     }
 
+    if (stationMessages.current.length === 0) {
+        cleanupAudio();
+        return;
+    }
+    
     setIsGeneratingMessage(true);
-    setCurrentTrack(undefined); // Clear track info while generating
+    cleanupAudio();
 
     const message = stationMessages.current[Math.floor(Math.random() * stationMessages.current.length)];
     setCurrentTrack(message);
 
-    if (!currentStation || !user) {
-        setError("User or station info missing for audio generation.");
-        setIsGeneratingMessage(false);
-        return;
-    }
-
     const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
-    setIsGeneratingMessage(false);
-
+    
     if (result.audioBase64) {
         try {
             const byteCharacters = atob(result.audioBase64);
@@ -106,46 +111,62 @@ export function OndeSpectraleRadio() {
                 audio.load();
                 await audio.play();
                 setIsPlaying(true);
+                isPlayingRef.current = true;
             }
         } catch (e: any) {
             console.error("Audio playback error:", e);
             setError("Failed to play generated audio.");
-            setIsPlaying(false);
+            cleanupAudio();
         }
     } else {
         setError(result.error || "Failed to generate audio.");
-        setIsPlaying(false);
-        setTimeout(playNextMessage, 5000); // Retry after a delay
+        cleanupAudio();
     }
-  }, [currentStation, user]);
+
+    setIsGeneratingMessage(false);
+
+  }, [currentStation, user, isGeneratingMessage, cleanupAudio]);
+
+  const onEnded = useCallback(() => {
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    // Delay before playing next to avoid abrupt transitions
+    setTimeout(() => {
+        if (currentStation) { // Only play next if still on a station
+            playNextMessage();
+        }
+    }, 1000);
+  }, [playNextMessage, currentStation]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.addEventListener('ended', onEnded);
+      return () => {
+        audio.removeEventListener('ended', onEnded);
+      };
+    }
+  }, [onEnded]);
 
 
-  // Effect for finding station on frequency change
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      setCurrentStation(null);
-      setCurrentTrack(undefined);
-      setIsPlaying(false);
       
-      if(audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.src = '';
-      }
+      cleanupAudio();
+      setCurrentStation(null);
 
       try {
         const station = await getStationForFrequency(debouncedFrequency);
-        setCurrentStation(station);
         setSignalStrength(station ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 10);
         
         if (station) {
             stationMessages.current = station.playlist.filter(p => p.type === 'message');
-            if (stationMessages.current.length > 0) {
-                 playNextMessage();
-            } else {
-                // Station has no messages, remain silent.
-            }
+            setCurrentStation(station);
+            // The playNextMessage will be triggered by the station change effect
+        } else {
+            setCurrentStation(null);
         }
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}.`);
@@ -155,15 +176,17 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, playNextMessage]);
+  }, [debouncedFrequency, cleanupAudio]);
 
-  const onEnded = useCallback(() => {
-    setIsPlaying(false);
-    playNextMessage();
-  }, [playNextMessage]);
+  useEffect(() => {
+    if (currentStation && user && stationMessages.current.length > 0 && !isPlayingRef.current) {
+        playNextMessage();
+    } else if (!currentStation) {
+        cleanupAudio();
+    }
+  }, [currentStation, user, playNextMessage, cleanupAudio]);
 
 
-  // User auth effect
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -205,8 +228,7 @@ export function OndeSpectraleRadio() {
   return (
     <>
       <audio 
-        ref={audioRef} 
-        onEnded={onEnded}
+        ref={audioRef}
         crossOrigin="anonymous"
       />
       <div className="relative w-full min-h-[90vh] overflow-hidden">
@@ -246,29 +268,34 @@ export function OndeSpectraleRadio() {
               <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
               
               <CardHeader className="relative border-b-2 border-orange-500/30 pb-4 bg-gradient-to-r from-black/90 to-zinc-900/90">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <OndeSpectraleLogo className="h-8 w-8 text-orange-400 drop-shadow-lg" />
-                      <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                        <OndeSpectraleLogo className="h-8 w-8 text-orange-400 drop-shadow-lg" />
+                        <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
+                        </div>
+                        <CardTitle className="font-headline text-3xl text-orange-100 tracking-wider drop-shadow-lg">
+                        <span className="inline-block animate-flicker">Onde Spectrale</span>
+                        </CardTitle>
                     </div>
-                    <CardTitle className="font-headline text-3xl text-orange-100 tracking-wider drop-shadow-lg">
-                      <span className="inline-block animate-flicker">Onde Spectrale</span>
-                    </CardTitle>
-                  </div>
-                   <div className="flex items-center gap-2">
-                     {user ? (
-                        <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
-                            <UserCog className="mr-2 h-4 w-4" />
-                            Admin
-                        </Button>
-                     ) : (
-                      <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
-                          <Rss className="mr-2 h-4 w-4" />
-                          Créer ou Gérer
-                      </Button>
-                     )}
-                  </div>
+                    <div className="flex items-center gap-2">
+                        {user ? (
+                            <>
+                                {currentStation && currentStation.ownerId === user.uid && (
+                                    <Button variant="outline" size="sm" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push(`/admin/stations/${currentStation.id}`)}>
+                                        <Settings className="mr-2 h-4 w-4" /> Gérer
+                                    </Button>
+                                )}
+                                <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
+                                    <UserCog className="mr-2 h-4 w-4" /> Admin
+                                </Button>
+                            </>
+                        ) : (
+                            <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
+                                <Rss className="mr-2 h-4 w-4" /> Créer ou Gérer
+                            </Button>
+                        )}
+                    </div>
                 </div>
               </CardHeader>
               <CardContent className="p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
