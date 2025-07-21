@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
-import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
+import { db, storage, ref, getDownloadURL } from '@/lib/firebase';
+import { uploadBytesResumable } from 'firebase/storage';
 import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
@@ -131,13 +132,34 @@ export async function previewCustomDjAudio(input: { message: string, voice: any 
   }
 }
 
-export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
-    const stationRef = doc(db, 'stations', stationId);
-    const stationDoc = await getDoc(stationRef);
+// Helper function to upload audio buffer to Firebase Storage
+async function uploadAudioToStorage(buffer: Buffer, path: string): Promise<string> {
+  const storageRef = ref(storage, path);
+  const metadata = { contentType: 'audio/wav' };
 
-    if (!stationDoc.exists()) {
-        return { error: "Station non trouvée." };
-    }
+  return new Promise((resolve, reject) => {
+    const uploadTask = uploadBytesResumable(storageRef, buffer, metadata);
+
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        // Optional: handle progress
+      },
+      (error) => {
+        reject(error);
+      },
+      async () => {
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        } catch (error) {
+          reject(error);
+        }
+      }
+    );
+  });
+}
+
+export async function addMessageToStation(stationId: string, message: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
     const station = await getStationById(stationId);
     if (!station) {
         return { error: "Station non trouvée." };
@@ -152,7 +174,6 @@ export async function addMessageToStation(stationId: string, message: string): P
     }
 
     let audioResult;
-
     try {
       if ('isCustom' in dj && dj.isCustom) {
           audioResult = await generateCustomDjAudio({ message, voice: dj.voice });
@@ -163,7 +184,6 @@ export async function addMessageToStation(stationId: string, message: string): P
       if (!audioResult || !audioResult.audioBase64) {
         throw new Error('Données audio base64 invalides ou vides.');
       }
-
     } catch(err: any) {
       return { error: `La génération de la voix IA a échoué: ${err.message}` };
     }
@@ -171,14 +191,11 @@ export async function addMessageToStation(stationId: string, message: string): P
     // Upload audio to Firebase Storage
     const messageId = `msg-${Date.now()}`;
     const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
-    const storageRef = ref(storage, audioPath);
     let downloadUrl = '';
 
     try {
-        const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', {
-            contentType: 'audio/wav',
-        });
-        downloadUrl = await getDownloadURL(snapshot.ref);
+        const audioBuffer = Buffer.from(audioResult.audioBase64, 'base64');
+        downloadUrl = await uploadAudioToStorage(audioBuffer, audioPath);
     } catch (storageError: any) {
         return { error: `L'enregistrement du fichier audio a échoué: ${storageError.message}` };
     }
@@ -194,17 +211,16 @@ export async function addMessageToStation(stationId: string, message: string): P
     };
     
     try {
+        const stationRef = doc(db, 'stations', stationId);
         await updateDoc(stationRef, {
             playlist: arrayUnion(newPlaylistItem)
         });
-    } catch (firestoreError) {
-        return { error: "La mise à jour de la base de données a échoué." };
+    } catch (firestoreError: any) {
+        return { error: `La mise à jour de la base de données a échoué: ${firestoreError.message}` };
     }
-
 
     revalidatePath(`/admin/stations/${stationId}`);
     return { success: true, playlistItem: newPlaylistItem };
-
 }
 
 
@@ -391,11 +407,6 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
 }
 
 export async function generateAndAddPlaylist(stationId: string, theme: string): Promise<{ success: true, playlist: PlaylistItem[] } | { error: string }> {
-    const stationRef = doc(db, 'stations', stationId);
-    const stationDoc = await getDoc(stationRef);
-    if (!stationDoc.exists()) {
-        return { error: "Station non trouvée." };
-    }
     const station = await getStationById(stationId);
     if (!station) {
         return { error: "Station non trouvée." };
@@ -427,6 +438,7 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
     }
     
     const newPlaylist: PlaylistItem[] = [];
+    const stationRef = doc(db, 'stations', stationId);
 
     // 2. Process each item
     for (const item of playlistScript.items) {
@@ -449,14 +461,11 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
             
             const messageId = `msg-${Date.now()}-${Math.random()}`;
             const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
-            const storageRef = ref(storage, audioPath);
             let downloadUrl: string;
             
             try {
-                const snapshot = await uploadString(storageRef, audioResult.audioBase64, 'base64', { 
-                    contentType: 'audio/wav',
-                });
-                downloadUrl = await getDownloadURL(snapshot.ref);
+                const audioBuffer = Buffer.from(audioResult.audioBase64, 'base64');
+                downloadUrl = await uploadAudioToStorage(audioBuffer, audioPath);
             } catch(e) {
                  console.error(`Skipping message due to upload error: ${e}`);
                  continue;

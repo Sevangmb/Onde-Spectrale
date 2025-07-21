@@ -1,14 +1,15 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permettre la lecture publique de tous les fichiers
+    
+    // Allow read access to everyone for all files
     match /{allPaths=**} {
       allow read;
     }
 
-    // Sécuriser le dossier des messages DJ
-    // Autoriser tout utilisateur authentifié à créer des messages.
+    // Allow authenticated users to write to their own DJ message folders
     match /dj-messages/{stationId}/{messageId} {
       allow write: if request.auth != null;
     }
