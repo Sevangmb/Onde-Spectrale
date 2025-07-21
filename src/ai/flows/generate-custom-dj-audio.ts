@@ -99,7 +99,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     const pitch = pitchMap[voice.tone] || 0.0;
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
+      model: 'googleai/gemini-2.5-pro-preview-tts',
       config: {
         responseModalities: ['AUDIO'],
         speechConfig: {
