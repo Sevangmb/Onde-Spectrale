@@ -90,14 +90,6 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     
     const voiceName = voiceMap[voice.gender]?.[voice.style] || 'Antares'; // Default to a neutral voice
 
-    // Map tone to pitch
-    const pitchMap: { [key: string]: number } = {
-        deep: -4.0,
-        medium: 0.0,
-        high: 4.0,
-    };
-    const pitch = pitchMap[voice.tone] || 0.0;
-
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.5-pro-preview-tts',
       config: {
@@ -106,8 +98,6 @@ const generateCustomDjAudioFlow = ai.defineFlow({
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voiceName },
           },
-          pitch: pitch,
-          speakingRate: voice.speakingRate,
         },
       },
       prompt: message,

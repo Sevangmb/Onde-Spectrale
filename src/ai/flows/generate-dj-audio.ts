@@ -89,7 +89,7 @@ async function toWav(
       bitDepth: sampleWidth * 8,
     });
 
-    let bufs = [] as any[];
+    let bufs: any[] = [];
     writer.on('error', reject);
     writer.on('data', function (d) {
       bufs.push(d);
@@ -119,8 +119,6 @@ const generateDjAudioFlow = ai.defineFlow({
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: character.voiceName },
           },
-          pitch: character.pitch,
-          speakingRate: character.speakingRate,
         },
       },
       prompt: input.message,

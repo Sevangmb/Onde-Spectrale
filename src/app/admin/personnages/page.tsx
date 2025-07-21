@@ -56,7 +56,10 @@ export default function PersonnagesManagement() {
 
     try {
       const form = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
+      // We are not using speakingRate anymore, so we set it to 1.0
+      const dataToSubmit = { ...formData, speakingRate: 1.0 };
+
+      Object.entries(dataToSubmit).forEach(([key, value]) => {
         form.append(key, String(value));
       });
 
@@ -214,14 +217,6 @@ export default function PersonnagesManagement() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Vitesse d'élocution: {formData.speakingRate.toFixed(1)}x</Label>
-                      <Slider
-                        value={[formData.speakingRate]}
-                        onValueChange={(value) => setFormData({ ...formData, speakingRate: value[0] })}
-                        min={0.5} max={2.0} step={0.1}
-                      />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="ghost" onClick={() => setIsCreateModalOpen(false)} disabled={isCreating}>Annuler</Button>
