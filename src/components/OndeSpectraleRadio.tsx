@@ -8,6 +8,7 @@ import type { Station, PlaylistItem } from '@/lib/types';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { MUSIC_CATALOG } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -46,8 +47,8 @@ export function OndeSpectraleRadio() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
-  const stationMessages = useRef<PlaylistItem[]>([]);
-  const isPlayingRef = useRef(false);
+  const lastPlayedType = useRef<'message' | 'music'>('music');
+
 
   useEffect(() => {
     setIsClient(true);
@@ -65,78 +66,95 @@ export function OndeSpectraleRadio() {
     if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        audioRef.current.loop = false;
     }
     if (currentBlobUrl.current) {
         URL.revokeObjectURL(currentBlobUrl.current);
         currentBlobUrl.current = null;
     }
     setIsPlaying(false);
-    isPlayingRef.current = false;
     setCurrentTrack(undefined);
   }, []);
   
-  const playNextMessage = useCallback(async () => {
+  const playNextTrack = useCallback(async () => {
     if (isGeneratingMessage || !currentStation || !user) {
-        return;
-    }
-
-    if (stationMessages.current.length === 0) {
         cleanupAudio();
         return;
     }
-    
-    setIsGeneratingMessage(true);
+
+    const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
+    const playMusic = lastPlayedType.current === 'message' || stationMessages.length === 0;
+
     cleanupAudio();
 
-    const message = stationMessages.current[Math.floor(Math.random() * stationMessages.current.length)];
-    setCurrentTrack(message);
+    if (playMusic && MUSIC_CATALOG.length > 0) {
+        // Play music
+        lastPlayedType.current = 'music';
+        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+        setCurrentTrack(track);
 
-    const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
-    
-    if (result.audioBase64) {
-        try {
-            const byteCharacters = atob(result.audioBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'audio/wav' });
-            const url = URL.createObjectURL(blob);
-            currentBlobUrl.current = url;
-
-            const audio = audioRef.current;
-            if (audio) {
-                audio.src = url;
-                audio.load();
-                await audio.play();
+        if (audioRef.current) {
+            audioRef.current.src = track.url;
+            audioRef.current.load();
+            try {
+                await audioRef.current.play();
                 setIsPlaying(true);
-                isPlayingRef.current = true;
+            } catch (e) {
+                console.error("Error playing music:", e);
+                cleanupAudio();
             }
-        } catch (e: any) {
-            console.error("Audio playback error:", e);
-            setError("Failed to play generated audio.");
+        }
+    } else if (stationMessages.length > 0) {
+        // Play message
+        lastPlayedType.current = 'message';
+        setIsGeneratingMessage(true);
+
+        const message = stationMessages[Math.floor(Math.random() * stationMessages.length)];
+        setCurrentTrack(message);
+
+        const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
+        
+        if (result.audioBase64) {
+            try {
+                const byteCharacters = atob(result.audioBase64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                currentBlobUrl.current = url;
+
+                if (audioRef.current) {
+                    audioRef.current.src = url;
+                    audioRef.current.load();
+                    await audioRef.current.play();
+                    setIsPlaying(true);
+                }
+            } catch (e: any) {
+                console.error("Audio playback error:", e);
+                cleanupAudio();
+            }
+        } else {
+            setError(result.error || "Failed to generate audio.");
             cleanupAudio();
         }
+        setIsGeneratingMessage(false);
     } else {
-        setError(result.error || "Failed to generate audio.");
+        // No content available
         cleanupAudio();
     }
-
-    setIsGeneratingMessage(false);
-
   }, [currentStation, user, isGeneratingMessage, cleanupAudio]);
 
   const onEnded = useCallback(() => {
     setIsPlaying(false);
-    isPlayingRef.current = false;
-    // Delay before playing next to avoid abrupt transitions
     setTimeout(() => {
-        if (currentStation) { // Only play next if still on a station
-            playNextMessage();
+        if (currentStation) {
+            playNextTrack();
         }
-    }, 1000);
-  }, [playNextMessage, currentStation]);
+    }, 1500); // Pause between tracks
+  }, [playNextTrack, currentStation]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -162,9 +180,9 @@ export function OndeSpectraleRadio() {
         setSignalStrength(station ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 10);
         
         if (station) {
-            stationMessages.current = station.playlist.filter(p => p.type === 'message');
             setCurrentStation(station);
-            // The playNextMessage will be triggered by the station change effect
+            lastPlayedType.current = 'music'; // Reset to play music first
+            playNextTrack();
         } else {
             setCurrentStation(null);
         }
@@ -176,15 +194,8 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, cleanupAudio]);
-
-  useEffect(() => {
-    if (currentStation && user && stationMessages.current.length > 0 && !isPlayingRef.current) {
-        playNextMessage();
-    } else if (!currentStation) {
-        cleanupAudio();
-    }
-  }, [currentStation, user, playNextMessage, cleanupAudio]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedFrequency]);
 
 
   useEffect(() => {
@@ -278,7 +289,7 @@ export function OndeSpectraleRadio() {
                         <span className="inline-block animate-flicker">Onde Spectrale</span>
                         </CardTitle>
                     </div>
-                    <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
                         {user ? (
                             <>
                                 {currentStation && currentStation.ownerId === user.uid && (
@@ -382,7 +393,7 @@ export function OndeSpectraleRadio() {
                         {currentStation ? (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            {isGeneratingMessage ? 'Génération...' : ( isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE' ) }
+                            {isGeneratingMessage ? 'GÉNÉRATION IA...' : ( isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE' ) }
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
