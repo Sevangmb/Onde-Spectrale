@@ -20,20 +20,20 @@ import wav from 'wav';
 // This is a creative choice to give character to the voices
 const voiceMap: { [key: string]: { [key: string]: string } } = {
   male: {
-    calm: 'Encke',
-    energetic: 'Talitha',
-    joker: 'Mizar',
-    deep: 'Encke',
-    medium: 'Talitha',
-    high: 'Mizar'
+    calm: 'umbriel',      // Voix masculine calme
+    energetic: 'zephyr',  // Voix masculine énergique
+    joker: 'puck',        // Voix masculine de farceur
+    deep: 'rasalgethi',   // Voix masculine grave
+    medium: 'zubenelgenubi',// Voix masculine médium
+    high: 'achernar'      // Voix masculine aiguë
   },
   female: {
-    calm: 'Alhena',
-    energetic: 'Regulus',
-    joker: 'Caph',
-    deep: 'Alhena',
-    medium: 'Regulus',
-    high: 'Caph'
+    calm: 'autonoe',      // Voix féminine calme
+    energetic: 'callirrhoe',// Voix féminine énergique
+    joker: 'erinome',     // Voix féminine de farceuse
+    deep: 'laomedeia',    // Voix féminine grave
+    medium: 'leda',       // Voix féminine médium
+    high: 'kore'          // Voix féminine aiguë
   },
 };
 
@@ -93,7 +93,7 @@ export const generateCustomDjAudioFlow = ai.defineFlow({
     const { voice, message } = input;
     
     // Prioritize style, then tone for voice mapping
-    const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'Antares'; // Default to a neutral voice
+    const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix'; // Default to a neutral voice
 
     const {stream: media, response: responsePromise} = ai.generateStream({
       model: googleAI.model('gemini-2.5-flash-preview-tts'),
