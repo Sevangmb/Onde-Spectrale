@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAdminLayout } from '../../layout';
 import { getStationById, addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
@@ -36,8 +36,9 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-export default function StationDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function StationDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
   const { user, customCharacters } = useAdminLayout();
   const router = useRouter();
   const { toast } = useToast();
