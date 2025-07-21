@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -18,7 +19,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
-import { LayoutDashboard, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { LayoutDashboard, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, RadioTower } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
