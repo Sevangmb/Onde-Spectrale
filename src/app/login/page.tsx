@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { updateUserOnLogin } from '@/app/actions';
 
@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [isClient, setIsClient] = useState(false);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -44,15 +45,19 @@ export default function LoginPage() {
 
     // Check if user is already authenticated
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.push('/');
-      }
+        setUser(user);
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
-  const handleEmailLogin = async (isSignUp = false) => {
+  useEffect(() => {
+    if (user) {
+      router.push('/admin');
+    }
+  }, [user, router]);
+  
+  const handleAuthAction = async (isSignUp = false) => {
     if (!email || !password) {
       setError('Veuillez remplir tous les champs.');
       return;
@@ -70,15 +75,14 @@ export default function LoginPage() {
       }
 
       await updateUserOnLogin(userCredential.user.uid, userCredential.user.email);
-      router.push('/');
+      router.push('/admin');
     } catch (err: any) {
       console.error('Erreur d\'authentification:', err);
       switch (err.code) {
         case 'auth/user-not-found':
-          setError('Aucun compte trouvé avec cette adresse email.');
-          break;
         case 'auth/wrong-password':
-          setError('Mot de passe incorrect.');
+        case 'auth/invalid-credential':
+          setError('Adresse e-mail ou mot de passe incorrect.');
           break;
         case 'auth/email-already-in-use':
           setError('Cette adresse email est déjà utilisée.');
@@ -89,8 +93,11 @@ export default function LoginPage() {
         case 'auth/invalid-email':
           setError('Adresse email invalide.');
           break;
+        case 'auth/too-many-requests':
+          setError('Trop de tentatives. Veuillez réessayer plus tard.');
+          break;
         default:
-          setError('Erreur de connexion. Réessayez.');
+          setError('Erreur de connexion. Vérifiez la console pour plus de détails.');
       }
     } finally {
       setIsLoading(false);
@@ -105,10 +112,14 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
       await updateUserOnLogin(userCredential.user.uid, userCredential.user.email);
-      router.push('/');
+      router.push('/admin');
     } catch (err: any) {
       console.error('Erreur de connexion Google:', err);
-      setError('Erreur de connexion Google. Réessayez.');
+       if (err.code === 'auth/popup-closed-by-user') {
+        setError('La fenêtre de connexion a été fermée.');
+      } else {
+        setError('Erreur de connexion Google. Réessayez.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -240,13 +251,13 @@ export default function LoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
                         disabled={isLoading}
-                        onKeyPress={(e) => e.key === 'Enter' && handleEmailLogin(false)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAuthAction(false)}
                       />
                     </div>
                   </div>
 
                   <Button
-                    onClick={() => handleEmailLogin(false)}
+                    onClick={() => handleAuthAction(false)}
                     disabled={isLoading}
                     className="w-full bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20 relative overflow-hidden"
                   >
@@ -295,13 +306,13 @@ export default function LoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
                         disabled={isLoading}
-                        onKeyPress={(e) => e.key === 'Enter' && handleEmailLogin(true)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleAuthAction(true)}
                       />
                     </div>
                   </div>
 
                   <Button
-                    onClick={() => handleEmailLogin(true)}
+                    onClick={() => handleAuthAction(true)}
                     disabled={isLoading}
                     className="w-full bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20 relative overflow-hidden"
                   >

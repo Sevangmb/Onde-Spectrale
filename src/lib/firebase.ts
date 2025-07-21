@@ -15,7 +15,7 @@ const firebaseConfig = {
 
 // Vérification que les variables d'environnement sont bien chargées
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  throw new Error("Les variables d'environnement Firebase ne sont pas correctement configurées. Vérifiez votre fichier .env.local et assurez-vous que les variables commençant par NEXT_PUBLIC_FIREBASE_ sont bien définies.");
+  throw new Error("Les variables d'environnement Firebase ne sont pas correctement configurées. Vérifiez votre fichier .env et assurez-vous que les variables commençant par NEXT_PUBLIC_FIREBASE_ sont bien définies.");
 }
 
 
