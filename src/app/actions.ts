@@ -379,7 +379,7 @@ export async function generateAndAddPlaylist(stationId: string, theme: string): 
         return { error: `L'IA n'a pas pu générer de playlist: ${e.message}` };
     }
     
-    if (!playlistScript || !playlistScript.items) {
+    if (!playlistScript || !playlistScript.items || playlistScript.items.length === 0) {
       return { error: "L'IA n'a pas pu générer de playlist. Essayez un autre thème." };
     }
     
