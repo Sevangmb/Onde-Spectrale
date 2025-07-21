@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
-import { db } from '@/lib/firebase';
+import { db, storage, ref, uploadString, getDownloadURL } from '@/lib/firebase';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { genkitClient } from '@/lib/genkitClient';
@@ -161,11 +161,35 @@ export async function addMessageToStation(stationId: string, message: string): P
       return { error: "La génération de la voix IA a échoué. Réessayez." };
     }
     
+    // Upload audio to Firebase Storage
+    const messageId = `msg-${Date.now()}`;
+    const audioPath = `dj-messages/${station.id}/${messageId}.wav`;
+    const storageRef = ref(storage, audioPath);
+    let downloadUrl = '';
+
+    try {
+        // audio.audioUrl is 'data:audio/wav;base64,....'
+        // We need to extract the base64 part
+        const base64Data = audio.audioUrl.split(',')[1];
+        if (!base64Data) {
+            throw new Error('Invalid base64 audio data.');
+        }
+
+        const snapshot = await uploadString(storageRef, base64Data, 'base64', {
+            contentType: 'audio/wav'
+        });
+        downloadUrl = await getDownloadURL(snapshot.ref);
+
+    } catch (storageError) {
+        console.error("Erreur lors de l'enregistrement sur Firebase Storage:", storageError);
+        return { error: "L'enregistrement du fichier audio a échoué." };
+    }
+
     const newPlaylistItem: PlaylistItem = {
-        id: `msg-${Date.now()}`,
+        id: messageId,
         type: 'message',
         title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
-        url: audio.audioUrl,
+        url: downloadUrl, // Use the public URL from Firebase Storage
         duration: 15, // Mock duration, could be calculated from audio file
         artist: station.djCharacterId,
         addedAt: new Date().toISOString(),
