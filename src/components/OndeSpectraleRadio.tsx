@@ -19,7 +19,8 @@ import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { RadioTower, Settings, Rss, AlertTriangle, ChevronLeft, ChevronRight, Zap, Loader2 } from 'lucide-react';
+import { StationManagementSheet } from './StationManagementSheet';
 
 interface ParticleStyle {
     left: string;
@@ -321,7 +322,7 @@ export function OndeSpectraleRadio() {
                     </CardTitle>
                   </div>
                    <div className="flex items-center gap-2">
-                     {currentStation && isOwner && (
+                     {currentStation && user && currentStation.ownerId === user.uid && (
                       <StationManagementSheet station={currentStation} dj={dj}>
                         <Button variant="ghost" size="icon" className="border border-orange-500/30 hover:bg-orange-500/20 hover:border-orange-400/50">
                           <Settings className="h-5 w-5 text-orange-300" />
