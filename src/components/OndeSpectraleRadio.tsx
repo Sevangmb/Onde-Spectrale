@@ -39,7 +39,7 @@ export function OndeSpectraleRadio() {
 
   const [currentTrack, setCurrentTrack] = useState<PlaylistItem | undefined>(undefined);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
+  const [isLoadingTrack, setIsLoadingTrack] = useState(false);
 
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
@@ -47,8 +47,11 @@ export function OndeSpectraleRadio() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
+  const isMounted = useRef(true);
+
 
   useEffect(() => {
+    isMounted.current = true;
     setIsClient(true);
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
@@ -58,91 +61,92 @@ export function OndeSpectraleRadio() {
         animationDuration: `${3 + Math.random() * 4}s`,
       }))
     );
+    return () => { isMounted.current = false; };
   }, []);
 
   const cleanupAudio = useCallback(() => {
-    if (audioRef.current) {
-        audioRef.current.pause();
-    }
-    if (currentBlobUrl.current) {
-        URL.revokeObjectURL(currentBlobUrl.current);
-        currentBlobUrl.current = null;
-    }
-    setIsPlaying(false);
-  }, []);
-  
-  const loadAndPlay = useCallback((url: string) => {
     const audio = audioRef.current;
-    if (!audio) return;
-
-    // Stop and clean up previous audio if any
-    audio.pause();
+    if (audio) {
+      audio.pause();
+      audio.src = '';
+    }
     if (currentBlobUrl.current) {
       URL.revokeObjectURL(currentBlobUrl.current);
       currentBlobUrl.current = null;
     }
+  }, []);
+
+  const loadAndPlay = useCallback((url: string) => {
+    if (!audioRef.current || !isMounted.current) return;
+    const audio = audioRef.current;
+
+    cleanupAudio();
 
     const handleCanPlay = async () => {
-        try {
-            await audio.play();
-            setIsPlaying(true);
-        } catch (e) {
-            console.error("Error playing audio:", e);
-            cleanupAudio();
-        } finally {
-            audio.removeEventListener('canplaythrough', handleCanPlay);
+      try {
+        if (isMounted.current) {
+          await audio.play();
+          setIsPlaying(true);
+          setIsLoadingTrack(false);
         }
+      } catch (e) {
+        console.error("Error playing audio:", e);
+        if (isMounted.current) {
+            setIsPlaying(false);
+            setIsLoadingTrack(false);
+        }
+      }
+      audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-    
+
     audio.addEventListener('canplaythrough', handleCanPlay);
-    
-    // Assign new source and let the browser handle loading
     audio.src = url;
-
-    // Store the blob URL if it is one, so we can revoke it later
-    if (url.startsWith('blob:')) {
-      currentBlobUrl.current = url;
-    }
-
+    currentBlobUrl.current = url; // Store blob url to revoke later
   }, [cleanupAudio]);
 
 
   const playNextTrack = useCallback(async () => {
-    if (isGeneratingMessage || !currentStation || !user) {
-        cleanupAudio();
-        return;
+    if (!isMounted.current || !currentStation || !user) {
+      cleanupAudio();
+      return;
     }
 
-    // Determine next track type based on what just finished
-    const lastPlayedType = currentTrack?.type;
-    const playNextType = (lastPlayedType === 'message' || !lastPlayedType) ? 'music' : 'message';
+    setIsPlaying(false);
+    setIsLoadingTrack(true);
+    
+    // Decide next track type
+    const nextType = (currentTrack?.type === 'message' || !currentTrack) ? 'music' : 'message';
 
-    const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-
-    if (playNextType === 'music') {
-        if (MUSIC_CATALOG.length > 0) {
-            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            setCurrentTrack(track);
-            loadAndPlay(track.url);
+    if (nextType === 'music') {
+        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+        setCurrentTrack(track);
+        try {
+            const response = await fetch(track.url);
+            if (!response.ok) throw new Error(`Failed to fetch music: ${response.statusText}`);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            if (isMounted.current) loadAndPlay(blobUrl);
+        } catch(e) {
+            console.error("Error fetching music:", e);
+            if(isMounted.current) setIsLoadingTrack(false);
         }
+
     } else { // play message
+        const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
         if (stationMessages.length === 0) {
-            // No messages, fallback to music
-            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            setCurrentTrack(track);
-            loadAndPlay(track.url);
+            // No messages, fallback to music immediately
+            setCurrentTrack(undefined); // Reset so next track is music again
+            if(isMounted.current) setIsLoadingTrack(false);
+            playNextTrack(); // Re-run to select music
             return;
         }
 
-        setIsGeneratingMessage(true);
-        setCurrentTrack(undefined); // Clear track while generating
-
         const message = stationMessages[Math.floor(Math.random() * stationMessages.length)];
+        setCurrentTrack(message);
         
         const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
         
-        setIsGeneratingMessage(false);
-        if (result.audioBase64) {
+        if (result.audioBase64 && isMounted.current) {
             try {
                 const byteCharacters = atob(result.audioBase64);
                 const byteNumbers = new Array(byteCharacters.length);
@@ -151,28 +155,22 @@ export function OndeSpectraleRadio() {
                 }
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'audio/wav' });
-                const url = URL.createObjectURL(blob);
-                setCurrentTrack(message); // Set track info right before playing
-                loadAndPlay(url);
+                const blobUrl = URL.createObjectURL(blob);
+                loadAndPlay(blobUrl);
             } catch (e: any) {
                 console.error("Audio playback error:", e);
-                cleanupAudio();
+                if(isMounted.current) setIsLoadingTrack(false);
             }
         } else {
-            setError(result.error || "Failed to generate audio.");
-            cleanupAudio();
-            // Try playing a music track instead as a fallback
-            if (MUSIC_CATALOG.length > 0) {
-              const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-              setCurrentTrack(track);
-              loadAndPlay(track.url);
-            }
+            console.error(result.error || "Failed to generate audio.");
+            if(isMounted.current) setIsLoadingTrack(false);
         }
     }
-}, [currentStation, user, isGeneratingMessage, cleanupAudio, loadAndPlay, currentTrack]);
+  }, [currentStation, user, loadAndPlay, cleanupAudio, currentTrack]);
 
 
   const onEnded = useCallback(() => {
+    if (!isMounted.current) return;
     setIsPlaying(false);
     playNextTrack();
   }, [playNextTrack]);
@@ -183,7 +181,9 @@ export function OndeSpectraleRadio() {
     if (audio) {
       audio.addEventListener('ended', onEnded);
       return () => {
-        audio.removeEventListener('ended', onEnded);
+        if(audio) {
+          audio.removeEventListener('ended', onEnded);
+        }
       };
     }
   }, [onEnded]);
@@ -196,38 +196,39 @@ export function OndeSpectraleRadio() {
       
       cleanupAudio();
       setCurrentStation(null);
-      setCurrentTrack(undefined); // Reset track on frequency change
+      setCurrentTrack(undefined);
+      setIsPlaying(false);
+      setIsLoadingTrack(false);
 
       try {
         const station = await getStationForFrequency(debouncedFrequency);
         setSignalStrength(station ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 10);
         
-        setCurrentStation(station); // This will trigger the next effect
+        if (isMounted.current) {
+          setCurrentStation(station);
+        }
       } catch (err: any) {
-        setError(`Erreur de données: ${err.message}.`);
+        if (isMounted.current) setError(`Erreur de données: ${err.message}.`);
       } finally {
-        setIsLoading(false);
+        if (isMounted.current) setIsLoading(false);
       }
     };
 
     fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedFrequency]);
+  }, [debouncedFrequency, cleanupAudio]);
 
-  // This effect starts the very first track when a station is found.
   useEffect(() => {
     if (currentStation) {
       playNextTrack();
     } else {
       cleanupAudio();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStation]);
+  }, [currentStation, playNextTrack, cleanupAudio]);
 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (isMounted.current) setUser(currentUser);
     });
     return () => unsubscribe();
   }, []);
@@ -237,7 +238,7 @@ export function OndeSpectraleRadio() {
     setIsScanning(true);
     const newFreq = Math.min(108.0, frequency + 0.5);
     setFrequency(newFreq);
-    setTimeout(() => setIsScanning(false), 1000);
+    setTimeout(() => { if (isMounted.current) setIsScanning(false); }, 1000);
   }, [frequency, isScanning]);
 
   const handleScanDown = useCallback(() => {
@@ -245,7 +246,7 @@ export function OndeSpectraleRadio() {
     setIsScanning(true);
     const newFreq = Math.max(87.0, frequency - 0.5);
     setFrequency(newFreq);
-    setTimeout(() => setIsScanning(false), 1000);
+    setTimeout(() => { if (isMounted.current) setIsScanning(false); }, 1000);
   }, [frequency, isScanning]);
 
   const handleFrequencyChange = (value: number[]) => {
@@ -265,10 +266,7 @@ export function OndeSpectraleRadio() {
 
   return (
     <>
-      <audio 
-        ref={audioRef}
-        crossOrigin="anonymous"
-      />
+      <audio ref={audioRef} crossOrigin="anonymous"/>
       <div className="relative w-full min-h-[90vh] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
         
@@ -420,7 +418,7 @@ export function OndeSpectraleRadio() {
                         {currentStation ? (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            {isGeneratingMessage ? 'GÉNÉRATION IA...' : ( isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE' ) }
+                            {isLoadingTrack ? 'CHARGEMENT...' : ( isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE' ) }
                           </div>
                         ) : (
                           <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
@@ -436,7 +434,8 @@ export function OndeSpectraleRadio() {
                   
                   <AudioPlayer 
                     track={currentTrack} 
-                    isPlaying={isPlaying || isGeneratingMessage} 
+                    isPlaying={isPlaying} 
+                    isLoading={isLoadingTrack}
                     audioRef={audioRef} 
                   />
 

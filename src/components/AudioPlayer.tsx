@@ -2,7 +2,7 @@
 'use client';
 
 import type React from 'react';
-import { Music, MessageSquare, Volume2, VolumeX, Volume1, Radio } from 'lucide-react';
+import { Music, MessageSquare, Volume2, VolumeX, Volume1, Radio, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { PlaylistItem } from '@/lib/types';
@@ -11,12 +11,14 @@ import { useEffect, useState, useCallback } from 'react';
 interface AudioPlayerProps {
   track: PlaylistItem | undefined;
   isPlaying: boolean;
+  isLoading: boolean;
   audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 export function AudioPlayer({
   track,
   isPlaying,
+  isLoading,
   audioRef
 }: AudioPlayerProps) {
   const [progress, setProgress] = useState(0);
@@ -86,8 +88,7 @@ export function AudioPlayer({
       updateProgress();
     };
     
-    // Reset state when track changes
-    if (audio.src) {
+    if (!track) {
         setDuration(0);
         setCurrentTime(0);
         setProgress(0);
@@ -107,6 +108,8 @@ export function AudioPlayer({
   }, [audioRef, track, volume]);
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+  
+  const displayTitle = isLoading ? 'Chargement...' : (track ? track.title : "Silence radio");
 
   return (
     <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
@@ -119,7 +122,8 @@ export function AudioPlayer({
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
           <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3 shadow-lg shadow-orange-500/10">
-            { !track ? <Radio className="h-8 w-8 text-orange-400" /> :
+            { isLoading ? <Loader2 className="h-8 w-8 text-orange-400 animate-spin"/> :
+              !track ? <Radio className="h-8 w-8 text-orange-400" /> :
               track.type === 'music' ? 
               <Music className="h-8 w-8 text-orange-400" /> : 
               <MessageSquare className="h-8 w-8 text-orange-400" />
@@ -127,15 +131,15 @@ export function AudioPlayer({
           </div>
           <div className="flex-grow overflow-hidden">
             <p className="text-lg font-medium text-orange-100 truncate drop-shadow-lg animate-flicker-subtle">
-              {track ? track.title : "Silence radio"}
+              {displayTitle}
             </p>
-            {track?.artist && (
+            {track?.artist && !isLoading && (
               <p className="text-sm text-orange-300/80 truncate">
                 {track.artist}
               </p>
             )}
              <p className="text-xs text-orange-400/60 uppercase tracking-wider">
-              { !track ? 'HORS LIGNE' :
+              { !track || isLoading ? 'HORS LIGNE' :
                 track.type === 'music' ? 'MUSIQUE' : 'MESSAGE'
               }
             </p>
