@@ -67,7 +67,6 @@ export function OndeSpectraleRadio() {
         audioRef.current.pause();
         audioRef.current.removeAttribute('src');
         audioRef.current.load();
-        audioRef.current.loop = false;
     }
     if (currentBlobUrl.current) {
         URL.revokeObjectURL(currentBlobUrl.current);
@@ -77,9 +76,11 @@ export function OndeSpectraleRadio() {
     setCurrentTrack(undefined);
   }, []);
   
-  const loadAndPlay = useCallback((url: string, loop = false) => {
+  const loadAndPlay = useCallback((url: string) => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    cleanupAudio();
 
     const handleCanPlay = async () => {
         audio.removeEventListener('canplaythrough', handleCanPlay);
@@ -94,14 +95,7 @@ export function OndeSpectraleRadio() {
     
     audio.addEventListener('canplaythrough', handleCanPlay);
     
-    // Cleanup previous Blob URL if it exists before setting a new one
-    if (currentBlobUrl.current) {
-        URL.revokeObjectURL(currentBlobUrl.current);
-        currentBlobUrl.current = null;
-    }
-
     audio.src = url;
-    audio.loop = loop;
     audio.load();
 
     if (url.startsWith('blob:')) {
@@ -162,12 +156,9 @@ export function OndeSpectraleRadio() {
 
   const onEnded = useCallback(() => {
     setIsPlaying(false);
-    setTimeout(() => {
-        if (currentStation) {
-            playNextTrack();
-        }
-    }, 1500); // Pause between tracks
-  }, [playNextTrack, currentStation]);
+    playNextTrack();
+  }, [playNextTrack]);
+
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -194,9 +185,6 @@ export function OndeSpectraleRadio() {
         
         if (station) {
             setCurrentStation(station);
-            lastPlayedType.current = 'music';
-        } else {
-            setCurrentStation(null);
         }
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}.`);
@@ -424,7 +412,7 @@ export function OndeSpectraleRadio() {
                     </div>
                   </div>
                   
-                  <SpectrumAnalyzer isPlaying={isPlaying} audioRef={audioRef} className="h-24" />
+                  <SpectrumAnalyzer isPlaying={isPlaying} className="h-24" />
                   
                   <AudioPlayer 
                     track={currentTrack} 

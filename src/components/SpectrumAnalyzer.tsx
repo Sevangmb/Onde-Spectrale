@@ -1,72 +1,41 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface SpectrumAnalyzerProps {
   isPlaying: boolean;
-  audioRef: React.RefObject<HTMLAudioElement>;
   className?: string;
 }
 
-export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: SpectrumAnalyzerProps) {
+export function SpectrumAnalyzer({ isPlaying, className = '' }: SpectrumAnalyzerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameId = useRef<number>();
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-
-  const bufferLengthRef = useRef<number>(0);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
-
-  const setupAudioContext = useCallback(() => {
-    if (!audioRef.current || audioContextRef.current) return;
-
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      
-      const source = audioContext.createMediaElementSource(audioRef.current);
-      source.connect(analyser);
-      analyser.connect(audioContext.destination);
-
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-      sourceNodeRef.current = source;
-      bufferLengthRef.current = analyser.frequencyBinCount;
-      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-    } catch (e) {
-      console.error("Erreur lors de l'initialisation de l'AudioContext:", e);
-    }
-  }, [audioRef]);
-
+  
   const draw = useCallback(() => {
-    if (!analyserRef.current || !dataArrayRef.current || !canvasRef.current) {
-      return;
-    }
-
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    const analyser = analyserRef.current;
-    const dataArray = dataArrayRef.current;
-    const bufferLength = bufferLengthRef.current;
-    
-    analyser.getByteFrequencyData(dataArray);
-
+  
+    const bufferLength = 64; 
+    const dataArray = new Uint8Array(bufferLength);
+  
+    // Faking the data for visual effect
+    for (let i = 0; i < bufferLength; i++) {
+      dataArray[i] = Math.random() * 255;
+    }
+  
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+  
     const barWidth = (canvas.width / bufferLength) * 1.5;
     let x = 0;
-
+  
     for (let i = 0; i < bufferLength; i++) {
-      const barHeight = (dataArray[i] / 255) * canvas.height * 1.2;
+      const barHeight = (dataArray[i] / 255) * canvas.height * (0.5 + Math.random() * 0.5);
       
       const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
       gradient.addColorStop(0, '#ff4800');
@@ -101,20 +70,13 @@ export function SpectrumAnalyzer({ isPlaying, audioRef, className = '' }: Spectr
 
   useEffect(() => {
     if (isPlaying) {
-      if (!audioContextRef.current) {
-        setupAudioContext();
-      }
-      if (audioContextRef.current?.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-      stopDrawing(); // clear previous animation
       draw();
     } else {
       stopDrawing();
     }
     
     return stopDrawing;
-  }, [isPlaying, draw, stopDrawing, setupAudioContext]);
+  }, [isPlaying, draw, stopDrawing]);
   
   useEffect(() => {
     const canvas = canvasRef.current;
