@@ -81,12 +81,6 @@ export function OndeSpectraleRadio() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Cleanup previous Blob URL if it exists
-    if (currentBlobUrl.current) {
-      URL.revokeObjectURL(currentBlobUrl.current);
-      currentBlobUrl.current = null;
-    }
-    
     const handleCanPlay = async () => {
         audio.removeEventListener('canplaythrough', handleCanPlay);
         try {
@@ -100,11 +94,16 @@ export function OndeSpectraleRadio() {
     
     audio.addEventListener('canplaythrough', handleCanPlay);
     
+    // Cleanup previous Blob URL if it exists before setting a new one
+    if (currentBlobUrl.current) {
+        URL.revokeObjectURL(currentBlobUrl.current);
+        currentBlobUrl.current = null;
+    }
+
     audio.src = url;
     audio.loop = loop;
     audio.load();
 
-    // If the new source is a data URI, it might be a blob
     if (url.startsWith('blob:')) {
       currentBlobUrl.current = url;
     }
