@@ -103,7 +103,7 @@ export function OndeSpectraleRadio() {
         if (isMounted.current) {
             setIsLoadingTrack(false);
             setIsPlaying(false);
-            onEnded();
+            // onEnded is handled by the event listener now
         }
         audio.removeEventListener('canplaythrough', handleCanPlay);
     });
@@ -112,72 +112,21 @@ export function OndeSpectraleRadio() {
     audio.load();
   }, []);
 
+  const playNextTrack = useCallback(async () => {
+    if (!currentStation || !currentStation.playlist || currentStation.playlist.length === 0) return;
 
-    const playTrack = useCallback(async (track: PlaylistItem) => {
-        if (!track || !isMounted.current || !currentStation || !user) {
-            setIsLoadingTrack(false);
-            return;
-        }
+    const currentIdx = currentTrackRef.current
+        ? currentStation.playlist.findIndex(t => t.id === currentTrackRef.current!.id)
+        : -1;
+    
+    const nextIdx = (currentIdx + 1) % currentStation.playlist.length;
+    const nextTrack = currentStation.playlist[nextIdx];
 
-        setIsLoadingTrack(true);
-        setCurrentTrack(track);
-
-        if (track.type === 'message') {
-            const result = await getAudioForMessage(track.content, currentStation.djCharacterId, user.uid);
-            if (result.audioBase64 && isMounted.current) {
-                const byteCharacters = atob(result.audioBase64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'audio/wav' });
-                const blobUrl = URL.createObjectURL(blob);
-                if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
-                currentBlobUrl.current = blobUrl;
-                loadAndPlay(blobUrl);
-            } else {
-                console.error("Failed to get audio for message:", result.error);
-                onEnded();
-            }
-        } else { // Music
-            const { data, error } = await searchMusic(track.content);
-            if (data && data.length > 0 && isMounted.current) {
-                const trackToPlay = data[0];
-                setCurrentTrack(trackToPlay);
-                
-                try {
-                    const response = await fetch(trackToPlay.url);
-                    if (!response.ok) throw new Error(`[${response.status}] ${response.statusText}`);
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
-                    currentBlobUrl.current = blobUrl;
-                    loadAndPlay(blobUrl);
-                } catch(e) {
-                    console.error("Failed to fetch and play music:", e);
-                    setIsLoadingTrack(false);
-                    onEnded();
-                }
-            } else {
-                 console.error("Music search failed:", error);
-                 setIsLoadingTrack(false);
-                 onEnded();
-            }
-        }
-    }, [currentStation, user, loadAndPlay]);
-
-    const playNextTrack = useCallback(() => {
-        if (!currentStation || !currentStation.playlist || currentStation.playlist.length === 0) return;
-
-        const currentIdx = currentTrackRef.current 
-            ? currentStation.playlist.findIndex(t => t.id === currentTrackRef.current!.id)
-            : -1;
-        
-        const nextIdx = (currentIdx + 1) % currentStation.playlist.length;
-        const nextTrack = currentStation.playlist[nextIdx];
-
+    if (nextTrack) {
         playTrack(nextTrack);
+    }
+  }, [currentStation]);
 
-    }, [currentStation, playTrack]);
 
   const onEnded = useCallback(() => {
     if (!isMounted.current) return;
@@ -185,7 +134,83 @@ export function OndeSpectraleRadio() {
     playNextTrack();
   }, [playNextTrack]);
 
+  const playTrack = useCallback(async (track: PlaylistItem) => {
+    if (!track || !isMounted.current || !currentStation || !user) {
+        setIsLoadingTrack(false);
+        return;
+    }
 
+    setIsLoadingTrack(true);
+    setCurrentTrack(track);
+
+    if (track.type === 'message') {
+        const result = await getAudioForMessage(track.content, currentStation.djCharacterId, user.uid);
+        if (result.audioBase64 && isMounted.current) {
+            const byteCharacters = atob(result.audioBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'audio/wav' });
+            const blobUrl = URL.createObjectURL(blob);
+            if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
+            currentBlobUrl.current = blobUrl;
+            loadAndPlay(blobUrl);
+        } else {
+            console.error("Failed to get audio for message:", result.error);
+            onEnded();
+        }
+    } else { // Music
+      const playMusic = async (retryCount = 0) => {
+        if (!isMounted.current) return;
+
+        let selectedTrack = track;
+        
+        if (retryCount > 0) { // On retry, pick a random song
+            const musicTracks = currentStation.playlist.filter(p => p.type === 'music');
+            if (musicTracks.length > 0) {
+              selectedTrack = musicTracks[Math.floor(Math.random() * musicTracks.length)];
+            } else {
+              console.error("No music tracks in playlist to retry with.");
+              onEnded();
+              return;
+            }
+        }
+        setCurrentTrack(selectedTrack);
+
+        try {
+            const searchResults = await searchMusic(selectedTrack.content);
+            if (!searchResults.data || searchResults.data.length === 0) {
+              throw new Error(`No results for "${selectedTrack.content}"`);
+            }
+            const musicUrl = searchResults.data[0].url;
+            
+            const response = await fetch(musicUrl);
+            if (!response.ok) {
+              throw new Error(`[${response.status}] ${response.statusText}`);
+            }
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
+            currentBlobUrl.current = blobUrl;
+            loadAndPlay(blobUrl);
+
+        } catch (e: any) {
+            console.error(`Attempt ${retryCount + 1} failed for "${selectedTrack.content}":`, e.message);
+            if (retryCount < 2 && isMounted.current) {
+                setTimeout(() => playMusic(retryCount + 1), 1000);
+            } else {
+                console.error("All attempts to play music failed. Falling back to a message.");
+                if (isMounted.current) {
+                   onEnded();
+                }
+            }
+        }
+      };
+      await playMusic();
+    }
+  }, [currentStation, user, loadAndPlay, onEnded]);
+  
+  
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -229,14 +254,13 @@ export function OndeSpectraleRadio() {
 
   useEffect(() => {
     if (currentStation && currentStation.playlist && currentStation.playlist.length > 0) {
-      // Start playback with the first track
       playTrack(currentStation.playlist[0]);
     } else {
       cleanupAudio();
       setIsPlaying(false);
       setCurrentTrack(undefined);
     }
-  }, [currentStation]);
+  }, [currentStation, playTrack, cleanupAudio]);
 
 
   useEffect(() => {
