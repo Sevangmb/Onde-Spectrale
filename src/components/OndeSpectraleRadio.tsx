@@ -63,8 +63,6 @@ export function OndeSpectraleRadio() {
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
     }
     if (currentBlobUrl.current) {
         URL.revokeObjectURL(currentBlobUrl.current);
@@ -77,24 +75,31 @@ export function OndeSpectraleRadio() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    cleanupAudio();
+    // Stop and clean up previous audio if any
+    audio.pause();
+    if (currentBlobUrl.current) {
+      URL.revokeObjectURL(currentBlobUrl.current);
+      currentBlobUrl.current = null;
+    }
 
     const handleCanPlay = async () => {
-        audio.removeEventListener('canplaythrough', handleCanPlay);
         try {
             await audio.play();
             setIsPlaying(true);
         } catch (e) {
             console.error("Error playing audio:", e);
             cleanupAudio();
+        } finally {
+            audio.removeEventListener('canplaythrough', handleCanPlay);
         }
     };
     
     audio.addEventListener('canplaythrough', handleCanPlay);
     
+    // Assign new source and let the browser handle loading
     audio.src = url;
-    audio.load();
 
+    // Store the blob URL if it is one, so we can revoke it later
     if (url.startsWith('blob:')) {
       currentBlobUrl.current = url;
     }
@@ -108,20 +113,27 @@ export function OndeSpectraleRadio() {
         return;
     }
 
+    // Determine next track type based on what just finished
     const lastPlayedType = currentTrack?.type;
+    const playNextType = (lastPlayedType === 'message' || !lastPlayedType) ? 'music' : 'message';
+
     const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
 
-    // Decide next track type: alternate between music and message
-    // If last was music, play message. If last was message (or nothing), play music.
-    const playNextType = lastPlayedType === 'music' ? 'message' : 'music';
-
-    if (playNextType === 'music' || (playNextType === 'message' && stationMessages.length === 0)) {
+    if (playNextType === 'music') {
         if (MUSIC_CATALOG.length > 0) {
             const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
             setCurrentTrack(track);
             loadAndPlay(track.url);
         }
-    } else if (playNextType === 'message' && stationMessages.length > 0) {
+    } else { // play message
+        if (stationMessages.length === 0) {
+            // No messages, fallback to music
+            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+            setCurrentTrack(track);
+            loadAndPlay(track.url);
+            return;
+        }
+
         setIsGeneratingMessage(true);
         setCurrentTrack(undefined); // Clear track while generating
 
@@ -150,9 +162,11 @@ export function OndeSpectraleRadio() {
             setError(result.error || "Failed to generate audio.");
             cleanupAudio();
             // Try playing a music track instead as a fallback
-            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            setCurrentTrack(track);
-            loadAndPlay(track.url);
+            if (MUSIC_CATALOG.length > 0) {
+              const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+              setCurrentTrack(track);
+              loadAndPlay(track.url);
+            }
         }
     }
 }, [currentStation, user, isGeneratingMessage, cleanupAudio, loadAndPlay, currentTrack]);
@@ -188,9 +202,7 @@ export function OndeSpectraleRadio() {
         const station = await getStationForFrequency(debouncedFrequency);
         setSignalStrength(station ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 10);
         
-        if (station) {
-            setCurrentStation(station);
-        }
+        setCurrentStation(station); // This will trigger the next effect
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}.`);
       } finally {
@@ -204,11 +216,13 @@ export function OndeSpectraleRadio() {
 
   // This effect starts the very first track when a station is found.
   useEffect(() => {
-    if (!isLoading && currentStation && !isPlaying && !currentTrack) {
+    if (currentStation) {
       playNextTrack();
+    } else {
+      cleanupAudio();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStation, isLoading, isPlaying, currentTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStation]);
 
 
   useEffect(() => {
