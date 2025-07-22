@@ -10,14 +10,14 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-type GeneratePlaylistInput = {
+export type GeneratePlaylistInput = {
     stationName: string;
     djName: string;
     djDescription: string;
     theme: string;
 };
 
-type GeneratePlaylistOutput = {
+export type GeneratePlaylistOutput = {
     items: {
         type: 'message' | 'music';
         content: string;
@@ -33,7 +33,7 @@ const GeneratePlaylistInputSchema = z.object({
 
 const PlaylistItemSchema = z.object({
   type: z.enum(['message', 'music']).describe("Le type d'élément de la playlist."),
-  content: z.string().describe("Le contenu du message du DJ. Laisser vide si le type est 'music'."),
+  content: z.string().describe("Le contenu du message du DJ ou un terme de recherche pour la musique."),
 });
 
 const GeneratePlaylistOutputSchema = z.object({
@@ -59,12 +59,21 @@ const playlistPrompt = ai.definePrompt({
     Instructions :
     1.  Crée une playlist contenant EXACTEMENT 7 éléments.
     2.  La structure doit être: Message, Musique, Message, Musique, Message, Musique, Message.
-    3.  Les messages doivent être courts (1-2 phrases), immersifs et correspondre à la personnalité du DJ et au thème de l'émission.
-    4.  Les messages doivent être uniques et variés.
-    5.  Pour les éléments de type 'music', le champ 'content' doit être une chaîne de caractères vide.
+    3.  Les messages ('message') doivent être courts (1-2 phrases), immersifs et correspondre à la personnalité du DJ et au thème de l'émission.
+    4.  Les pistes musicales ('music') doivent être représentées par un terme de recherche simple (2-3 mots) en anglais, typique des années 40-50, comme "ink spots", "swing jazz", "sentimental journey", "butcher pete". Le champ 'content' contiendra ce terme de recherche.
 
-    Exemple de message sur le thème de "l'espoir" pour un DJ optimiste :
-    "Un autre jour se lève sur les terres désolées, mes amis. N'oubliez pas, même dans l'ombre, une étincelle peut allumer un feu d'espoir. Restez à l'écoute."
+    Exemple de réponse :
+    {
+      "items": [
+        { "type": "message", "content": "Un autre jour se lève sur les terres désolées, mes amis. Restez à l'écoute." },
+        { "type": "music", "content": "big band swing" },
+        { "type": "message", "content": "N'oubliez pas, même dans l'ombre, une étincelle peut allumer un feu d'espoir." },
+        { "type": "music", "content": "i dont want to set the world on fire" },
+        { "type": "message", "content": "Faites attention aux goules, elles sont plus agitées que d'habitude aujourd'hui." },
+        { "type": "music", "content": "maybe the ink spots" },
+        { "type": "message", "content": "C'était votre DJ, vous rappelant de garder vos capsules à portée de main. A la prochaine." }
+      ]
+    }
   `,
 });
 

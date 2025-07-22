@@ -23,7 +23,8 @@ export type PlaylistItem = {
   type: 'message' | 'music';
   title: string;
   artist?: string;
-  url: string; // URL to the audio file in Firebase Storage or Archive.org
+  content: string; // The message text, or a search term for music
+  url: string; // URL to the audio file (can be empty for messages)
   duration: number; // in seconds
   addedAt?: string; // ISO string
 };
@@ -32,6 +33,7 @@ export type Station = {
   id: string;
   frequency: number;
   name: string;
+  theme: string;
   ownerId: string; // User ID of the owner
   djCharacterId: string;
   playlist: PlaylistItem[];

@@ -7,17 +7,19 @@ import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-int
 import { z } from 'zod';
 import { db, storage, ref, getDownloadURL } from '@/lib/firebase';
 import { uploadBytesResumable } from 'firebase/storage';
-import { DJ_CHARACTERS, MUSIC_CATALOG } from '@/lib/data';
+import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generateThemedMessage, type GenerateThemedMessageInput } from '@/ai/flows/generate-themed-message';
+import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
   frequency: z.number(),
   djCharacterId: z.string(),
+  theme: z.string().min(3, "Le thème est requis."),
   ownerId: z.string(),
 });
 
@@ -103,6 +105,7 @@ export async function createStation(ownerId: string, formData: FormData) {
     name: formData.get('name'),
     frequency: parseFloat(formData.get('frequency') as string),
     djCharacterId: formData.get('djCharacterId'),
+    theme: formData.get('theme'),
     ownerId: ownerId,
   });
 
@@ -112,19 +115,51 @@ export async function createStation(ownerId: string, formData: FormData) {
     };
   }
   
-  const { name, frequency, djCharacterId } = validatedFields.data;
+  const { name, frequency, djCharacterId, theme } = validatedFields.data;
 
   const existingStation = await getStationForFrequency(frequency);
   if (existingStation) {
     return { error: { general: 'Cette fréquence est déjà occupée.' } };
   }
+  
+  const allDjs = await getCustomCharactersForUser(ownerId);
+  const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+  const dj = fullDjList.find(d => d.id === djCharacterId);
+
+  if (!dj) {
+    return { error: { general: 'Personnage DJ non trouvé.' } };
+  }
+  
+  const playlistInput: GeneratePlaylistInput = {
+      stationName: name,
+      djName: dj.name,
+      djDescription: 'isCustom' in dj ? dj.description : 'Un DJ mystérieux des terres désolées.',
+      theme: theme,
+  };
+
+  const initialPlaylist = await generatePlaylist(playlistInput);
+  
+  if (!initialPlaylist || !initialPlaylist.items) {
+      return { error: { general: "Impossible de générer la playlist initiale pour la station."}};
+  }
+  
+  const playlistWithIds = initialPlaylist.items.map((item, index) => ({
+      ...item,
+      id: `${Date.now()}-${index}`,
+      title: item.type === 'message' ? item.content.substring(0, 30) + '...' : item.content,
+      artist: item.type === 'message' ? dj.name : 'Artiste Inconnu',
+      duration: item.type === 'message' ? 15 : 180, // Default durations
+      addedAt: new Date().toISOString()
+  }));
+
 
   const newStationData = {
     name,
     frequency,
     djCharacterId,
+    theme,
     ownerId,
-    playlist: [],
+    playlist: playlistWithIds,
     createdAt: serverTimestamp(),
   };
   
@@ -171,7 +206,8 @@ export async function addMessageToStation(stationId: string, message: string): P
         id: messageId,
         type: 'message',
         title: message.substring(0, 30) + (message.length > 30 ? '...' : ''),
-        url: message, // Store the raw text
+        content: message, // Store the raw text
+        url: '', // will be generated on the fly
         duration: 15, // Mock duration, will be dynamic on client
         artist: dj.name,
         addedAt: new Date().toISOString(),
@@ -194,7 +230,7 @@ export async function addMessageToStation(stationId: string, message: string): P
 export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistItem[], error?: string}> {
     if (!searchTerm) return {data:[]};
 
-    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=20&page=1&output=json`;
+    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=5&page=1&output=json`;
     
     try {
         const response = await fetch(searchUrl, {
@@ -207,8 +243,8 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
         }
         const data = await response.json();
         const responseData = data.response;
-        if (!responseData || !responseData.docs) {
-          return { data: [] };
+        if (!responseData || !responseData.docs || responseData.docs.length === 0) {
+          return { error: "Aucun résultat trouvé pour cette recherche." };
         }
         const docs = responseData.docs;
 
@@ -219,6 +255,7 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
             type: 'music',
             title: doc.title || 'Titre inconnu',
             artist: doc.creator || 'Artiste inconnu',
+            content: doc.title,
             url: `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp3`,
             duration: Math.round(parseFloat(doc.duration) || 180),
             addedAt: new Date().toISOString(),
@@ -371,43 +408,6 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
     };
   });
-}
-
-export async function addThemedMessageToStation(stationId: string, theme: string): Promise<{ success: true, playlistItem: PlaylistItem } | { error: string }> {
-    const station = await getStationById(stationId);
-    if (!station) {
-        return { error: "Station non trouvée." };
-    }
-
-    const allDjs = await getCustomCharactersForUser(station.ownerId);
-    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
-    const dj = fullDjList.find(d => d.id === station.djCharacterId);
-
-    if (!dj) {
-      return { error: "Personnage DJ non trouvé." };
-    }
-
-    let generatedMessage: { message: string; } | undefined;
-    
-    try {
-        const input: GenerateThemedMessageInput = {
-            djName: dj.name,
-            djDescription: 'description' in dj ? dj.description : 'Un DJ mystérieux',
-            theme: theme,
-        };
-        generatedMessage = await generateThemedMessage(input);
-    } catch (e: any) {
-        const errorMessage = e.message.includes('503') 
-            ? "Les serveurs de l'IA sont actuellement surchargés. Veuillez réessayer dans quelques instants."
-            : e.message;
-       return { error: `L'IA n'a pas pu générer de message: ${errorMessage}` };
-    }
-    
-    if (!generatedMessage || !generatedMessage.message) {
-      return { error: "L'IA n'a pas pu générer de message. Essayez un autre thème." };
-    }
-
-    return await addMessageToStation(stationId, generatedMessage.message);
 }
 
 

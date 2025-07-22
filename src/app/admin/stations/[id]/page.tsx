@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
-import { getStationById, addMessageToStation, addMusicToStation, searchMusic, addThemedMessageToStation } from '@/app/actions';
+import { getStationById, addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -54,9 +54,6 @@ export default function StationDetailPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   
   const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
-
-  const [messageTheme, setMessageTheme] = useState('Annonces optimistes et conseils de survie');
-  const [isGeneratingMessageIA, setIsGeneratingMessageIA] = useState(false);
 
 
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
@@ -119,24 +116,6 @@ export default function StationDetailPage() {
     }
     setAddingTrackId(null);
   }
-
-  const handleGenerateThemedMessage = async () => {
-    if (!station || !messageTheme.trim()) {
-        toast({ variant: 'destructive', title: "Erreur", description: "Le thème ne peut pas être vide." });
-        return;
-    }
-    setIsGeneratingMessageIA(true);
-    const result = await addThemedMessageToStation(station.id, messageTheme);
-    
-    if (result.error) {
-        toast({ variant: 'destructive', title: "Erreur de génération", description: result.error });
-    } else {
-        toast({ title: "Message IA ajouté !", description: "Un nouveau message thématique est dans votre playlist." });
-        setStation(prev => prev ? { ...prev, playlist: [...prev.playlist, result.playlistItem!] } : null);
-    }
-    
-    setIsGeneratingMessageIA(false);
-  };
 
   const sortedPlaylist = useMemo(() => {
     if (!station?.playlist) return [];
@@ -219,32 +198,31 @@ export default function StationDetailPage() {
 
          <Card className="lg:col-span-2">
             <CardHeader>
-                <CardTitle>Générateur de Message IA</CardTitle>
-                 <CardDescription>Laissez l'IA créer un message unique pour votre DJ !</CardDescription>
+                <CardTitle>Générateur de Playlist IA</CardTitle>
+                 <CardDescription>La playlist de cette station est générée automatiquement par l'IA. Pour ajouter manuellement du contenu, utilisez les options ci-dessous.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="message-theme">Thème du message</Label>
+                 <div className="space-y-2">
+                    <Label htmlFor="message-theme">Thème de la station</Label>
                     <Input
                         id="message-theme"
-                        value={messageTheme}
-                        onChange={(e) => setMessageTheme(e.target.value)}
-                        placeholder="Ex: Histoires d'espoir, chroniques des anciens temps..."
+                        value={station.theme}
+                        disabled
                     />
                      <p className="text-xs text-muted-foreground">
-                        L'IA générera un message unique en fonction de ce thème.
+                        Ce thème est utilisé par l'IA pour générer les messages et choisir les musiques.
                      </p>
                 </div>
-                <Button onClick={handleGenerateThemedMessage} disabled={isGeneratingMessageIA} className="w-full">
-                    {isGeneratingMessageIA ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {isGeneratingMessageIA ? 'Génération en cours...' : 'Générer et ajouter le message'}
+                <Button disabled className="w-full">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Playlist gérée par l'IA
                 </Button>
             </CardContent>
          </Card>
       </div>
        <Card>
             <CardHeader>
-                <CardTitle>Ajout Manuel</CardTitle>
+                <CardTitle>Ajout Manuel de Contenu</CardTitle>
                  <CardDescription>Ajoutez des messages ou des musiques spécifiques à la suite de la playlist actuelle.</CardDescription>
             </CardHeader>
             <CardContent>

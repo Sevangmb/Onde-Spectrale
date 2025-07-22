@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -43,7 +44,8 @@ export default function StationsManagement() {
   const [formData, setFormData] = useState({
     name: '',
     frequency: 92.1,
-    djCharacterId: ''
+    djCharacterId: '',
+    theme: 'Histoires d\'espoir et de survie dans les terres désolées'
   });
 
   const handleCreateStation = async (e: React.FormEvent) => {
@@ -58,6 +60,7 @@ export default function StationsManagement() {
       form.append('name', formData.name);
       form.append('frequency', formData.frequency.toString());
       form.append('djCharacterId', formData.djCharacterId);
+      form.append('theme', formData.theme);
 
       const result = await createStation(user.uid, form);
 
@@ -73,7 +76,7 @@ export default function StationsManagement() {
           description: `La station ${formData.name} est maintenant en ligne sur ${formData.frequency} MHz.`,
         });
         setIsCreateModalOpen(false);
-        setFormData({ name: '', frequency: 92.1, djCharacterId: '' });
+        setFormData({ name: '', frequency: 92.1, djCharacterId: '', theme: 'Histoires d\'espoir et de survie dans les terres désolées' });
         router.push(`/admin/stations/${result.stationId}`);
       }
     } catch (err: any) {
@@ -146,6 +149,17 @@ export default function StationsManagement() {
                     placeholder="Radio Wasteland"
                     required
                   />
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="station-theme">Thème de la station</Label>
+                  <Input
+                    id="station-theme"
+                    value={formData.theme}
+                    onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
+                    placeholder="Ex: Humour noir et jazz d'avant-guerre"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">L'IA utilisera ce thème pour générer les messages et choisir la musique.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="station-frequency">Fréquence (87.0 - 108.0 MHz)</Label>

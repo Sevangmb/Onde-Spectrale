@@ -3,12 +3,11 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
-import { getStationForFrequency, updateUserFrequency, getAudioForMessage } from '@/app/actions';
+import { getStationForFrequency, updateUserFrequency, getAudioForMessage, searchMusic } from '@/app/actions';
 import type { Station, PlaylistItem } from '@/lib/types';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { MUSIC_CATALOG } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -70,8 +69,8 @@ export function OndeSpectraleRadio() {
   const loadAndPlay = useCallback((url: string) => {
     if (!audioRef.current || !isMounted.current) return;
     const audio = audioRef.current;
-
-    const handleCanPlay = async () => {
+  
+    const playAudio = async () => {
       try {
         if (isMounted.current) {
           await audio.play();
@@ -88,110 +87,100 @@ export function OndeSpectraleRadio() {
          }
       }
     };
+  
+    const handleCanPlay = () => {
+      playAudio();
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+    };
     
     setIsLoadingTrack(true);
     
-    // Cleanup previous source before setting a new one
     audio.pause();
     
-    audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
+    audio.addEventListener('canplaythrough', handleCanPlay);
     audio.addEventListener('error', (e) => {
         console.error('Audio Element Error:', e);
         if (isMounted.current) {
             setIsLoadingTrack(false);
             setIsPlaying(false);
+            // Maybe try next track on error?
         }
-    }, { once: true });
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+    });
     
     audio.src = url;
     audio.load();
   }, []);
 
-  const playNextTrack = useCallback(async () => {
-    if (!isMounted.current || !currentStation) return;
-
+ const playNextTrack = useCallback(async () => {
+    if (!isMounted.current || !currentStation || !user) return;
+    
     setIsLoadingTrack(true);
     
-    const lastTrack = currentTrackRef.current;
-    
-    const playMessage = async () => {
-      const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-      if (!user || stationMessages.length === 0) {
-          await playMusic(); // fallback to music if no messages
-          return;
-      }
+    const lastTrackType = currentTrackRef.current?.type;
+    let nextItem: PlaylistItem | undefined;
 
-      const track = stationMessages[Math.floor(Math.random() * stationMessages.length)];
-      setCurrentTrack(track);
+    if (lastTrackType === 'music') {
+        const messages = currentStation.playlist.filter(item => item.type === 'message');
+        if (messages.length > 0) {
+            const lastIndex = currentStation.playlist.indexOf(currentTrackRef.current!);
+            const nextMessageIndex = currentStation.playlist.findIndex((item, index) => index > lastIndex && item.type === 'message');
+            nextItem = currentStation.playlist[nextMessageIndex !== -1 ? nextMessageIndex : 0];
+        }
+    } 
     
-      const result = await getAudioForMessage(track.url, currentStation.djCharacterId, user.uid);
+    if (!nextItem) {
+        const musics = currentStation.playlist.filter(item => item.type === 'music');
+        if (musics.length > 0) {
+            nextItem = musics[Math.floor(Math.random() * musics.length)];
+        }
+    }
     
-      if (result.audioBase64 && isMounted.current) {
-          try {
-              const byteCharacters = atob(result.audioBase64);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                  byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new Blob([byteArray], { type: 'audio/wav' });
-              const blobUrl = URL.createObjectURL(blob);
-              if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
-              currentBlobUrl.current = blobUrl;
-              loadAndPlay(blobUrl);
-          } catch (e: any) {
-              console.error("Audio playback error:", e);
-              if(isMounted.current) {
-                setIsLoadingTrack(false);
-                await playMusic(); // fallback to music on error
-              }
-          }
-      } else {
-          console.error(result.error || "Failed to generate audio.");
-          if(isMounted.current) {
-            setIsLoadingTrack(false);
-            await playMusic(); // fallback to music on error
-          }
-      }
-    };
-    
-    const playMusic = async () => {
-        let attempts = 0;
-        const maxAttempts = 5;
+    if (!nextItem) {
+        // Fallback if playlist is empty or misconfigured
+        setIsLoadingTrack(false);
+        return;
+    }
 
-        while(attempts < maxAttempts) {
-            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            setCurrentTrack(track);
+    setCurrentTrack(nextItem);
+
+    if (nextItem.type === 'message') {
+        const result = await getAudioForMessage(nextItem.content, currentStation.djCharacterId, user.uid);
+        if (result.audioBase64 && isMounted.current) {
+            const byteCharacters = atob(result.audioBase64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'audio/wav' });
+            const blobUrl = URL.createObjectURL(blob);
+            if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
+            currentBlobUrl.current = blobUrl;
+            loadAndPlay(blobUrl);
+        }
+    } else { // Music
+        const {data, error} = await searchMusic(nextItem.content);
+        if (data && data.length > 0 && isMounted.current) {
+            const trackToPlay = data[0];
+            setCurrentTrack(trackToPlay); // Update track with full details
+            
             try {
-                const response = await fetch(track.url);
-                if (!response.ok) {
-                   console.warn(`Failed to fetch music from ${track.url}: [${response.status}] ${response.statusText}`);
-                   attempts++;
-                   continue; // Try another song
-                }
+                const response = await fetch(trackToPlay.url);
+                if (!response.ok) throw new Error(`[${response.status}] ${response.statusText}`);
                 const blob = await response.blob();
                 const blobUrl = URL.createObjectURL(blob);
                 if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
                 currentBlobUrl.current = blobUrl;
-                if (isMounted.current) loadAndPlay(blobUrl);
-                return; // Success, exit the function
-            } catch(e: any) {
-                console.warn(`Failed to fetch music from ${track.url}:`, e);
-                attempts++;
+                loadAndPlay(blobUrl);
+            } catch(e) {
+                console.error("Failed to fetch and play music:", e);
+                setIsLoadingTrack(false);
+                onEnded(); // try next track
             }
+        } else {
+             console.error("Music search failed:", error);
+             setIsLoadingTrack(false);
+             onEnded(); // try next track
         }
-
-        // If all attempts fail, fall back to a message
-        console.error("All attempts to play music failed. Falling back to a message.");
-        if (isMounted.current) {
-            await playMessage();
-        }
-    };
-
-    if (lastTrack?.type === 'music') {
-        await playMessage();
-    } else { // if last track was a message or it's the first track
-        await playMusic();
     }
 
   }, [currentStation, user, loadAndPlay]);
@@ -253,8 +242,7 @@ export function OndeSpectraleRadio() {
       setIsPlaying(false);
       setCurrentTrack(undefined);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStation, playNextTrack]);
+  }, [currentStation]);
 
 
   useEffect(() => {
