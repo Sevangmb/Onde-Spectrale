@@ -104,7 +104,7 @@ export function OndeSpectraleRadio() {
     };
     
     setIsLoadingTrack(true);
-    audio.pause();
+    cleanupAudio();
 
     audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
     audio.addEventListener('error', (e) => {
@@ -116,49 +116,22 @@ export function OndeSpectraleRadio() {
     }, { once: true });
     
     audio.src = url;
-  }, []);
+  }, [cleanupAudio]);
 
 
  const playNextTrack = useCallback(async () => {
     if (!isMounted.current || !currentStation) return;
 
-    cleanupAudio();
     setIsLoadingTrack(true);
     
-    const lastTrack = currentTrackRef.current;
-    const nextTrackType = !lastTrack || lastTrack.type === 'music' ? 'message' : 'music';
+    const lastTrackType = currentTrackRef.current?.type;
+    const nextTrackType = lastTrackType === 'music' ? 'message' : 'music';
 
-    if (nextTrackType === 'music') {
-        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-        setCurrentTrack(track);
-        try {
-            const response = await fetch(track.url);
-            if (!response.ok) throw new Error(`Failed to fetch music: ${response.statusText}`);
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            currentBlobUrl.current = blobUrl;
-            if (isMounted.current) loadAndPlay(blobUrl);
-        } catch(e) {
-            console.error("Error fetching music:", e);
-            if(isMounted.current) setIsLoadingTrack(false);
-        }
-    } else { // play message
+    const playMessage = async () => {
         const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
         if (!user || stationMessages.length === 0) {
-            // No messages, fallback to music immediately
-            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-            setCurrentTrack(track);
-            try {
-                const response = await fetch(track.url);
-                if (!response.ok) throw new Error(`Failed to fetch music: ${response.statusText}`);
-                const blob = await response.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                currentBlobUrl.current = blobUrl;
-                if (isMounted.current) loadAndPlay(blobUrl);
-            } catch(e) {
-                console.error("Error fetching music fallback:", e);
-                if(isMounted.current) setIsLoadingTrack(false);
-            }
+            // No messages, play music instead
+            await playMusic();
             return;
         }
 
@@ -187,8 +160,36 @@ export function OndeSpectraleRadio() {
             console.error(result.error || "Failed to generate audio.");
             if(isMounted.current) setIsLoadingTrack(false);
         }
+    };
+    
+    const playMusic = async () => {
+        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+        setCurrentTrack(track);
+        try {
+            const response = await fetch(track.url);
+            if (!response.ok) {
+              throw new Error(`[${response.status}] ${response.statusText}`);
+            }
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            currentBlobUrl.current = blobUrl;
+            if (isMounted.current) loadAndPlay(blobUrl);
+        } catch(e) {
+            console.error(`Failed to fetch music from ${track.url}:`, e);
+            if(isMounted.current) {
+                // Fallback to a message if music fails
+                await playMessage();
+            }
+        }
+    };
+
+    if (nextTrackType === 'music') {
+        await playMusic();
+    } else {
+        await playMessage();
     }
-  }, [currentStation, user, loadAndPlay, cleanupAudio]);
+
+  }, [currentStation, user, loadAndPlay]);
 
 
   const onEnded = useCallback(() => {
@@ -247,7 +248,8 @@ export function OndeSpectraleRadio() {
       setIsPlaying(false);
       setCurrentTrack(undefined);
     }
-  }, [currentStation, playNextTrack, cleanupAudio]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStation]);
 
 
   useEffect(() => {
