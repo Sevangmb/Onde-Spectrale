@@ -133,7 +133,7 @@ export async function createStation(ownerId: string, formData: FormData) {
   const playlistInput: GeneratePlaylistInput = {
       stationName: name,
       djName: dj.name,
-      djDescription: 'isCustom' in dj ? dj.description : 'Un DJ mystérieux des terres désolées.',
+      djDescription: 'isCustom' in dj && dj.isCustom ? dj.description : 'Un DJ mystérieux des terres désolées.',
       theme: theme,
   };
 
@@ -244,7 +244,7 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
         const data = await response.json();
         const responseData = data.response;
         if (!responseData || !responseData.docs || responseData.docs.length === 0) {
-          return { error: "Aucun résultat trouvé pour cette recherche." };
+          return { data: [] }; // Return empty data instead of error
         }
         const docs = responseData.docs;
 
@@ -436,3 +436,5 @@ export async function getAudioForMessage(message: string, djCharacterId: string,
         return { error: `La génération de la voix IA a échoué: ${err.message}` };
     }
 }
+
+    
