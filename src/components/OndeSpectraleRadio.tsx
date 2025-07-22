@@ -18,7 +18,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { RadioTower, Rss, ChevronLeft, ChevronRight, Zap, UserCog, Settings, Loader2 } from 'lucide-react';
+import { RadioTower, Rss, ChevronLeft, ChevronRight, Zap, UserCog, Settings } from 'lucide-react';
 
 interface ParticleStyle {
     left: string;
@@ -38,6 +38,10 @@ export function OndeSpectraleRadio() {
   const router = useRouter();
 
   const [currentTrack, setCurrentTrack] = useState<PlaylistItem | undefined>(undefined);
+  const currentTrackRef = useRef(currentTrack);
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
 
@@ -48,32 +52,12 @@ export function OndeSpectraleRadio() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
   const isMounted = useRef(true);
-  const currentTrackRef = useRef(currentTrack);
 
-  useEffect(() => {
-    currentTrackRef.current = currentTrack;
-  }, [currentTrack]);
-
-
-  useEffect(() => {
-    isMounted.current = true;
-    setIsClient(true);
-    setParticleStyles(
-      Array.from({ length: 15 }, () => ({
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-        animationDelay: `${Math.random() * 5}s`,
-        animationDuration: `${3 + Math.random() * 4}s`,
-      }))
-    );
-    return () => { isMounted.current = false; };
-  }, []);
 
   const cleanupAudio = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
-      audio.src = '';
     }
     if (currentBlobUrl.current) {
       URL.revokeObjectURL(currentBlobUrl.current);
@@ -125,68 +109,86 @@ export function OndeSpectraleRadio() {
     setIsLoadingTrack(true);
     
     const lastTrackType = currentTrackRef.current?.type;
-    const nextTrackType = lastTrackType === 'music' ? 'message' : 'music';
 
     const playMessage = async () => {
-        const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-        if (!user || stationMessages.length === 0) {
-            // No messages, play music instead
-            await playMusic();
-            return;
-        }
+      const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
+       if (!user || stationMessages.length === 0) {
+          await playMusic(); // fallback to music if no messages
+          return;
+      }
 
-        const track = stationMessages[Math.floor(Math.random() * stationMessages.length)];
-        setCurrentTrack(track);
-      
-        const result = await getAudioForMessage(track.url, currentStation.djCharacterId, user.uid);
-      
-        if (result.audioBase64 && isMounted.current) {
-            try {
-                const byteCharacters = atob(result.audioBase64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'audio/wav' });
-                const blobUrl = URL.createObjectURL(blob);
-                currentBlobUrl.current = blobUrl;
-                loadAndPlay(blobUrl);
-            } catch (e: any) {
-                console.error("Audio playback error:", e);
-                if(isMounted.current) setIsLoadingTrack(false);
-            }
-        } else {
-            console.error(result.error || "Failed to generate audio.");
-            if(isMounted.current) setIsLoadingTrack(false);
-        }
+      const track = stationMessages[Math.floor(Math.random() * stationMessages.length)];
+      setCurrentTrack(track);
+    
+      const result = await getAudioForMessage(track.url, currentStation.djCharacterId, user.uid);
+    
+      if (result.audioBase64 && isMounted.current) {
+          try {
+              const byteCharacters = atob(result.audioBase64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                  byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'audio/wav' });
+              const blobUrl = URL.createObjectURL(blob);
+              currentBlobUrl.current = blobUrl;
+              loadAndPlay(blobUrl);
+          } catch (e: any) {
+              console.error("Audio playback error:", e);
+              if(isMounted.current) {
+                setIsLoadingTrack(false);
+                await playMusic(); // fallback to music on error
+              }
+          }
+      } else {
+          console.error(result.error || "Failed to generate audio.");
+          if(isMounted.current) {
+            setIsLoadingTrack(false);
+            await playMusic(); // fallback to music on error
+          }
+      }
     };
     
     const playMusic = async () => {
-        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
-        setCurrentTrack(track);
-        try {
-            const response = await fetch(track.url);
-            if (!response.ok) {
-              throw new Error(`[${response.status}] ${response.statusText}`);
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while(attempts < maxAttempts) {
+            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+            setCurrentTrack(track);
+            try {
+                const response = await fetch(track.url);
+                if (!response.ok) {
+                  if (response.status === 503 && attempts < maxAttempts - 1) {
+                      console.warn(`Attempt ${attempts + 1} failed for ${track.title} with 503. Retrying with another track.`);
+                      attempts++;
+                      continue; // try another song
+                  }
+                  throw new Error(`[${response.status}] ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                currentBlobUrl.current = blobUrl;
+                if (isMounted.current) loadAndPlay(blobUrl);
+                return; // Success, exit the loop
+            } catch(e) {
+                console.error(`Failed to fetch music from ${track.url}:`, e);
+                attempts++;
             }
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            currentBlobUrl.current = blobUrl;
-            if (isMounted.current) loadAndPlay(blobUrl);
-        } catch(e) {
-            console.error(`Failed to fetch music from ${track.url}:`, e);
-            if(isMounted.current) {
-                // Fallback to a message if music fails
-                await playMessage();
-            }
+        }
+
+        // If all attempts fail, fallback to a message
+        console.error("All attempts to play music failed. Falling back to a message.");
+        if (isMounted.current) {
+            await playMessage();
         }
     };
 
-    if (nextTrackType === 'music') {
-        await playMusic();
-    } else {
+    if (lastTrackType === 'music') {
         await playMessage();
+    } else {
+        await playMusic();
     }
 
   }, [currentStation, user, loadAndPlay]);
@@ -253,10 +255,25 @@ export function OndeSpectraleRadio() {
 
 
   useEffect(() => {
+    isMounted.current = true;
+    setIsClient(true);
+    setParticleStyles(
+      Array.from({ length: 15 }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 5}s`,
+        animationDuration: `${3 + Math.random() * 4}s`,
+      }))
+    );
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (isMounted.current) setUser(currentUser);
     });
-    return () => unsubscribe();
+
+    return () => {
+      isMounted.current = false; 
+      unsubscribe();
+    };
   }, []);
 
   const handleScanUp = useCallback(() => {
