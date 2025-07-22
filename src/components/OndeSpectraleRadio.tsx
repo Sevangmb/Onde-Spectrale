@@ -65,7 +65,8 @@ export function OndeSpectraleRadio() {
   const cleanupAudio = useCallback(() => {
     if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = '';
+        audioRef.current.removeAttribute('src');
+        audioRef.current.load();
         audioRef.current.loop = false;
     }
     if (currentBlobUrl.current) {
@@ -76,6 +77,41 @@ export function OndeSpectraleRadio() {
     setCurrentTrack(undefined);
   }, []);
   
+  const loadAndPlay = useCallback((url: string, loop = false) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Cleanup previous Blob URL if it exists
+    if (currentBlobUrl.current) {
+      URL.revokeObjectURL(currentBlobUrl.current);
+      currentBlobUrl.current = null;
+    }
+    
+    const handleCanPlay = async () => {
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+        try {
+            await audio.play();
+            setIsPlaying(true);
+        } catch (e) {
+            console.error("Error playing audio:", e);
+            cleanupAudio();
+        }
+    };
+    
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    
+    audio.src = url;
+    audio.loop = loop;
+    audio.load();
+
+    // If the new source is a data URI, it might be a blob
+    if (url.startsWith('blob:')) {
+      currentBlobUrl.current = url;
+    }
+
+  }, [cleanupAudio]);
+
+
   const playNextTrack = useCallback(async () => {
     if (isGeneratingMessage || !currentStation || !user) {
         cleanupAudio();
@@ -84,28 +120,14 @@ export function OndeSpectraleRadio() {
 
     const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
     const playMusic = lastPlayedType.current === 'message' || stationMessages.length === 0;
-
-    cleanupAudio();
-
+    
     if (playMusic && MUSIC_CATALOG.length > 0) {
-        // Play music
         lastPlayedType.current = 'music';
         const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
         setCurrentTrack(track);
+        loadAndPlay(track.url);
 
-        if (audioRef.current) {
-            audioRef.current.src = track.url;
-            audioRef.current.load();
-            try {
-                await audioRef.current.play();
-                setIsPlaying(true);
-            } catch (e) {
-                console.error("Error playing music:", e);
-                cleanupAudio();
-            }
-        }
     } else if (stationMessages.length > 0) {
-        // Play message
         lastPlayedType.current = 'message';
         setIsGeneratingMessage(true);
 
@@ -114,6 +136,7 @@ export function OndeSpectraleRadio() {
 
         const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
         
+        setIsGeneratingMessage(false);
         if (result.audioBase64) {
             try {
                 const byteCharacters = atob(result.audioBase64);
@@ -124,14 +147,7 @@ export function OndeSpectraleRadio() {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'audio/wav' });
                 const url = URL.createObjectURL(blob);
-                currentBlobUrl.current = url;
-
-                if (audioRef.current) {
-                    audioRef.current.src = url;
-                    audioRef.current.load();
-                    await audioRef.current.play();
-                    setIsPlaying(true);
-                }
+                loadAndPlay(url);
             } catch (e: any) {
                 console.error("Audio playback error:", e);
                 cleanupAudio();
@@ -140,12 +156,10 @@ export function OndeSpectraleRadio() {
             setError(result.error || "Failed to generate audio.");
             cleanupAudio();
         }
-        setIsGeneratingMessage(false);
     } else {
-        // No content available
         cleanupAudio();
     }
-  }, [currentStation, user, isGeneratingMessage, cleanupAudio]);
+  }, [currentStation, user, isGeneratingMessage, cleanupAudio, loadAndPlay]);
 
   const onEnded = useCallback(() => {
     setIsPlaying(false);
@@ -181,8 +195,7 @@ export function OndeSpectraleRadio() {
         
         if (station) {
             setCurrentStation(station);
-            lastPlayedType.current = 'music'; // Reset to play music first
-            playNextTrack();
+            lastPlayedType.current = 'music';
         } else {
             setCurrentStation(null);
         }
@@ -196,6 +209,13 @@ export function OndeSpectraleRadio() {
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedFrequency]);
+
+  useEffect(() => {
+    if (!isLoading && currentStation) {
+      playNextTrack();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStation, isLoading]);
 
 
   useEffect(() => {
@@ -291,18 +311,18 @@ export function OndeSpectraleRadio() {
                     </div>
                      <div className="flex items-center gap-2">
                         {user ? (
-                            <>
-                                {currentStation && currentStation.ownerId === user.uid && (
-                                    <Button variant="outline" size="sm" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push(`/admin/stations/${currentStation.id}`)}>
-                                        <Settings className="mr-2 h-4 w-4" /> Gérer
-                                    </Button>
-                                )}
-                                <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
-                                    <UserCog className="mr-2 h-4 w-4" /> Admin
+                           <>
+                             {currentStation && currentStation.ownerId === user.uid && (
+                                <Button variant="outline" size="sm" className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" onClick={() => router.push(`/admin/stations/${currentStation.id}`)}>
+                                    <Settings className="mr-2 h-4 w-4" /> Gérer
                                 </Button>
-                            </>
+                             )}
+                             <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/admin')}>
+                                <UserCog className="mr-2 h-4 w-4" /> Admin
+                             </Button>
+                           </>
                         ) : (
-                            <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
+                             <Button variant="default" className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" onClick={() => router.push('/login')}>
                                 <Rss className="mr-2 h-4 w-4" /> Créer ou Gérer
                             </Button>
                         )}
