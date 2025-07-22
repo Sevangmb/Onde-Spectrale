@@ -47,7 +47,7 @@ export function OndeSpectraleRadio() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const currentBlobUrl = useRef<string | null>(null);
-  const lastPlayedType = useRef<'message' | 'music'>('music');
+  const nextTrackTypeRef = useRef<'message' | 'music'>('message');
 
 
   useEffect(() => {
@@ -112,16 +112,14 @@ export function OndeSpectraleRadio() {
     }
 
     const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-    const playMusic = lastPlayedType.current === 'message' || stationMessages.length === 0;
     
-    if (playMusic && MUSIC_CATALOG.length > 0) {
-        lastPlayedType.current = 'music';
+    if (nextTrackTypeRef.current === 'music' && MUSIC_CATALOG.length > 0) {
         const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
         setCurrentTrack(track);
         loadAndPlay(track.url);
+        nextTrackTypeRef.current = stationMessages.length > 0 ? 'message' : 'music';
 
     } else if (stationMessages.length > 0) {
-        lastPlayedType.current = 'message';
         setIsGeneratingMessage(true);
 
         const message = stationMessages[Math.floor(Math.random() * stationMessages.length)];
@@ -141,6 +139,7 @@ export function OndeSpectraleRadio() {
                 const blob = new Blob([byteArray], { type: 'audio/wav' });
                 const url = URL.createObjectURL(blob);
                 loadAndPlay(url);
+                nextTrackTypeRef.current = 'music';
             } catch (e: any) {
                 console.error("Audio playback error:", e);
                 cleanupAudio();
@@ -150,7 +149,11 @@ export function OndeSpectraleRadio() {
             cleanupAudio();
         }
     } else {
-        cleanupAudio();
+        // No messages, just play music
+        const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+        setCurrentTrack(track);
+        loadAndPlay(track.url);
+        nextTrackTypeRef.current = 'music';
     }
   }, [currentStation, user, isGeneratingMessage, cleanupAudio, loadAndPlay]);
 
@@ -199,6 +202,7 @@ export function OndeSpectraleRadio() {
 
   useEffect(() => {
     if (!isLoading && currentStation) {
+      nextTrackTypeRef.current = 'message'; // Start with a message
       playNextTrack();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,3 +434,4 @@ export function OndeSpectraleRadio() {
     </>
   );
 }
+
