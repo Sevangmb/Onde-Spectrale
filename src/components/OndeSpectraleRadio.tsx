@@ -48,64 +48,52 @@ export function OndeSpectraleRadio() {
   const isMounted = useRef(true);
   const currentTrackIndexRef = useRef(0);
 
-  const cleanupAudio = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-    }
-  }, []);
-  
-  const playTrack = useCallback(async (track: PlaylistItem) => {
-    if (!isMounted.current || !currentStation || !user) {
+  const playTrack = useCallback(async (trackIndex: number) => {
+    if (!isMounted.current || !currentStation || !user || !currentStation.playlist[trackIndex]) {
         setIsLoadingTrack(false);
         return;
     }
     
     setIsLoadingTrack(true);
+    const track = currentStation.playlist[trackIndex];
+    currentTrackIndexRef.current = trackIndex;
     setCurrentTrack(track);
 
     const result = await getAudioForTrack(track, currentStation.djCharacterId, user.uid);
     
-    if (result.audioUrl && isMounted.current) {
-        if(audioRef.current) {
-            audioRef.current.src = result.audioUrl;
-            try {
-                await audioRef.current.play();
-                setIsPlaying(true);
-            } catch (e) {
-                console.error("Error playing audio:", e);
-                setIsPlaying(false);
-            } finally {
-                setIsLoadingTrack(false);
+    if (result.audioUrl && isMounted.current && audioRef.current) {
+        audioRef.current.src = result.audioUrl;
+        try {
+            await audioRef.current.play();
+            setIsPlaying(true);
+        } catch (e) {
+            console.error("Error playing audio:", e);
+            setIsPlaying(false);
+             if (isMounted.current) {
+                const nextTrackIndex = (currentTrackIndexRef.current + 1) % currentStation.playlist.length;
+                playTrack(nextTrackIndex);
             }
         }
     } else {
         console.error("Failed to get audio for track:", result.error);
+        if (isMounted.current) {
+            const nextTrackIndex = (currentTrackIndexRef.current + 1) % currentStation.playlist.length;
+            playTrack(nextTrackIndex);
+        }
+    }
+    
+    if (isMounted.current) {
         setIsLoadingTrack(false);
-        // Automatically try the next track on failure
-        playNextTrack();
     }
   }, [currentStation, user]);
   
-  const playNextTrack = useCallback(() => {
-    if (!currentStation || currentStation.playlist.length === 0) return;
-    
-    currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % currentStation.playlist.length;
-    const nextTrack = currentStation.playlist[currentTrackIndexRef.current];
-
-    if (nextTrack) {
-        playTrack(nextTrack);
-    }
+  const onEnded = useCallback(() => {
+    if (!isMounted.current || !currentStation) return;
+    setIsPlaying(false);
+    const nextTrackIndex = (currentTrackIndexRef.current + 1) % currentStation.playlist.length;
+    playTrack(nextTrackIndex);
   }, [currentStation, playTrack]);
   
-  const onEnded = useCallback(() => {
-    if (!isMounted.current) return;
-    setIsPlaying(false);
-    playNextTrack();
-  }, [playNextTrack]);
-
   useEffect(() => {
     isMounted.current = true;
     setIsClient(true);
@@ -131,10 +119,14 @@ export function OndeSpectraleRadio() {
     return () => {
       isMounted.current = false; 
       unsubscribe();
-      if(audio) audio.removeEventListener('ended', onEnded);
-      cleanupAudio();
+      if(audio) {
+        audio.removeEventListener('ended', onEnded);
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      }
     };
-  }, [cleanupAudio, onEnded]);
+  }, [onEnded]);
 
 
   useEffect(() => {
@@ -142,7 +134,13 @@ export function OndeSpectraleRadio() {
       setIsLoading(true);
       setError(null);
       
-      cleanupAudio();
+      const audio = audioRef.current;
+      if (audio) {
+          audio.pause();
+          audio.removeAttribute('src');
+          audio.load();
+      }
+
       setCurrentStation(null);
       setCurrentTrack(undefined);
       setIsPlaying(false);
@@ -164,11 +162,11 @@ export function OndeSpectraleRadio() {
     };
 
     fetchData();
-  }, [debouncedFrequency, cleanupAudio]);
+  }, [debouncedFrequency]);
 
   useEffect(() => {
-    if (currentStation && currentStation.playlist && currentStation.playlist.length > 0 && !isPlaying && !isLoadingTrack) {
-      playTrack(currentStation.playlist[0]);
+    if (currentStation && currentStation.playlist.length > 0 && !isPlaying && !isLoadingTrack) {
+        playTrack(0);
     }
   }, [currentStation, isPlaying, isLoadingTrack, playTrack]);
 

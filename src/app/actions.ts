@@ -421,6 +421,9 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
     if (track.type === 'message') {
         try {
             let audioResult;
+            if (!track.content) {
+                 return { error: 'Contenu du message vide.' };
+            }
             if ('isCustom' in dj && dj.isCustom) {
                 audioResult = await generateCustomDjAudio({ message: track.content, voice: dj.voice });
             } else {
@@ -440,7 +443,6 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             try {
                 const searchResults = await searchMusic(track.content);
                 if (searchResults.length > 0 && searchResults[0].url) {
-                    // Test the URL to see if it's accessible
                     const response = await fetch(searchResults[0].url, { method: 'HEAD' });
                     if (response.ok) {
                         return { audioUrl: searchResults[0].url };
@@ -453,3 +455,5 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         return { error: `Impossible de trouver une source valide pour "${track.content}"` };
     }
 }
+
+    
