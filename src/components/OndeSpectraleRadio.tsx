@@ -80,69 +80,75 @@ export function OndeSpectraleRadio() {
     if (!audioRef.current || !isMounted.current) return;
     const audio = audioRef.current;
 
-    cleanupAudio();
-
     const handleCanPlay = async () => {
       try {
         if (isMounted.current) {
           await audio.play();
           setIsPlaying(true);
-          setIsLoadingTrack(false);
         }
       } catch (e) {
         console.error("Error playing audio:", e);
         if (isMounted.current) {
             setIsPlaying(false);
-            setIsLoadingTrack(false);
         }
+      } finally {
+         if (isMounted.current) {
+            setIsLoadingTrack(false);
+         }
       }
       audio.removeEventListener('canplaythrough', handleCanPlay);
     };
-
-    audio.addEventListener('canplaythrough', handleCanPlay);
-    audio.src = url;
-    currentBlobUrl.current = url; // Store blob url to revoke later
-  }, [cleanupAudio]);
-
-
-  const playNextTrack = useCallback(async () => {
-    if (!isMounted.current || !currentStation || !user) {
-      cleanupAudio();
-      return;
-    }
-
-    setIsPlaying(false);
-    setIsLoadingTrack(true);
     
-    // Decide next track type
-    const nextType = (currentTrack?.type === 'message' || !currentTrack) ? 'music' : 'message';
+    setIsLoadingTrack(true);
+    // Pause previous track before loading new one
+    audio.pause();
+    
+    // Use a fresh event listener
+    audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
+    
+    // Set the new source. This triggers the browser to load it.
+    audio.src = url;
+  }, []);
+
+
+ const playNextTrack = useCallback(async () => {
+    if (!isMounted.current) return;
+    
+    cleanupAudio();
+    
+    const nextType = currentTrack?.type === 'music' ? 'message' : 'music';
 
     if (nextType === 'music') {
         const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
         setCurrentTrack(track);
+        setIsLoadingTrack(true);
         try {
             const response = await fetch(track.url);
             if (!response.ok) throw new Error(`Failed to fetch music: ${response.statusText}`);
             const blob = await response.blob();
             const blobUrl = URL.createObjectURL(blob);
+            currentBlobUrl.current = blobUrl;
             if (isMounted.current) loadAndPlay(blobUrl);
         } catch(e) {
             console.error("Error fetching music:", e);
             if(isMounted.current) setIsLoadingTrack(false);
         }
-
     } else { // play message
-        const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-        if (stationMessages.length === 0) {
+        if (!currentStation || !user || currentStation.playlist.filter(p => p.type === 'message').length === 0) {
             // No messages, fallback to music immediately
-            setCurrentTrack(undefined); // Reset so next track is music again
-            if(isMounted.current) setIsLoadingTrack(false);
-            playNextTrack(); // Re-run to select music
+            const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
+            setCurrentTrack(track);
+            // This re-runs the logic to actually play music
+            if(isMounted.current) {
+              playNextTrack();
+            }
             return;
         }
-
+        
+        const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
         const message = stationMessages[Math.floor(Math.random() * stationMessages.length)];
         setCurrentTrack(message);
+        setIsLoadingTrack(true);
         
         const result = await getAudioForMessage(message.url, currentStation.djCharacterId, user.uid);
         
@@ -156,6 +162,7 @@ export function OndeSpectraleRadio() {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'audio/wav' });
                 const blobUrl = URL.createObjectURL(blob);
+                currentBlobUrl.current = blobUrl;
                 loadAndPlay(blobUrl);
             } catch (e: any) {
                 console.error("Audio playback error:", e);
@@ -166,7 +173,7 @@ export function OndeSpectraleRadio() {
             if(isMounted.current) setIsLoadingTrack(false);
         }
     }
-  }, [currentStation, user, loadAndPlay, cleanupAudio, currentTrack]);
+  }, [currentStation, user, loadAndPlay, cleanupAudio, currentTrack?.type]);
 
 
   const onEnded = useCallback(() => {
