@@ -2,7 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
+import type { Station, PlaylistItem, CustomDJCharacter, DJCharacter } from '@/lib/types';
 import { simulateFrequencyInterference } from '@/ai/flows/simulate-frequency-interference';
 import { z } from 'zod';
 import { db, storage, ref, getDownloadURL } from '@/lib/firebase';
@@ -11,7 +11,6 @@ import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
-import { generateThemedMessage, type GenerateThemedMessageInput } from '@/ai/flows/generate-themed-message';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 
 
@@ -36,7 +35,6 @@ function serializeStation(doc: any): Station {
 export async function getStationForFrequency(frequency: number): Promise<Station | null> {
     const stationsCol = collection(db, 'stations');
     
-    // Utiliser une petite marge pour la recherche pour éviter les problèmes de virgule flottante
     const margin = 0.01;
     const lowerBound = frequency - margin;
     const upperBound = frequency + margin;
@@ -52,8 +50,6 @@ export async function getStationForFrequency(frequency: number): Promise<Station
         return null;
     }
 
-    // Il pourrait y avoir plusieurs correspondances si les marges se chevauchent.
-    // On prend la plus proche.
     const stationDoc = querySnapshot.docs.sort((a, b) => 
         Math.abs(a.data().frequency - frequency) - Math.abs(b.data().frequency - frequency)
     )[0];
@@ -123,7 +119,7 @@ export async function createStation(ownerId: string, formData: FormData) {
   }
   
   const allDjs = await getCustomCharactersForUser(ownerId);
-  const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+  const fullDjList: (DJCharacter | CustomDJCharacter)[] = [...DJ_CHARACTERS, ...allDjs];
   const dj = fullDjList.find(d => d.id === djCharacterId);
 
   if (!dj) {
@@ -133,7 +129,7 @@ export async function createStation(ownerId: string, formData: FormData) {
   const playlistInput: GeneratePlaylistInput = {
       stationName: name,
       djName: dj.name,
-      djDescription: 'isCustom' in dj && dj.isCustom ? dj.description : 'Un DJ mystérieux des terres désolées.',
+      djDescription: 'isCustom' in dj && dj.isCustom ? dj.description : (dj as DJCharacter).description,
       theme: theme,
   };
 
@@ -143,12 +139,13 @@ export async function createStation(ownerId: string, formData: FormData) {
       return { error: { general: "Impossible de générer la playlist initiale pour la station."}};
   }
   
-  const playlistWithIds = initialPlaylist.items.map((item, index) => ({
+  const playlistWithIds: PlaylistItem[] = initialPlaylist.items.map((item, index) => ({
       ...item,
       id: `${Date.now()}-${index}`,
-      title: item.type === 'message' ? item.content.substring(0, 30) + '...' : item.content,
+      title: item.type === 'message' ? item.content.substring(0, 50) + '...' : item.content,
       artist: item.type === 'message' ? dj.name : 'Artiste Inconnu',
       duration: item.type === 'message' ? 15 : 180, // Default durations
+      url: '', // Will be resolved at playback time
       addedAt: new Date().toISOString()
   }));
 
@@ -227,8 +224,8 @@ export async function addMessageToStation(stationId: string, message: string): P
 }
 
 
-export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistItem[], error?: string}> {
-    if (!searchTerm) return {data:[]};
+export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
+    if (!searchTerm) return [];
 
     const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=5&page=1&output=json`;
     
@@ -239,12 +236,13 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
           }
         });
         if (!response.ok) {
-            return {error: `Erreur Archive.org: ${response.statusText}`};
+            console.error(`Erreur Archive.org: ${response.statusText}`);
+            return [];
         }
         const data = await response.json();
         const responseData = data.response;
         if (!responseData || !responseData.docs || responseData.docs.length === 0) {
-          return { data: [] }; // Return empty data instead of error
+          return [];
         }
         const docs = responseData.docs;
 
@@ -261,10 +259,11 @@ export async function searchMusic(searchTerm: string): Promise<{data?: PlaylistI
             addedAt: new Date().toISOString(),
         }));
         
-        return {data: searchResults};
+        return searchResults;
 
     } catch (error) {
-        return {error: "La recherche sur Archive.org a échoué."};
+        console.error("La recherche sur Archive.org a échoué:", error);
+        return [];
     }
 }
 
@@ -410,31 +409,47 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
   });
 }
 
-
-export async function getAudioForMessage(message: string, djCharacterId: string, ownerId: string): Promise<{ audioBase64?: string; error?: string }> {
+export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string): Promise<{ audioUrl?: string; error?: string }> {
     const allDjs = await getCustomCharactersForUser(ownerId);
-    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+    const fullDjList: (DJCharacter | CustomDJCharacter)[] = [...DJ_CHARACTERS, ...allDjs];
     const dj = fullDjList.find(d => d.id === djCharacterId);
     
     if (!dj) {
         return { error: "Personnage DJ non trouvé." };
     }
-    
-    try {
-        let audioResult;
-        if ('isCustom' in dj && dj.isCustom) {
-            audioResult = await generateCustomDjAudio({ message, voice: dj.voice });
-        } else {
-            audioResult = await generateDjAudio({ message, characterId: dj.id });
-        }
 
-        if (!audioResult || !audioResult.audioBase64) {
-            throw new Error('Données audio générées vides.');
+    if (track.type === 'message') {
+        try {
+            let audioResult;
+            if ('isCustom' in dj && dj.isCustom) {
+                audioResult = await generateCustomDjAudio({ message: track.content, voice: dj.voice });
+            } else {
+                audioResult = await generateDjAudio({ message: track.content, characterId: dj.id });
+            }
+    
+            if (!audioResult || !audioResult.audioBase64) {
+                throw new Error('Données audio générées vides.');
+            }
+            return { audioUrl: `data:audio/wav;base64,${audioResult.audioBase64}` };
+        } catch(err: any) {
+            console.error("Erreur de génération vocale IA:", err);
+            return { error: `La génération de la voix IA a échoué: ${err.message}` };
         }
-        return { audioBase64: audioResult.audioBase64 };
-    } catch(err: any) {
-        return { error: `La génération de la voix IA a échoué: ${err.message}` };
+    } else { // music
+        for (let i = 0; i < 3; i++) { // Retry logic
+            try {
+                const searchResults = await searchMusic(track.content);
+                if (searchResults.length > 0 && searchResults[0].url) {
+                    // Test the URL to see if it's accessible
+                    const response = await fetch(searchResults[0].url, { method: 'HEAD' });
+                    if (response.ok) {
+                        return { audioUrl: searchResults[0].url };
+                    }
+                }
+            } catch (error) {
+                console.warn(`Tentative de recherche musicale ${i+1} échouée pour "${track.content}"`, error);
+            }
+        }
+        return { error: `Impossible de trouver une source valide pour "${track.content}"` };
     }
 }
-
-    
