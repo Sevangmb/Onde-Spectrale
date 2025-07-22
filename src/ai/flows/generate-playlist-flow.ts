@@ -33,7 +33,7 @@ const GeneratePlaylistInputSchema = z.object({
 
 const PlaylistItemSchema = z.object({
   type: z.enum(['message', 'music']).describe("Le type d'élément de la playlist."),
-  content: z.string().describe("Le contenu du message du DJ ou un terme de recherche pour la musique."),
+  content: z.string().describe("Le contenu du message du DJ ou un terme de recherche pour la musique. Ne doit JAMAIS être une chaîne vide."),
 });
 
 const GeneratePlaylistOutputSchema = z.object({
@@ -56,13 +56,14 @@ const playlistPrompt = ai.definePrompt({
     - Personnalité du DJ : {{{djDescription}}}
     - Thème de l'émission : {{{theme}}}
 
-    Instructions :
+    Instructions STRICTES :
     1.  Crée une playlist contenant EXACTEMENT 7 éléments.
-    2.  La structure doit être: Message, Musique, Message, Musique, Message, Musique, Message.
-    3.  Les messages ('message') doivent être courts (1-2 phrases), immersifs et correspondre à la personnalité du DJ et au thème de l'émission.
-    4.  Les pistes musicales ('music') doivent être représentées par un terme de recherche simple (2-3 mots) en anglais, typique des années 40-50, comme "ink spots", "swing jazz", "sentimental journey", "butcher pete". Le champ 'content' contiendra ce terme de recherche.
+    2.  La structure doit être OBLIGATOIREMENT: Message, Musique, Message, Musique, Message, Musique, Message.
+    3.  Les messages ('message') doivent être courts (1-2 phrases), immersifs et correspondre à la personnalité du DJ et au thème de l'émission. Le champ 'content' contiendra le texte du message.
+    4.  Les pistes musicales ('music') doivent être représentées par un terme de recherche simple et efficace en anglais (2-3 mots), typique des années 40-50, comme "ink spots", "swing jazz", "sentimental journey", "butcher pete". Le champ 'content' contiendra ce terme de recherche.
+    5.  Le champ 'content' NE DOIT JAMAIS être une chaîne de caractères vide. Il doit toujours contenir soit un message, soit un terme de recherche musical.
 
-    Exemple de réponse :
+    Exemple de réponse VALIDE :
     {
       "items": [
         { "type": "message", "content": "Un autre jour se lève sur les terres désolées, mes amis. Restez à l'écoute." },

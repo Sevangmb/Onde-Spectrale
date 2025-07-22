@@ -1,9 +1,10 @@
+
 // src/hooks/usePlaylistManager.ts
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { PlaylistItem, Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
-import { getAudioForTrack, searchMusicAdvanced, generateDjMessage } from '@/app/actions';
+import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
+import { getAudioForTrack } from '@/app/actions';
 
 interface PlaylistManagerProps {
   station: Station | null;
@@ -61,21 +62,59 @@ export function usePlaylistManager({ station, user, allDjs }: PlaylistManagerPro
     }
   }, [station, user, allDjs]);
 
+  const nextTrack = useCallback(async () => {
+    if (!station || !station.playlist.length) return;
+
+    let nextIndex = (currentTrackIndex + 1) % station.playlist.length;
+    let attempts = 0;
+    const maxAttempts = station.playlist.length;
+
+    // Boucle pour trouver et jouer la prochaine piste valide
+    while (attempts < maxAttempts) {
+      const track = station.playlist[nextIndex];
+      const trackId = track.id;
+
+      if (!failedTracks.has(trackId)) {
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        const success = await playTrack(nextIndex);
+        if (success) return; // Si la piste a été jouée avec succès, on arrête
+      }
+      
+      // Passer à l'index suivant si la piste a échoué ou a été ignorée
+      nextIndex = (nextIndex + 1) % station.playlist.length;
+      attempts++;
+    }
+
+    // Si toutes les pistes ont échoué
+    console.warn('Aucune piste valide trouvée dans la playlist. La lecture s\'arrête.');
+    setIsPlaying(false);
+    setCurrentTrack(undefined);
+  }, [station, currentTrackIndex, failedTracks]);
+
+
   // Fonction pour jouer une piste spécifique
-  const playTrack = useCallback(async (trackIndex: number) => {
+  const playTrack = useCallback(async (trackIndex: number): Promise<boolean> => {
     if (!station || !station.playlist[trackIndex] || !isMountedRef.current) {
       return false;
     }
 
-    setIsLoadingTrack(true);
     const track = station.playlist[trackIndex];
     const trackId = track.id;
 
+    // Ignorer les pistes sans contenu
+    if (!track.content || track.content.trim() === '') {
+        console.warn(`Piste "${track.title}" ignorée car son contenu est vide.`);
+        // Ne pas marquer comme échec, juste passer à la suivante
+        return false;
+    }
+
+    setIsLoadingTrack(true);
+
     // Vérifier si cette piste a déjà échoué trop de fois
     const retryCount = retryCountRef.current.get(trackId) || 0;
-    if (retryCount >= 3) {
+    if (retryCount >= 2) {
       console.log(`Piste ${track.title} ignorée (trop d'échecs)`);
-      setFailedTracks(prev => new Set(prev.add(trackId)));
+      setFailedTracks(prev => new Set(prev).add(trackId));
       setIsLoadingTrack(false);
       return false;
     }
@@ -87,59 +126,28 @@ export function usePlaylistManager({ station, user, allDjs }: PlaylistManagerPro
       const audioUrl = await getTrackAudioUrl(track);
       
       if (!audioUrl || !isMountedRef.current || !audioRef.current) {
-        throw new Error('URL audio introuvable');
+        throw new Error('URL audio introuvable ou composant démonté');
       }
 
-      // Configurer l'audio
       audioRef.current.src = audioUrl;
       audioRef.current.load();
       
       await audioRef.current.play();
       setIsPlaying(true);
       setIsLoadingTrack(false);
-
-      // Réinitialiser le compteur d'échecs en cas de succès
       retryCountRef.current.delete(trackId);
       
-      // Ajouter à l'historique
       setPlaylistHistory(prev => [...prev.slice(-9), trackIndex]);
       
       return true;
     } catch (error) {
       console.error(`Erreur lecture piste ${track.title}:`, error);
-      
-      // Incrémenter le compteur d'échecs
       retryCountRef.current.set(trackId, retryCount + 1);
       
       setIsLoadingTrack(false);
       return false;
     }
   }, [station, getTrackAudioUrl]);
-
-  // Fonction pour passer à la piste suivante
-  const nextTrack = useCallback(async () => {
-    if (!station || !station.playlist.length) return;
-
-    let nextIndex = (currentTrackIndex + 1) % station.playlist.length;
-    let attempts = 0;
-    const maxAttempts = station.playlist.length;
-
-    // Essayer de trouver une piste qui fonctionne
-    while (attempts < maxAttempts) {
-      const trackId = station.playlist[nextIndex].id;
-      
-      if (!failedTracks.has(trackId)) {
-        const success = await playTrack(nextIndex);
-        if (success) return;
-      }
-
-      nextIndex = (nextIndex + 1) % station.playlist.length;
-      attempts++;
-    }
-
-    console.warn('Aucune piste valide trouvée dans la playlist');
-    setIsPlaying(false);
-  }, [station, currentTrackIndex, failedTracks, playTrack]);
 
   // Fonction pour revenir à la piste précédente
   const previousTrack = useCallback(async () => {
@@ -159,7 +167,6 @@ export function usePlaylistManager({ station, user, allDjs }: PlaylistManagerPro
       setIsPlaying(false);
     } else {
       if (!currentTrack) {
-        // Commencer la lecture avec la première piste
         await playTrack(0);
       } else {
         try {
@@ -183,19 +190,25 @@ export function usePlaylistManager({ station, user, allDjs }: PlaylistManagerPro
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    
+    const onError = async () => {
+      console.error(`Erreur de l'élément audio pour la piste : ${currentTrack?.title}`);
+      setIsPlaying(false);
+      if (currentTrack) {
+        const retryCount = retryCountRef.current.get(currentTrack.id) || 0;
+        retryCountRef.current.set(currentTrack.id, retryCount + 1);
+      }
+      await nextTrack();
+    };
 
     audio.addEventListener('ended', handleTrackEnd);
-    audio.addEventListener('error', () => {
-      console.error('Erreur audio détectée');
-      setIsPlaying(false);
-      nextTrack();
-    });
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('ended', handleTrackEnd);
-      audio.removeEventListener('error', nextTrack);
+      audio.removeEventListener('error', onError);
     };
-  }, [handleTrackEnd, nextTrack]);
+  }, [handleTrackEnd, nextTrack, currentTrack]);
 
   // Auto-play quand une station est chargée
   useEffect(() => {
@@ -218,7 +231,6 @@ export function usePlaylistManager({ station, user, allDjs }: PlaylistManagerPro
     isPlaying,
     isLoadingTrack,
     failedTracks,
-    playlistHistory,
     audioRef,
     
     // Actions

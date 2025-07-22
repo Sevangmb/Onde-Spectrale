@@ -420,10 +420,10 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
 
     if (track.type === 'message') {
         try {
-            let audioResult;
             if (!track.content) {
                  return { error: 'Contenu du message vide.' };
             }
+            let audioResult;
             if ('isCustom' in dj && dj.isCustom) {
                 audioResult = await generateCustomDjAudio({ message: track.content, voice: dj.voice });
             } else {
@@ -439,6 +439,9 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: `La génération de la voix IA a échoué: ${err.message}` };
         }
     } else { // music
+        if (!track.content) {
+            return { error: 'Terme de recherche musical vide.' };
+        }
         for (let i = 0; i < 3; i++) { // Retry logic
             try {
                 const searchResults = await searchMusic(track.content);
@@ -455,5 +458,3 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         return { error: `Impossible de trouver une source valide pour "${track.content}"` };
     }
 }
-
-    
