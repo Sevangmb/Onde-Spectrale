@@ -42,6 +42,7 @@ export function OndeSpectraleRadio() {
   useEffect(() => {
     currentTrackRef.current = currentTrack;
   }, [currentTrack]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
 
@@ -58,6 +59,7 @@ export function OndeSpectraleRadio() {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
+      audio.removeAttribute('src');
     }
     if (currentBlobUrl.current) {
       URL.revokeObjectURL(currentBlobUrl.current);
@@ -88,8 +90,10 @@ export function OndeSpectraleRadio() {
     };
     
     setIsLoadingTrack(true);
-    cleanupAudio();
-
+    
+    // Cleanup previous source before setting a new one
+    audio.pause();
+    
     audio.addEventListener('canplaythrough', handleCanPlay, { once: true });
     audio.addEventListener('error', (e) => {
         console.error('Audio Element Error:', e);
@@ -100,19 +104,19 @@ export function OndeSpectraleRadio() {
     }, { once: true });
     
     audio.src = url;
-  }, [cleanupAudio]);
+    audio.load();
+  }, []);
 
-
- const playNextTrack = useCallback(async () => {
+  const playNextTrack = useCallback(async () => {
     if (!isMounted.current || !currentStation) return;
 
     setIsLoadingTrack(true);
     
-    const lastTrackType = currentTrackRef.current?.type;
-
+    const lastTrack = currentTrackRef.current;
+    
     const playMessage = async () => {
       const stationMessages = currentStation.playlist.filter(p => p.type === 'message');
-       if (!user || stationMessages.length === 0) {
+      if (!user || stationMessages.length === 0) {
           await playMusic(); // fallback to music if no messages
           return;
       }
@@ -132,6 +136,7 @@ export function OndeSpectraleRadio() {
               const byteArray = new Uint8Array(byteNumbers);
               const blob = new Blob([byteArray], { type: 'audio/wav' });
               const blobUrl = URL.createObjectURL(blob);
+              if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
               currentBlobUrl.current = blobUrl;
               loadAndPlay(blobUrl);
           } catch (e: any) {
@@ -152,7 +157,7 @@ export function OndeSpectraleRadio() {
     
     const playMusic = async () => {
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 5;
 
         while(attempts < maxAttempts) {
             const track = MUSIC_CATALOG[Math.floor(Math.random() * MUSIC_CATALOG.length)];
@@ -160,34 +165,32 @@ export function OndeSpectraleRadio() {
             try {
                 const response = await fetch(track.url);
                 if (!response.ok) {
-                  if (response.status === 503 && attempts < maxAttempts - 1) {
-                      console.warn(`Attempt ${attempts + 1} failed for ${track.title} with 503. Retrying with another track.`);
-                      attempts++;
-                      continue; // try another song
-                  }
-                  throw new Error(`[${response.status}] ${response.statusText}`);
+                   console.warn(`Failed to fetch music from ${track.url}: [${response.status}] ${response.statusText}`);
+                   attempts++;
+                   continue; // Try another song
                 }
                 const blob = await response.blob();
                 const blobUrl = URL.createObjectURL(blob);
+                if (currentBlobUrl.current) URL.revokeObjectURL(currentBlobUrl.current);
                 currentBlobUrl.current = blobUrl;
                 if (isMounted.current) loadAndPlay(blobUrl);
-                return; // Success, exit the loop
-            } catch(e) {
-                console.error(`Failed to fetch music from ${track.url}:`, e);
+                return; // Success, exit the function
+            } catch(e: any) {
+                console.warn(`Failed to fetch music from ${track.url}:`, e);
                 attempts++;
             }
         }
 
-        // If all attempts fail, fallback to a message
+        // If all attempts fail, fall back to a message
         console.error("All attempts to play music failed. Falling back to a message.");
         if (isMounted.current) {
             await playMessage();
         }
     };
 
-    if (lastTrackType === 'music') {
+    if (lastTrack?.type === 'music') {
         await playMessage();
-    } else {
+    } else { // if last track was a message or it's the first track
         await playMusic();
     }
 
@@ -251,7 +254,7 @@ export function OndeSpectraleRadio() {
       setCurrentTrack(undefined);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStation]);
+  }, [currentStation, playNextTrack]);
 
 
   useEffect(() => {
@@ -273,8 +276,9 @@ export function OndeSpectraleRadio() {
     return () => {
       isMounted.current = false; 
       unsubscribe();
+      cleanupAudio();
     };
-  }, []);
+  }, [cleanupAudio]);
 
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
