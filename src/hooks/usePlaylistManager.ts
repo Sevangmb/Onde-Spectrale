@@ -116,21 +116,34 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             utterance.volume = 1;
             
             return new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                window.speechSynthesis.cancel();
+                reject(new Error('TTS timeout - passage à la piste suivante'));
+              }, 30000);
+
               utterance.onstart = () => {
+                setIsLoadingTrack(false);
                 setIsPlaying(true);
               };
               
               utterance.onend = () => {
+                clearTimeout(timeout);
                 setIsPlaying(false);
                 resolve(null);
               };
               
               utterance.onerror = (e) => {
+                clearTimeout(timeout);
                 setIsPlaying(false);
                 reject(new Error(`Erreur TTS: ${e.error}`));
               };
               
-              window.speechSynthesis.speak(utterance);
+              try {
+                window.speechSynthesis.speak(utterance);
+              } catch (speechError) {
+                clearTimeout(timeout);
+                reject(new Error(`Impossible de lancer TTS: ${speechError}`));
+              }
             });
           } else {
             throw new Error('Synthèse vocale non supportée par ce navigateur');
@@ -166,6 +179,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           });
           
           await audioRef.current.play();
+          setIsLoadingTrack(false);
         }
         
         setIsPlaying(true);
@@ -180,6 +194,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         
         if (retryCount > maxRetries) {
           if(isMountedRef.current) {
+            setIsLoadingTrack(false);
             setFailedTracks(prev => new Set(prev).add(trackId));
             console.error(`Piste "${track.title}" marquée comme défaillante après ${maxRetries + 1} tentatives`);
             nextTrack();
@@ -192,6 +207,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       }
     }
     
+    setIsLoadingTrack(false);
     return false;
   }, [station, user, failedTracks, nextTrack, playlistHistory]);
 
