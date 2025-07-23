@@ -88,7 +88,7 @@ export function OndeSpectraleRadio() {
   useEffect(() => {
     setIsClient(true);
     
-    fetchStationData(frequency);
+    fetchStationData(92.1);
 
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
@@ -116,16 +116,12 @@ export function OndeSpectraleRadio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    setSliderValue(frequency);
-  }, [frequency]);
-
-
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
     const newFreq = Math.min(108.0, frequency + 0.5);
     setFrequency(newFreq);
+    setSliderValue(newFreq); // Sync slider
     if (user) updateUserFrequency(user.uid, newFreq);
     fetchStationData(newFreq);
     setTimeout(() => setIsScanning(false), 300);
@@ -136,6 +132,7 @@ export function OndeSpectraleRadio() {
     setIsScanning(true);
     const newFreq = Math.max(87.0, frequency - 0.5);
     setFrequency(newFreq);
+    setSliderValue(newFreq); // Sync slider
     if (user) updateUserFrequency(user.uid, newFreq);
     fetchStationData(newFreq);
     setTimeout(() => setIsScanning(false), 300);
