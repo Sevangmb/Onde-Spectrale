@@ -14,6 +14,43 @@ import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 import { searchMusicAdvanced } from './actions-improved';
 
+/**
+ * URLs de fallback pour les pistes musicales de test
+ */
+function getFallbackMusicUrls(searchTerm: string): string[] {
+  const fallbackMusic = {
+    'jazz': [
+      'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Test simple
+      'https://sample-music.netlify.app/mp3/jazz-sample.mp3',
+      'https://www2.cs.uic.edu/~i101/SoundFiles/CantinaBand3.wav'
+    ],
+    'classical': [
+      'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Test simple
+      'https://sample-music.netlify.app/mp3/classical-sample.mp3',
+      'https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.wav'
+    ],
+    'rock': [
+      'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav', // Test simple
+      'https://sample-music.netlify.app/mp3/rock-sample.mp3'
+    ]
+  };
+
+  // Correspondance basique par mot-clé
+  for (const [genre, urls] of Object.entries(fallbackMusic)) {
+    if (searchTerm.toLowerCase().includes(genre)) {
+      return urls;
+    }
+  }
+
+  // Fallback général - URLs d'échantillons audio fiables
+  return [
+    'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+    'https://www2.cs.uic.edu/~i101/SoundFiles/CantinaBand3.wav',
+    'https://www2.cs.uic.edu/~i101/SoundFiles/StarWars3.wav',
+    'https://www2.cs.uic.edu/~i101/SoundFiles/PinkPanther30.wav'
+  ];
+}
+
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -538,16 +575,38 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         }
         
         // Nouvelle recherche avec validation
-        const searchResults = await searchMusicAdvanced(track.content, 3);
+        try {
+            const searchResults = await searchMusicAdvanced(track.content, 3);
+            
+            for (const result of searchResults) {
+                try {
+                    const response = await fetch(result.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                    if (response.ok && response.headers.get('content-type')?.includes('audio')) {
+                        console.log(`Piste trouvée: ${result.title} - ${result.url}`);
+                        return { audioUrl: result.url };
+                    }
+                } catch (err) {
+                    console.warn(`URL invalide pour ${result.title}:`, err);
+                    continue;
+                }
+            }
+        } catch (searchError) {
+            console.error('Erreur de recherche musicale:', searchError);
+        }
         
-        for (const result of searchResults) {
+        // Fallback avec URLs de test fiables
+        console.log(`Utilisation d'URLs de test pour "${track.content}"`);
+        const fallbackUrls = getFallbackMusicUrls(track.content);
+        
+        for (const url of fallbackUrls) {
             try {
-                const response = await fetch(result.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
                 if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                    return { audioUrl: result.url };
+                    console.log(`Fallback URL trouvée: ${url}`);
+                    return { audioUrl: url };
                 }
             } catch (err) {
-                console.warn(`URL invalide pour ${result.title}:`, err);
+                console.warn(`Fallback URL échouée: ${url}`, err);
                 continue;
             }
         }
