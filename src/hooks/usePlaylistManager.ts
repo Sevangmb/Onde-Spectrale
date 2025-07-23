@@ -24,53 +24,30 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const isMountedRef = useRef(true);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const nextTrackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentTrackRef = useRef<PlaylistItem | undefined>();
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
 
   const stopPlayback = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = '';
     }
-    if (window.speechSynthesis.speaking) {
+    if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
       window.speechSynthesis.cancel();
     }
     setIsPlaying(false);
     if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
   }, []);
 
-  // Reset when station changes
-  useEffect(() => {
-    isMountedRef.current = true;
-    stopPlayback();
-
-    setCurrentTrack(undefined);
-    setIsLoadingTrack(false);
-    setPlaylistHistory([]);
-    setFailedTracks(new Set());
-    setTtsMessage(null);
-    setErrorMessage(null);
-    utteranceRef.current = null;
-    
-    // Auto-play first track of new station
-    if (station && station.playlist.length > 0) {
-        setTimeout(() => playTrackById(station.playlist[0].id), 500);
-    }
-
-    return () => {
-      isMountedRef.current = false;
-      stopPlayback();
-    };
-  }, [station?.id, stopPlayback]);
-
   const playTrackById = useCallback(async (trackId: string): Promise<void> => {
+    if (isLoadingTrack) return;
     if (!station) return;
+    
     const track = station.playlist.find(t => t.id === trackId);
     if (!track) return;
-
-    if (track.type === 'message' && !track.content?.trim()) {
-        console.warn(`Skipping empty message track: ${track.id}`);
-        nextTrack();
-        return;
-    }
     
     stopPlayback();
     setIsLoadingTrack(true);
@@ -86,73 +63,50 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       setErrorMessage(result.error || `Impossible d'obtenir l'audio pour ${track.title}.`);
       setFailedTracks(prev => new Set(prev).add(track.id));
       setIsLoadingTrack(false);
-      nextTrackTimeoutRef.current = setTimeout(nextTrack, 2000);
+      nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 2000);
       return;
     }
     
     setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
+    setIsLoadingTrack(false);
 
-    if (result.audioUrl.startsWith('tts:')) {
-      const textToSpeak = decodeURIComponent(result.audioUrl.substring(4));
-      setTtsMessage(textToSpeak);
-      setIsLoadingTrack(false);
-
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        const voices = window.speechSynthesis.getVoices();
-        utterance.voice = voices.find(v => v.lang.startsWith('fr')) || voices[0];
-        utterance.rate = 0.9;
-        
-        utterance.onstart = () => setIsPlaying(true);
-        utterance.onend = () => {
-          setIsPlaying(false);
-          nextTrackTimeoutRef.current = setTimeout(nextTrack, 1500);
-        };
-        utterance.onerror = (e) => {
-          setErrorMessage(`Erreur TTS: ${e.error}`);
-          setIsPlaying(false);
-          nextTrackTimeoutRef.current = setTimeout(nextTrack, 1500);
-        };
-        
-        utteranceRef.current = utterance;
-        window.speechSynthesis.speak(utterance);
-      }
-    } else {
+    if (result.audioUrl.startsWith('data:audio')) { // Base64 audio for TTS or music
       if (!audioRef.current) return;
       audioRef.current.src = result.audioUrl;
       try {
         await audioRef.current.play();
-        setIsLoadingTrack(false);
         setIsPlaying(true);
       } catch (e) {
         setErrorMessage("La lecture automatique a été bloquée.");
-        setIsLoadingTrack(false);
         setIsPlaying(false);
       }
     }
-  }, [station, user, stopPlayback]);
+  }, [station, user, stopPlayback, isLoadingTrack]);
 
+  const playNextTrackInQueue = useCallback(() => {
+      if (!station || station.playlist.length === 0) return;
 
+      const currentId = currentTrackRef.current?.id;
+      const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
+      let nextIndex = (currentIndex + 1) % station.playlist.length;
+
+      let attempts = 0;
+      while (failedTracks.has(station.playlist[nextIndex].id) && attempts < station.playlist.length) {
+          nextIndex = (nextIndex + 1) % station.playlist.length;
+          attempts++;
+      }
+
+      if (attempts >= station.playlist.length) {
+          setErrorMessage("Toutes les pistes ont échoué.");
+          return;
+      }
+
+      playTrackById(station.playlist[nextIndex].id);
+  }, [station, playTrackById, failedTracks]);
+  
   const nextTrack = useCallback(() => {
-    if (!station || station.playlist.length === 0) return;
-
-    const currentIndex = station.playlist.findIndex(t => t.id === currentTrack?.id);
-    let nextIndex = (currentIndex + 1) % station.playlist.length;
-    
-    // Skip failed tracks
-    let attempts = 0;
-    while(failedTracks.has(station.playlist[nextIndex].id) && attempts < station.playlist.length) {
-        nextIndex = (nextIndex + 1) % station.playlist.length;
-        attempts++;
-    }
-    
-    if(attempts >= station.playlist.length) {
-        setErrorMessage("Toutes les pistes ont échoué.");
-        return;
-    }
-
-    playTrackById(station.playlist[nextIndex].id);
-  }, [station, currentTrack, failedTracks, playTrackById]);
+    playNextTrackInQueue();
+  }, [playNextTrackInQueue]);
 
   const previousTrack = useCallback(() => {
     if (playlistHistory.length < 2) return;
@@ -166,14 +120,14 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (isLoadingTrack) return;
     
     if (isPlaying) {
-      if (utteranceRef.current) window.speechSynthesis.pause();
+      if (utteranceRef.current && window.speechSynthesis.speaking) window.speechSynthesis.pause();
       if (audioRef.current) audioRef.current.pause();
       setIsPlaying(false);
     } else {
       if (!currentTrack && station && station.playlist.length > 0) {
         playTrackById(station.playlist[0].id);
       } else {
-        if (utteranceRef.current) window.speechSynthesis.resume();
+        if (utteranceRef.current && window.speechSynthesis.paused) window.speechSynthesis.resume();
         if (audioRef.current && audioRef.current.src) {
            try {
              await audioRef.current.play();
@@ -185,13 +139,37 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       }
     }
   }, [isLoadingTrack, isPlaying, currentTrack, station, playTrackById]);
+  
+  // Auto-play first track of new station
+  useEffect(() => {
+    isMountedRef.current = true;
+    stopPlayback();
+
+    setCurrentTrack(undefined);
+    setIsLoadingTrack(false);
+    setPlaylistHistory([]);
+    setFailedTracks(new Set());
+    setTtsMessage(null);
+    setErrorMessage(null);
+    utteranceRef.current = null;
+    
+    if (station && station.playlist.length > 0) {
+        setTimeout(() => playTrackById(station.playlist[0].id), 500);
+    }
+
+    return () => {
+      isMountedRef.current = false;
+      stopPlayback();
+    };
+  }, [station?.id, stopPlayback, playTrackById]);
+
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     
     const handleEnd = () => {
-        if (isPlaying) {
+        if (isMountedRef.current && isPlaying) {
              nextTrackTimeoutRef.current = setTimeout(nextTrack, 1000);
         }
     };
