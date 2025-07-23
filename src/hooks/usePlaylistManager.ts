@@ -32,6 +32,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   // Flag pour savoir si on doit ignorer les événements TTS
   const shouldIgnoreTtsRef = useRef(false);
+  // Flag pour empêcher les TTS simultanés
+  const ttsInProgressRef = useRef(false);
 
   // Référence pour nextTrack
   const nextTrackRef = useRef<() => void>();
@@ -155,16 +157,35 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
-            // Si il y a déjà un TTS, le marquer comme devant être ignoré
-            if (utteranceRef.current) {
-              shouldIgnoreTtsRef.current = true;
-              window.speechSynthesis.cancel();
-              // Attendre plus longtemps pour que le cancel soit effectif
-              await new Promise(resolve => setTimeout(resolve, 300));
+            // Empêcher les TTS simultanés
+            if (ttsInProgressRef.current) {
+              console.log('TTS déjà en cours, annulation du précédent');
             }
             
-            // Réinitialiser le flag d'ignore
+            // Forcer l'arrêt complet de toute synthèse vocale en cours
+            if (utteranceRef.current || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+              shouldIgnoreTtsRef.current = true;
+              ttsInProgressRef.current = false;
+              
+              // Annuler plusieurs fois pour être sûr
+              window.speechSynthesis.cancel();
+              window.speechSynthesis.cancel();
+              
+              // Vider la queue complètement
+              while (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                window.speechSynthesis.cancel();
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              
+              utteranceRef.current = null;
+              
+              // Attendre que tout soit vraiment arrêté
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // Réinitialiser les flags
             shouldIgnoreTtsRef.current = false;
+            ttsInProgressRef.current = true;
             
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utteranceRef.current = utterance;
@@ -190,6 +211,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   window.speechSynthesis.cancel();
                   utteranceRef.current = null;
                   setTtsMessage(null);
+                  ttsInProgressRef.current = false;
                   setErrorMessage('Le message vocal a mis trop de temps à être lu. Passage à la piste suivante.');
                   finished = true;
                   reject(new Error('TTS timeout - passage à la piste suivante'));
@@ -221,6 +243,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   setIsPlaying(false);
                   utteranceRef.current = null;
                   setTtsMessage(null);
+                  ttsInProgressRef.current = false;
                   finished = true;
                   resolve(true);
                   // Attendre 2 secondes avant le prochain message pour laisser le temps
@@ -231,16 +254,31 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   }, 2000);
                 } else if (shouldIgnoreTtsRef.current) {
                   console.log('TTS terminé mais ignoré (flag)');
+                  ttsInProgressRef.current = false;
                 }
               };
               
               utterance.onerror = (e) => {
                 if (!finished && !shouldIgnoreTtsRef.current) {
+                  // Ignorer les erreurs "interrupted" car elles sont normales lors du passage à la piste suivante
+                  if (e.error === 'interrupted') {
+                    console.log('TTS interrupted (normal lors du changement de piste)');
+                    clearTimeout(timeout);
+                    setIsPlaying(false);
+                    utteranceRef.current = null;
+                    setTtsMessage(null);
+                    ttsInProgressRef.current = false;
+                    finished = true;
+                    resolve(true); // Considérer comme succès
+                    return;
+                  }
+                  
                   console.error('Erreur TTS:', e.error);
                   clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
                   setTtsMessage(null);
+                  ttsInProgressRef.current = false;
                   setErrorMessage('Erreur lors de la lecture du message vocal. Passage à la piste suivante.');
                   finished = true;
                   reject(new Error(`Erreur TTS: ${e.error}`));
@@ -252,6 +290,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   }, 1000);
                 } else if (shouldIgnoreTtsRef.current) {
                   console.log('Erreur TTS ignorée (flag):', e.error);
+                  ttsInProgressRef.current = false;
                 }
               };
               
@@ -262,6 +301,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 clearTimeout(timeout);
                 utteranceRef.current = null;
                 setTtsMessage(null);
+                ttsInProgressRef.current = false;
                 setErrorMessage('Impossible de lancer la synthèse vocale. Passage à la piste suivante.');
                 finished = true;
                 reject(new Error(`Impossible de lancer TTS: ${speechError}`));
