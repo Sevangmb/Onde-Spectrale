@@ -292,6 +292,73 @@ export async function addMusicToStation(stationId: string, musicTrack: PlaylistI
     return { success: true, playlistItem: newTrack };
 }
 
+export async function regenerateStationPlaylist(stationId: string): Promise<{ success: true } | { error: string }> {
+    const station = await getStationById(stationId);
+    if (!station) {
+        return { error: "Station non trouvée." };
+    }
+
+    const allDjs = await getCustomCharactersForUser(station.ownerId);
+    const fullDjList = [...DJ_CHARACTERS, ...allDjs];
+    const dj = fullDjList.find(d => d.id === station.djCharacterId);
+
+    if (!dj) {
+        return { error: "DJ non trouvé." };
+    }
+
+    // Créer une nouvelle playlist avec contenu
+    const newPlaylist: PlaylistItem[] = [
+        {
+            id: `${Date.now()}-0`,
+            type: 'message',
+            title: 'Message de bienvenue',
+            content: `Bonjour et bienvenue sur ${station.name}. Je suis ${dj.name}, votre DJ. Nous diffusons de la musique sur le thème ${station.theme}.`,
+            artist: dj.name,
+            duration: 8,
+            url: '',
+            addedAt: new Date().toISOString()
+        },
+        {
+            id: `${Date.now()}-1`,
+            type: 'music',
+            title: 'Première chanson',
+            content: 'jazz',
+            artist: 'Artiste Inconnu',
+            duration: 180,
+            url: '',
+            addedAt: new Date().toISOString()
+        },
+        {
+            id: `${Date.now()}-2`,
+            type: 'message',
+            title: 'Transition musicale',
+            content: `Voici une belle chanson pour accompagner votre écoute sur ${station.name}. Restez à l'écoute !`,
+            artist: dj.name,
+            duration: 5,
+            url: '',
+            addedAt: new Date().toISOString()
+        },
+        {
+            id: `${Date.now()}-3`,
+            type: 'music',
+            title: 'Deuxième chanson',
+            content: 'classical',
+            artist: 'Artiste Inconnu',
+            duration: 200,
+            url: '',
+            addedAt: new Date().toISOString()
+        }
+    ];
+
+    const stationRef = doc(db, 'stations', stationId);
+    await updateDoc(stationRef, { playlist: newPlaylist });
+
+    revalidatePath(`/admin/stations/${stationId}`);
+    revalidatePath('/admin/stations');
+    
+    return { success: true };
+}
+
 
 export async function updateUserOnLogin(userId: string, email: string | null) {
   const userRef = doc(db, 'users', userId);
@@ -429,8 +496,14 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
     }
 
     if (track.type === 'message') {
-        if (!track.content) {
-             return { error: 'Contenu du message vide.' };
+        // Fallback pour les anciens messages sans content
+        let messageContent = track.content;
+        if (!messageContent || messageContent.trim() === '') {
+            messageContent = track.title || 'Message du DJ';
+        }
+        
+        if (!messageContent || messageContent.trim() === '') {
+             return { error: 'Aucun contenu de message disponible.' };
         }
         
         // TEMPORAIRE: Désactiver la génération IA pour diagnostiquer
@@ -441,7 +514,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             // Fallback: utiliser TTS du navigateur côté client
             const silentAudio = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW==';
             
-            return { audioUrl: `tts:${encodeURIComponent(track.content)}` };
+            return { audioUrl: `tts:${encodeURIComponent(messageContent)}` };
             
         } catch(err: any) {
             console.error("Erreur de génération vocale IA:", err);
