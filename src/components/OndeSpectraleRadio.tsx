@@ -43,6 +43,7 @@ interface ParticleStyle {
 
 export function OndeSpectraleRadio() {
   const [frequency, setFrequency] = useState(92.1);
+  const [sliderValue, setSliderValue] = useState(frequency);
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [isLoadingStation, setIsLoadingStation] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,27 +117,39 @@ export function OndeSpectraleRadio() {
     fetchStationData(frequency);
   }, [frequency, fetchStationData]);
 
+  useEffect(() => {
+    setSliderValue(frequency);
+  }, [frequency]);
+
+
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
-    const newFreq = Math.min(108.0, frequency + 0.5);
-    setFrequency(newFreq);
+    setFrequency(prev => {
+        const newFreq = Math.min(108.0, prev + 0.5);
+        if (user) updateUserFrequency(user.uid, newFreq);
+        return newFreq;
+    });
     setTimeout(() => setIsScanning(false), 300);
-  }, [frequency, isScanning]);
+  }, [isScanning, user]);
 
   const handleScanDown = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
-    const newFreq = Math.max(87.0, frequency - 0.5);
-    setFrequency(newFreq);
+    setFrequency(prev => {
+        const newFreq = Math.max(87.0, prev - 0.5);
+        if (user) updateUserFrequency(user.uid, newFreq);
+        return newFreq;
+    });
     setTimeout(() => setIsScanning(false), 300);
-  }, [frequency, isScanning]);
+  }, [isScanning, user]);
 
-  const handleFrequencyChange = (value: number[]) => {
-    setFrequency(value[0]);
+  const handleSliderChange = (value: number[]) => {
+    setSliderValue(value[0]);
   };
 
-  const handleFrequencyCommit = async (value: number[]) => {
+  const handleSliderCommit = async (value: number[]) => {
+    setFrequency(value[0]);
     if (user) {
       await updateUserFrequency(user.uid, value[0]);
     }
@@ -303,9 +316,9 @@ export function OndeSpectraleRadio() {
                               min={87.0}
                               max={108.0}
                               step={0.1}
-                              value={[frequency]}
-                              onValueChange={handleFrequencyChange}
-                              onValueCommit={handleFrequencyCommit}
+                              value={[sliderValue]}
+                              onValueChange={handleSliderChange}
+                              onValueCommit={handleSliderCommit}
                               className="w-full"
                               disabled={!!error || isScanning}
                             />
