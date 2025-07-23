@@ -50,3 +50,24 @@ export type User = {
   createdAt: string;
   lastLogin: string;
 };
+
+// --- PlayerState pour monitoring temps réel admin ---
+export type PlayerState = {
+  currentTrack?: {
+    title: string;
+    type: 'music' | 'message';
+    artist?: string;
+    duration?: number;
+    id?: string;
+  };
+  ttsMessage?: string | null;
+  errorMessage?: string | null;
+  isPlaying: boolean;
+  updatedAt: string; // ISO string
+  logs?: Array<{
+    type: 'error' | 'info' | 'track' | 'tts';
+    message: string;
+    timestamp: string;
+  }>;
+};
+// --- Fin PlayerState ---

@@ -83,6 +83,26 @@
 - [x] **Navigation** fluide entre toutes les pages
 - [x] **Authentification** protégée avec redirection
 
+#### ⚠️ Limites actuelles de l’admin
+- Le cœur CRUD et la gestion de stations/playlists/messages sont complets.
+- Il manque encore :
+  - Monitoring temps réel du player (état, logs, erreurs, auditeurs)
+  - Dashboard admin avancé (statut stations, activité, analytics)
+  - Logs d’erreurs et historique d’événements
+  - Analytics radio et statistiques d’écoute
+  - Navigation admin complète (sidebar, header, statut, etc.)
+  - Gestion avancée du contenu (catégories, priorités, planification, programmation/récurrence)
+  - Gestion des rôles et permissions
+  - Thématisation Fallout/post-apo poussée, accessibilité, polish UI
+
+### 🎨 **Composants UI**
+- [x] **Design system** complet avec shadcn/ui
+- [x] **Composants réutilisables** bien structurés
+- [x] **Animations CSS** personnalisées
+- [x] **Responsive design** mobile/desktop
+- [x] **Thème sombre** post-apocalyptique
+- [x] **Icons personnalisées** (OndeSpectraleLogo)
+
 ###  UX & Polish
 - [x] **Gestion d'erreurs** robuste sur la plupart des actions
 - [x] **Loading states** améliorés pour les opérations asynchrones
@@ -92,7 +112,15 @@
 
 ## ❌ **FONCTIONNALITÉS MANQUANTES** (2% restant)
 
-### 🛠️ **Améliorations mineures**
+### 🛠️ **Améliorations mineures et avancées (ADMIN)**
+- [ ] **Monitoring temps réel du player** (état, logs, erreurs, auditeurs, UI admin)
+- [ ] **Dashboard admin avancé** (statut stations, activité, analytics)
+- [ ] **Logs d’erreurs et historique d’événements**
+- [ ] **Analytics radio et statistiques d’écoute**
+- [ ] **Navigation admin complète** (sidebar, header, statut, etc.)
+- [ ] **Gestion avancée du contenu** (catégories, priorités, planification, programmation/récurrence)
+- [ ] **Gestion des rôles et permissions**
+
 - [ ] **Pagination** pour les listes longues (stations, playlist)
 - [ ] **Amélioration UI** pour la suppression d'éléments (playlist, etc.)
 - [ ] **Internationalisation (i18n)** si nécessaire
@@ -121,6 +149,15 @@
 2. **Gestion d'erreurs** robuste - **FAIT**
 3. **Tests de base** pour fonctionnalités critiques
 4. **Polish général** de l'interface
+
+### Phase 2 - Administration avancée (À lancer)
+1. **Connecter l’admin au monitoring temps réel du player** (WebSocket, Firestore…)
+2. **Ajouter logs d’erreurs et historique dans l’admin**
+3. **Développer le dashboard admin avancé** (statut stations, activité, analytics)
+4. **Prototyper la navigation complète admin** (sidebar, header…)
+5. **Ajouter analytics radio et statistiques d’écoute**
+6. **Mettre en place la gestion avancée du contenu et des rôles**
+7. **Polish UI, accessibilité, thématisation Fallout/post-apo**
 
 ### Phase 2 - Déploiement Production (Prêt)
 1. **Optimisation performances**

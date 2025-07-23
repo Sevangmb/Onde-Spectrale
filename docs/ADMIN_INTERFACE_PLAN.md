@@ -1,4 +1,39 @@
 # Plan de Développement - Interface d'Administration
+
+---
+
+## 🚦 Suivi d'avancement (Juillet 2025)
+
+### ✅ Réalisé
+- Lecture automatique playlist (TTS + musiques) avec gestion des erreurs et enchaînement
+- Ajout manuel de messages et musiques (UI admin station)
+- Affichage de la playlist actuelle
+- Encart "État du lecteur" (statique, PlayerStatusCard)
+
+### 🟡 En cours / partiel
+- Monitoring du player (statique, à connecter à l'état réel)
+- Affichage d'erreurs et feedback utilisateur (pas de logs/historique)
+- Ajout de contenu manuel (sans planification avancée)
+
+### ❌ À faire / manquant
+- Dashboard général (statut stations, auditeurs, logs, indicateurs)
+- Monitoring temps réel du player (état, logs, erreurs, auditeurs)
+- Gestion avancée du contenu (catégories, priorités, planification)
+- Programmation avancée, modes de rotation, récurrence
+- Analytics & statistiques, logs d'écoute
+- Système de rôles et permissions
+- Paramétrage station & système (couverture, settings, etc.)
+- Navigation admin complète (sidebar, header, breadcrumbs)
+- Thématisation Fallout/post-apo, responsive, accessibilité
+
+### 📌 Prochaines priorités
+1. Connecter PlayerStatusCard à l'état réel du player (WebSocket, Firestore...)
+2. Ajouter logs d'erreurs et historique dans l'admin
+3. Commencer le dashboard général (statut stations, auditeurs, activité récente)
+4. Prototyper la navigation complète admin (sidebar, header...)
+
+---
+
 ## Onde Spectrale - Radio Post-Apocalyptique
 
 ### 🎯 Vision du Projet

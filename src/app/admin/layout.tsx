@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { LayoutDashboard, Radio, Users, Library, BarChart2, Settings, LogOut, RadioTower } from 'lucide-react';
+import { OnboardingModal } from '@/components/OnboardingModal';
 
 
 interface AdminLayoutContextType {
@@ -56,6 +57,9 @@ export function useAdminLayout() {
 
 
 function AdminLayout({ children }: { children: ReactNode }) {
+  // Onboarding utilisateur (modale)
+  // Affichée au premier accès ou via bouton d’aide
+
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
@@ -130,71 +134,74 @@ function AdminLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AdminLayoutContext.Provider value={contextValue}>
-      <SidebarProvider>
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex items-center gap-2">
-              <OndeSpectraleLogo className="h-6 w-6 text-primary" />
-              <span className="font-headline text-lg">Onde Spectrale</span>
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarMenu>
-              {menuItems.map((item) => {
-                const isActive =
-                  item.href === '/admin'
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <Link href={item.href}>
-                      <SidebarMenuButton isActive={isActive}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarContent>
-           <SidebarFooter>
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center justify-start gap-2 p-2 h-auto">
-                   <Avatar className="h-8 w-8">
-                     <AvatarImage src={`https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${user.uid}`} />
-                     <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
-                   </Avatar>
-                   <div className="text-left overflow-hidden">
-                     <p className="text-sm font-medium truncate">{user.email}</p>
-                   </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-56">
-                <DropdownMenuLabel>Mon Compte</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/"><RadioTower className="mr-2 h-4 w-4" />Retour au Scanner</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Déconnexion</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-           </SidebarFooter>
-        </Sidebar>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/40 min-h-screen">
+    <>
+      <OnboardingModal />
+      <AdminLayoutContext.Provider value={contextValue}>
+        <SidebarProvider>
+          <Sidebar>
+            <SidebarHeader>
+              <div className="flex items-center gap-2">
+                <OndeSpectraleLogo className="h-6 w-6 text-primary" />
+                <span className="font-headline text-lg">Onde Spectrale</span>
+              </div>
+            </SidebarHeader>
+            <SidebarContent>
+              <SidebarMenu>
+                {menuItems.map((item) => {
+                  const isActive =
+                    item.href === '/admin'
+                      ? pathname === item.href
+                      : pathname.startsWith(item.href);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <Link href={item.href}>
+                        <SidebarMenuButton isActive={isActive}>
+                          <item.icon />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </Link>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarContent>
+            <SidebarFooter>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center justify-start gap-2 p-2 h-auto">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={`https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${user.uid}`} />
+                      <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="text-left overflow-hidden">
+                      <p className="text-sm font-medium truncate">{user.email}</p>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-56">
+                  <DropdownMenuLabel>Mon Compte</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/"><RadioTower className="mr-2 h-4 w-4" />Retour au Scanner</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Déconnexion</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarFooter>
+          </Sidebar>
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-muted/40 min-h-screen">
             <div className="flex items-center gap-4 mb-6 md:hidden">
               <SidebarTrigger />
               <h1 className="text-xl font-semibold">Admin</h1>
             </div>
             {children}
-        </main>
-      </SidebarProvider>
-    </AdminLayoutContext.Provider>
+          </main>
+        </SidebarProvider>
+      </AdminLayoutContext.Provider>
+    </>
   );
 }
 

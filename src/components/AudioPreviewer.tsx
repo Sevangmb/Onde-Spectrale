@@ -146,7 +146,7 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
           {status !== 'ready' && status !== 'playing' && status !== 'error' && (
             <Button
               onClick={handleGenerateAudio}
-              disabled={!message.trim() || status === 'loading' || status === 'playing'}
+              disabled={!message.trim() || status === 'loading'}
               className="w-full"
             >
               <Mic className="mr-2 h-4 w-4" />

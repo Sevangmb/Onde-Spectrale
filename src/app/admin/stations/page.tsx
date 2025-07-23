@@ -64,9 +64,9 @@ export default function StationsManagement() {
 
       const result = await createStation(user.uid, form);
 
-      if (result.error) {
-        if (result.error.general) {
-          setFormError(result.error.general);
+      if ('error' in result) {
+        if (typeof result.error === 'object' && result.error !== null && 'general' in result.error) {
+          setFormError(result.error.general as string);
         } else {
           setFormError('Erreur de validation. Vérifiez les champs.');
         }

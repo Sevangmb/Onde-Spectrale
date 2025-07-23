@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
+import { StationStatusCard } from '@/components/StationStatusCard';
 
 import { 
   RadioTower, 
@@ -176,12 +177,9 @@ export default function AdminDashboard() {
                 {stations.length > 0 ? (
                     <div className="space-y-2">
                         {stations.slice(0, 3).map(station => (
-                            <div key={station.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                                <div>
-                                    <p className="font-semibold">{station.name}</p>
-                                    <p className="text-sm text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/stations`)}>
+                            <div key={station.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted">
+                                <StationStatusCard stationId={station.id} name={station.name} frequency={station.frequency} />
+                                <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/stations/${station.id}`)}>
                                     Gérer <ArrowRight className="h-4 w-4 ml-2"/>
                                 </Button>
                             </div>

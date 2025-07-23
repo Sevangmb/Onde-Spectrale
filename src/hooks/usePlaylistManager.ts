@@ -5,6 +5,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { getAudioForTrack } from '@/app/actions';
+import { pushPlayerLog, updatePlayerState } from '@/lib/firestorePlayer';
 
 interface PlaylistManagerProps {
   station: Station | null;
@@ -19,10 +20,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const [isLoadingTrack, setIsLoadingTrack] = useState(false);
   const [playlistHistory, setPlaylistHistory] = useState<number[]>([]);
   const [failedTracks, setFailedTracks] = useState<Set<string>>(new Set());
-  
+  // Ajout : texte TTS en cours
+  const [ttsMessage, setTtsMessage] = useState<string | null>(null);
+  // Ajout : dernier message d'erreur
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const isMountedRef = useRef(true);
   const isSeekingRef = useRef(false);
+  // Ref pour suivre l'utterance TTS en cours
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Ajout : passer à la piste suivante à la fin d'une chanson
   useEffect(() => {
@@ -42,6 +49,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   // Reset when station changes
   useEffect(() => {
     isMountedRef.current = true;
+    // Annule le TTS en cours si changement de station
+    if (utteranceRef.current) {
+      window.speechSynthesis.cancel();
+      utteranceRef.current = null;
+    }
     if (station) {
       setCurrentTrackIndex(0);
       setCurrentTrack(undefined);
@@ -59,6 +71,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
     return () => {
       isMountedRef.current = false;
+      // Nettoie le TTS si le composant est démonté
+      if (utteranceRef.current) {
+        window.speechSynthesis.cancel();
+        utteranceRef.current = null;
+      }
     }
   }, [station?.id]);
 
@@ -116,10 +133,14 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         if (result.audioUrl.startsWith('tts:')) {
           // C'est un message TTS
           const textToSpeak = decodeURIComponent(result.audioUrl.substring(4));
+          setTtsMessage(textToSpeak); // Affiche le TTS en cours
           
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
+            // Annule tout TTS en cours avant d'en lancer un nouveau
+            window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utteranceRef.current = utterance;
             
             // Essayer de trouver une voix française
             const voices = window.speechSynthesis.getVoices();
@@ -133,44 +154,92 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             utterance.volume = 1;
             
             return new Promise((resolve, reject) => {
+              let finished = false;
               const timeout = setTimeout(() => {
-                window.speechSynthesis.cancel();
-                reject(new Error('TTS timeout - passage à la piste suivante'));
+                if (!finished) {
+                  window.speechSynthesis.cancel();
+                  utteranceRef.current = null;
+                  setTtsMessage(null);
+                  setErrorMessage('Le message vocal a mis trop de temps à être lu. Passage à la piste suivante.');
+                  finished = true;
+                  reject(new Error('TTS timeout - passage à la piste suivante'));
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      const nextIndex = (trackIndex + 1) % station.playlist.length;
+                      playTrack(nextIndex);
+                    }
+                  }, 1000);
+                }
               }, 30000);
 
               utterance.onstart = () => {
                 setIsLoadingTrack(false);
                 setIsPlaying(true);
+                setErrorMessage(null);
               };
               
               utterance.onend = () => {
-                clearTimeout(timeout);
-                setIsPlaying(false);
-                resolve(true);
-                // Passer automatiquement à la piste suivante après TTS
-                setTimeout(() => {
-                  if (isMountedRef.current) {
-                    const nextIndex = (trackIndex + 1) % station.playlist.length;
-                    console.log(`TTS terminé, passage de l'index ${trackIndex} à ${nextIndex}`);
-                    playTrack(nextIndex);
-                  }
-                }, 500);
+                if (!finished) {
+                  clearTimeout(timeout);
+                  setIsPlaying(false);
+                  utteranceRef.current = null;
+                  setTtsMessage(null);
+                  finished = true;
+                  resolve(true);
+                  // Passer automatiquement à la piste suivante après TTS
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      const nextIndex = (trackIndex + 1) % station.playlist.length;
+                      console.log(`TTS terminé, passage de l'index ${trackIndex} à ${nextIndex}`);
+                      playTrack(nextIndex);
+                    }
+                  }, 500);
+                }
               };
               
               utterance.onerror = (e) => {
-                clearTimeout(timeout);
-                setIsPlaying(false);
-                reject(new Error(`Erreur TTS: ${e.error}`));
+                if (!finished) {
+                  clearTimeout(timeout);
+                  setIsPlaying(false);
+                  utteranceRef.current = null;
+                  setTtsMessage(null);
+                  setErrorMessage('Erreur lors de la lecture du message vocal. Passage à la piste suivante.');
+                  finished = true;
+                  reject(new Error(`Erreur TTS: ${e.error}`));
+                  setTimeout(() => {
+                    if (isMountedRef.current) {
+                      const nextIndex = (trackIndex + 1) % station.playlist.length;
+                      playTrack(nextIndex);
+                    }
+                  }, 1000);
+                }
               };
               
               try {
                 window.speechSynthesis.speak(utterance);
               } catch (speechError) {
                 clearTimeout(timeout);
+                utteranceRef.current = null;
+                setTtsMessage(null);
+                setErrorMessage('Impossible de lancer la synthèse vocale. Passage à la piste suivante.');
+                finished = true;
                 reject(new Error(`Impossible de lancer TTS: ${speechError}`));
+                setTimeout(() => {
+                  if (isMountedRef.current) {
+                    const nextIndex = (trackIndex + 1) % station.playlist.length;
+                    playTrack(nextIndex);
+                  }
+                }, 1000);
               }
             });
           } else {
+            setErrorMessage('Synthèse vocale non supportée par ce navigateur. Passage à la piste suivante.');
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                const nextIndex = (trackIndex + 1) % station.playlist.length;
+                playTrack(nextIndex);
+              }
+            }, 1000);
             throw new Error('Synthèse vocale non supportée par ce navigateur');
           }
         } else {

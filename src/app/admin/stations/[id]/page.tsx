@@ -10,6 +10,8 @@ import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { PlayerStatusCard } from '@/components/PlayerStatusCard';
+import { usePlayerState } from '@/hooks/usePlayerState';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -19,6 +21,26 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle } from 'lucide-react';
+
+function PlayerStatusMonitor({ stationId }: { stationId: string }) {
+  const { playerState, loading: playerLoading, error: playerError } = usePlayerState(stationId);
+  const { toast } = useToast();
+  
+  if (playerLoading) return <div className="my-4"><Skeleton className="h-24 w-full" /></div>;
+  if (playerError) return <div className="my-4 text-red-600">Erreur monitoring player : {playerError.message}</div>;
+  
+  return (
+    <PlayerStatusCard
+      currentTrack={playerState?.currentTrack}
+      ttsMessage={playerState?.ttsMessage}
+      errorMessage={playerState?.errorMessage}
+      isPlaying={!!playerState?.isPlaying}
+      isLoading={playerLoading}
+      onNext={() => toast({ title: 'Contrôle', description: 'Passer à la suivante (fonction à connecter)' })}
+      onReplay={() => toast({ title: 'Contrôle', description: 'Rejouer la piste (fonction à connecter)' })}
+    />
+  );
+}
 
 import { 
   ArrowLeft,
@@ -79,7 +101,7 @@ export default function StationDetailPage() {
     }
     setIsGenerating(true);
     const result = await addMessageToStation(station.id, message);
-    if (result.error) {
+    if ('error' in result) {
       toast({ variant: 'destructive', title: "Erreur", description: result.error });
     } else {
       toast({ title: "Message ajouté", description: "Votre message est dans la playlist." });
@@ -161,6 +183,8 @@ export default function StationDetailPage() {
         </Button>
         <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
         <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
+        <PlayerStatusMonitor stationId={station.id} />
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
