@@ -396,7 +396,7 @@ export function OndeSpectraleRadio() {
               </div>
 
               {/* Panneau playlist (conditionnellement affiché) */}
-              {(isRadioActive && currentStation.playlist.length > 0) && (
+              {(isRadioActive && currentStation && currentStation.playlist.length > 0) && (
                 <div className={`lg:col-span-1 transition-opacity duration-500 ${showPlaylist ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                    {showPlaylist && (
                      <EnhancedPlaylist
@@ -406,10 +406,10 @@ export function OndeSpectraleRadio() {
                         isPlaying={playlistManager.isPlaying}
                         isLoadingTrack={playlistManager.isLoadingTrack}
                         failedTracks={playlistManager.failedTracks}
-                        onTrackSelect={playlistManager.playTrack}
-                        onPlayPause={playlistManager.togglePlayPause}
-                        onNext={playlistManager.nextTrack}
-                        onPrevious={playlistManager.previousTrack}
+                        onTrackSelect={async (index: number) => { await playlistManager.playTrack(index); }}
+                        onPlayPause={async () => { await playlistManager.togglePlayPause(); }}
+                        onNext={async () => { playlistManager.nextTrack(); }}
+                        onPrevious={async () => { await playlistManager.previousTrack(); }}
                         canGoBack={playlistManager.canGoBack}
                         className="h-full"
                       />

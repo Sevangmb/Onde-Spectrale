@@ -82,37 +82,74 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setCurrentTrackIndex(trackIndex);
     setCurrentTrack(track);
 
-    try {
-      const result = await getAudioForTrack(track, station.djCharacterId, user.uid);
-      
-      if (!isMountedRef.current || !audioRef.current) return false;
+    let retryCount = 0;
+    const maxRetries = 2;
 
-      if (result.error || !result.audioUrl) {
-        throw new Error(result.error || 'URL audio introuvable');
-      }
+    while (retryCount <= maxRetries && isMountedRef.current) {
+      try {
+        const result = await getAudioForTrack(track, station.djCharacterId, user.uid);
+        
+        if (!isMountedRef.current || !audioRef.current) return false;
 
-      audioRef.current.src = result.audioUrl;
-      audioRef.current.load();
-      await audioRef.current.play();
-      
-      setIsPlaying(true);
-      if (playlistHistory[playlistHistory.length - 1] !== trackIndex) {
-          setPlaylistHistory(prev => [...prev.slice(-9), trackIndex]);
-      }
-      return true;
-
-    } catch (error) {
-      console.error(`Échec du chargement de la piste "${track.title}":`, error);
-      if(isMountedRef.current) {
-        setFailedTracks(prev => new Set(prev).add(trackId));
-        nextTrack(); // Important: move to the next track on failure
-      }
-      return false;
-    } finally {
-        if (isMountedRef.current) {
-            setIsLoadingTrack(false);
+        if (result.error || !result.audioUrl) {
+          throw new Error(result.error || 'URL audio introuvable');
         }
+
+        audioRef.current.src = result.audioUrl;
+        audioRef.current.load();
+        
+        // Attendre que l'audio soit prêt
+        await new Promise((resolve, reject) => {
+          const handleCanPlay = () => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
+            audioRef.current?.removeEventListener('error', handleError);
+            resolve(null);
+          };
+          
+          const handleError = (e: any) => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
+            audioRef.current?.removeEventListener('error', handleError);
+            reject(new Error(`Erreur de lecture audio: ${e.message || 'Format non supporté'}`));
+          };
+          
+          audioRef.current?.addEventListener('canplay', handleCanPlay);
+          audioRef.current?.addEventListener('error', handleError);
+          
+          // Timeout de 10 secondes
+          setTimeout(() => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
+            audioRef.current?.removeEventListener('error', handleError);
+            reject(new Error('Timeout lors du chargement audio'));
+          }, 10000);
+        });
+        
+        await audioRef.current.play();
+        
+        setIsPlaying(true);
+        if (playlistHistory[playlistHistory.length - 1] !== trackIndex) {
+            setPlaylistHistory(prev => [...prev.slice(-9), trackIndex]);
+        }
+        return true;
+
+      } catch (error) {
+        console.error(`Tentative ${retryCount + 1}/${maxRetries + 1} échouée pour "${track.title}":`, error);
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          if(isMountedRef.current) {
+            setFailedTracks(prev => new Set(prev).add(trackId));
+            console.error(`Piste "${track.title}" marquée comme défaillante après ${maxRetries + 1} tentatives`);
+            nextTrack();
+          }
+          return false;
+        }
+        
+        // Attendre 1 seconde avant retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
+    
+    return false;
   }, [station, user, failedTracks, nextTrack, playlistHistory]);
 
   const previousTrack = useCallback(async () => {

@@ -230,42 +230,11 @@ export async function searchMusic(searchTerm: string): Promise<{ data?: Playlist
       return { error: "Search term is empty" };
     }
 
-    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=downloads%20desc&rows=5&page=1&output=json`;
-    
     try {
-        const response = await fetch(searchUrl, {
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-        if (!response.ok) {
-            console.error(`Erreur Archive.org: ${response.statusText}`);
-            return { error: `Archive.org error: ${response.statusText}` };
-        }
-        const data = await response.json();
-        const responseData = data.response;
-        if (!responseData || !responseData.docs || responseData.docs.length === 0) {
-          return { data: [] };
-        }
-        const docs = responseData.docs;
-
-        const searchResults: PlaylistItem[] = docs
-          .filter((doc: any) => doc.identifier && doc.title)
-          .map((doc: any) => ({
-            id: doc.identifier,
-            type: 'music',
-            title: doc.title || 'Titre inconnu',
-            artist: doc.creator || 'Artiste inconnu',
-            content: doc.title,
-            url: `https://archive.org/download/${doc.identifier}/${doc.identifier}.mp3`,
-            duration: Math.round(parseFloat(doc.duration) || 180),
-            addedAt: new Date().toISOString(),
-        }));
-        
-        return { data: searchResults };
-
+        const results = await searchMusicAdvanced(searchTerm, 8);
+        return { data: results };
     } catch (error: any) {
-        console.error("La recherche sur Archive.org a échoué:", error);
+        console.error("La recherche musicale a échoué:", error);
         return { error: error.message || "Unknown search error" };
     }
 }
@@ -432,7 +401,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         try {
             let audioResult;
             if ('isCustom' in dj && dj.isCustom) {
-                audioResult = await generateCustomDjAudio({ message: track.content, voice: dj.voice });
+                audioResult = await generateCustomDjAudio({ message: track.content, voice: (dj as CustomDJCharacter).voice });
             } else {
                 audioResult = await generateDjAudio({ message: track.content, characterId: dj.id });
             }
@@ -450,11 +419,33 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: 'Terme de recherche musical vide.' };
         }
         
-        const searchResults = await searchMusicAdvanced(track.content, 1);
-        if (searchResults.length > 0) {
-            return { audioUrl: searchResults[0].url };
+        // Essayer l'URL existante d'abord si elle existe
+        if (track.url) {
+            try {
+                const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                if (response.ok && response.headers.get('content-type')?.includes('audio')) {
+                    return { audioUrl: track.url };
+                }
+            } catch (err) {
+                console.warn(`URL existante invalide pour ${track.title}:`, err);
+            }
         }
         
-        return { error: `Impossible de trouver une source valide pour "${track.content}"` };
+        // Nouvelle recherche avec validation
+        const searchResults = await searchMusicAdvanced(track.content, 3);
+        
+        for (const result of searchResults) {
+            try {
+                const response = await fetch(result.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                if (response.ok && response.headers.get('content-type')?.includes('audio')) {
+                    return { audioUrl: result.url };
+                }
+            } catch (err) {
+                console.warn(`URL invalide pour ${result.title}:`, err);
+                continue;
+            }
+        }
+        
+        return { error: `Impossible de trouver une source audio valide pour "${track.content}"` };
     }
 }

@@ -174,11 +174,11 @@ export async function validateAudioUrl(url: string): Promise<boolean> {
   try {
     const response = await fetch(url, { 
       method: 'HEAD',
-      timeout: 5000 
+      signal: AbortSignal.timeout(5000)
     });
     
     return response.ok && 
-           response.headers.get('content-type')?.includes('audio');
+           (response.headers.get('content-type')?.includes('audio') ?? false);
   } catch {
     return false;
   }

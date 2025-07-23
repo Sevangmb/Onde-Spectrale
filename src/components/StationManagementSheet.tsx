@@ -42,7 +42,7 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
     }
     setIsGenerating(true);
     const result = await addMessageToStation(station.id, message);
-    if (result.error) {
+    if ('error' in result) {
       toast({ variant: 'destructive', title: "Erreur", description: result.error });
     } else {
       toast({ title: "Message ajouté", description: "Votre message est dans la playlist." });
@@ -55,7 +55,7 @@ export function StationManagementSheet({ station, dj, children }: StationManagem
       if (!musicQuery.trim()) return;
       setIsSearching(true);
       const results = await searchMusic(musicQuery);
-      setSearchResults(results);
+      setSearchResults(results.data || []);
       setIsSearching(false);
   };
 

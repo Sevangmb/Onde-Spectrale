@@ -5,15 +5,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /stations/{stationId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      allow write: if request.auth != null && 
+        (request.auth.uid == resource.data.ownerId || 
+         request.auth.uid == request.resource.data.ownerId);
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.ownerId;
     }
 
     match /users/{userId} {
-      // Un utilisateur authentifié peut lire, écrire et créer son propre document.
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Sous-collection des personnages personnalisés
+      match /characters/{charId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
-    // Les personnages sont en lecture seule
+    // Les personnages par défaut sont en lecture seule
     match /characters/{charId} {
       allow read: if true;
       allow write: if false;

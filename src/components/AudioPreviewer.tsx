@@ -143,7 +143,7 @@ export function AudioPreviewer({ character }: AudioPreviewerProps) {
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex gap-2 w-full sm:w-auto">
-          {status !== 'ready' && status !== 'playing' && (
+          {status !== 'ready' && status !== 'playing' && status !== 'error' && (
             <Button
               onClick={handleGenerateAudio}
               disabled={!message.trim() || status === 'loading' || status === 'playing'}
