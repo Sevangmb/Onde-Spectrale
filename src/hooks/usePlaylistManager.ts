@@ -149,7 +149,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
             // Annule tout TTS en cours avant d'en lancer un nouveau
-            window.speechSynthesis.cancel();
+            if (utteranceRef.current) {
+              window.speechSynthesis.cancel();
+              // Attendre un peu que l'annulation soit effective
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utteranceRef.current = utterance;
             
@@ -160,7 +165,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               utterance.voice = frenchVoice;
             }
             
-            utterance.rate = 0.9;
+            // Ralentir la vitesse pour une meilleure compréhension
+            utterance.rate = 0.7;
             utterance.pitch = 1;
             utterance.volume = 1;
             
@@ -200,12 +206,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   setTtsMessage(null);
                   finished = true;
                   resolve(true);
-                  // Utiliser nextTrackRef.current() au lieu de playTrack() directement
+                  // Attendre 2 secondes avant le prochain message pour laisser le temps
                   setTimeout(() => {
                     if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
                       nextTrackRef.current();
                     }
-                  }, 500);
+                  }, 2000);
                 }
               };
               
