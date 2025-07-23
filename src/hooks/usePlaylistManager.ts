@@ -130,6 +130,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 clearTimeout(timeout);
                 setIsPlaying(false);
                 resolve(null);
+                // Passer automatiquement à la piste suivante après TTS
+                setTimeout(() => {
+                  if (isMountedRef.current) {
+                    nextTrack();
+                  }
+                }, 500);
               };
               
               utterance.onerror = (e) => {
@@ -272,7 +278,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
   // Auto-play when a station is loaded
   useEffect(() => {
-    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && currentTrackIndex === 0 && !currentTrack) {
+    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && !currentTrack && currentTrackIndex === 0) {
       console.log('Auto-démarrage de la lecture pour la station:', station.name);
       playTrack(0);
     }
