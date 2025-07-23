@@ -23,12 +23,10 @@ export type PlaylistItem = {
   title: string;
   content: string; 
   artist?: string;
-  url: string; // URL to the audio file in Firebase Storage or Archive.org
+  url: string;
   duration: number; // in seconds
   addedAt?: string; // ISO string
   archiveId?: string; 
-  isLoading?: boolean; 
-  error?: string; 
 };
 
 export type Station = {
@@ -39,7 +37,7 @@ export type Station = {
   djCharacterId: string;
   playlist: PlaylistItem[];
   createdAt: string; // ISO string
-  theme?: string;
+  theme: string;
 };
 
 export type User = {

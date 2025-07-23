@@ -42,16 +42,14 @@ interface ParticleStyle {
 }
 
 export function OndeSpectraleRadio() {
-  // État de base
   const [frequency, setFrequency] = useState(92.1);
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingStation, setIsLoadingStation] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
   
-  // Interface
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
@@ -59,18 +57,15 @@ export function OndeSpectraleRadio() {
   
   const router = useRouter();
 
-  // Hook de gestion de playlist
   const playlistManager = usePlaylistManager({
     station: currentStation,
     user,
     allDjs
   });
 
-  // Initialisation
   useEffect(() => {
     setIsClient(true);
     
-    // Génération des particules
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
         left: `${Math.random() * 100}%`,
@@ -80,12 +75,10 @@ export function OndeSpectraleRadio() {
       }))
     );
 
-    // Authentification
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
-        // Charger les DJ personnalisés
         try {
           const customDjs = await getCustomCharactersForUser(currentUser.uid);
           setAllDjs([...DJ_CHARACTERS, ...customDjs]);
@@ -99,13 +92,12 @@ export function OndeSpectraleRadio() {
   }, []);
 
   const fetchStationData = useDebouncedCallback(async (freq: number) => {
-      setIsLoading(true);
+      setIsLoadingStation(true);
       setError(null);
 
       try {
         const station = await getStationForFrequency(freq);
         
-        // Calcul de la force du signal
         const newSignalStrength = station 
           ? Math.floor(Math.random() * 20) + 80 
           : Math.floor(Math.random() * 30) + 10;
@@ -116,23 +108,20 @@ export function OndeSpectraleRadio() {
       } catch (err: any) {
         setError(`Erreur de données: ${err.message}`);
       } finally {
-        setIsLoading(false);
+        setIsLoadingStation(false);
       }
   }, 500);
 
-
-  // Récupération des données de station
   useEffect(() => {
-    fetchStationData(frequency)
+    fetchStationData(frequency);
   }, [frequency, fetchStationData]);
 
-  // Gestion du scan des fréquences
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
     const newFreq = Math.min(108.0, frequency + 0.5);
     setFrequency(newFreq);
-    setTimeout(() => setIsScanning(false), 1000);
+    setTimeout(() => setIsScanning(false), 300);
   }, [frequency, isScanning]);
 
   const handleScanDown = useCallback(() => {
@@ -140,7 +129,7 @@ export function OndeSpectraleRadio() {
     setIsScanning(true);
     const newFreq = Math.max(87.0, frequency - 0.5);
     setFrequency(newFreq);
-    setTimeout(() => setIsScanning(false), 1000);
+    setTimeout(() => setIsScanning(false), 300);
   }, [frequency, isScanning]);
 
   const handleFrequencyChange = (value: number[]) => {
@@ -153,68 +142,49 @@ export function OndeSpectraleRadio() {
     }
   };
 
-  // État calculé
   const isRadioActive = useMemo(() => {
-    return isClient && !isLoading && currentStation !== null;
-  }, [isClient, isLoading, currentStation]);
+    return isClient && !isLoadingStation && currentStation !== null;
+  }, [isClient, isLoadingStation, currentStation]);
+
+  useEffect(() => {
+    if(isRadioActive && currentStation && currentStation.playlist.length > 0) {
+      setShowPlaylist(true);
+    } else {
+      setShowPlaylist(false);
+    }
+  }, [isRadioActive, currentStation]);
 
   return (
     <>
       <audio ref={playlistManager.audioRef} crossOrigin="anonymous" preload="metadata" />
       
       <div className="relative w-full min-h-[90vh] overflow-hidden">
-        {/* Arrière-plans et effets */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-background to-black"></div>
         
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-red-700/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
-        </div>
-        
-        <div className="absolute inset-0 opacity-10">
-          <div 
-            className="w-full h-full"
-            style={{
-              backgroundImage: `linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
-                              linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)`,
-              backgroundSize: '50px 50px',
-              animation: 'drift 20s linear infinite'
-            }}
-          />
-        </div>
-        
-        {/* Particules */}
         {isClient && (
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {particleStyles.map((style, i) => (
               <div 
                 key={i} 
-                className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float" 
+                className="absolute w-px h-px bg-primary/50 rounded-full animate-float" 
                 style={style} 
               />
             ))}
           </div>
         )}
 
-        {/* Contenu principal */}
         <div className="relative z-10 flex min-h-[90vh] w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
-          <div className="w-full max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="w-full max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               
-              {/* Panneau de contrôle principal */}
-              <div className="lg:col-span-2">
-                <Card className="w-full vintage-radio-frame pip-boy-terminal shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-pulse"></div>
-                  </div>
-                  <div className="absolute inset-1 border border-primary/20 rounded-lg pointer-events-none animate-pulse"></div>
+              <div className="lg:col-span-3">
+                <Card className="w-full pip-boy-terminal">
                   
                   <CardHeader className="relative border-b-2 border-primary/40 pb-4 bg-gradient-to-r from-background to-card wasteland-texture">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-3">
                         <div className="relative radioactive-pulse">
                           <OndeSpectraleLogo className="h-8 w-8 text-primary phosphor-glow drop-shadow-lg" />
-                          <div className="absolute inset-0 bg-primary/30 blur-sm animate-pulse"></div>
                         </div>
                         <CardTitle className="font-headline text-3xl text-primary phosphor-glow tracking-wider drop-shadow-lg uppercase">
                           <span className="inline-block animate-flicker">Onde Spectrale</span>
@@ -222,20 +192,6 @@ export function OndeSpectraleRadio() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {/* Bouton playlist */}
-                        {isRadioActive && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => setShowPlaylist(!showPlaylist)}
-                            className="retro-button"
-                          >
-                            <ListMusic className="mr-2 h-4 w-4" /> 
-                            Playlist ({playlistManager.playlistLength})
-                          </Button>
-                        )}
-                        
-                        {/* Boutons utilisateur */}
                         {user ? (
                           <>
                             {currentStation && currentStation.ownerId === user.uid && (
@@ -272,12 +228,7 @@ export function OndeSpectraleRadio() {
                   <CardContent className="p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
                     <div className="flex flex-col gap-6">
                       
-                      {/* Syntoniseur */}
-                      <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
-                        <div className="absolute inset-0 opacity-30 pointer-events-none">
-                          <div className={`w-full h-full bg-gradient-to-r from-transparent via-primary/40 to-transparent ${isScanning ? 'animate-pulse' : ''}`}></div>
-                        </div>
-                        
+                      <div className="vintage-radio-frame p-6 shadow-inner">
                         <div className="relative z-10 space-y-4">
                           <div className="flex items-center justify-between">
                             <label htmlFor="frequency" className="text-sm font-mono font-bold text-primary phosphor-glow tracking-wider uppercase">
@@ -375,7 +326,7 @@ export function OndeSpectraleRadio() {
                                   <Button 
                                     size="sm" 
                                     variant="outline"
-                                    onClick={() => playlistManager.togglePlayPause()}
+                                    onClick={playlistManager.togglePlayPause}
                                     className="border-green-500/30 hover:bg-green-500/20 text-green-300 text-xs"
                                   >
                                     ▶ Lancer la lecture
@@ -385,17 +336,15 @@ export function OndeSpectraleRadio() {
                             ) : (
                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
                                 <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                                {isLoading ? 'ANALYSE DU SPECTRE...' : 'STATIQUE'}
+                                {isLoadingStation ? 'ANALYSE DU SPECTRE...' : 'STATIQUE'}
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
                       
-                      {/* Analyseur de spectre */}
                       <SpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
                       
-                      {/* Lecteur audio */}
                       <AudioPlayer 
                         track={playlistManager.currentTrack} 
                         isPlaying={playlistManager.isPlaying} 
@@ -409,32 +358,27 @@ export function OndeSpectraleRadio() {
                 </Card>
               </div>
 
-              {/* Panneau playlist (conditionnellement affiché) */}
-              {(isRadioActive && currentStation && currentStation.playlist.length > 0) && (
-                <div className={`lg:col-span-1 transition-opacity duration-500 ${showPlaylist ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                   {showPlaylist && (
-                     <EnhancedPlaylist
-                        playlist={currentStation.playlist}
-                        currentTrackIndex={playlistManager.currentTrackIndex}
-                        currentTrack={playlistManager.currentTrack}
-                        isPlaying={playlistManager.isPlaying}
-                        isLoadingTrack={playlistManager.isLoadingTrack}
-                        failedTracks={playlistManager.failedTracks}
-                        onTrackSelect={async (index: number) => { await playlistManager.playTrack(index); }}
-                        onPlayPause={async () => { await playlistManager.togglePlayPause(); }}
-                        onNext={async () => { playlistManager.nextTrack(); }}
-                        onPrevious={async () => { await playlistManager.previousTrack(); }}
-                        canGoBack={playlistManager.canGoBack}
-                        className="h-full"
-                      />
-                   )}
-                </div>
-              )}
+              <div className={`lg:col-span-2 transition-opacity duration-500 ${showPlaylist ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                 {showPlaylist && currentStation && (
+                   <EnhancedPlaylist
+                      playlist={currentStation.playlist}
+                      currentTrackId={playlistManager.currentTrack?.id}
+                      isPlaying={playlistManager.isPlaying}
+                      isLoadingTrack={playlistManager.isLoadingTrack}
+                      failedTracks={playlistManager.failedTracks}
+                      onTrackSelect={playlistManager.playTrackById}
+                      onPlayPause={playlistManager.togglePlayPause}
+                      onNext={playlistManager.nextTrack}
+                      onPrevious={playlistManager.previousTrack}
+                      canGoBack={playlistManager.canGoBack}
+                      className="h-full"
+                    />
+                 )}
+              </div>
             </div>
           </div>
         </div>
         
-        {/* Système d'alerte d'urgence */}
         <EmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
       </div>
     </>

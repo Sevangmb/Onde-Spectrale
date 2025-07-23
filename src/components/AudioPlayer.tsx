@@ -5,8 +5,8 @@ import type React from 'react';
 import { Music, MessageSquare, Volume2, VolumeX, Volume1, Radio, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { PlaylistItem } from '@/lib/types';
-import { useEffect, useState, useCallback } from 'react';
+import type { PlaylistItem } from '@/lib/types';
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 interface AudioPlayerProps {
   track: PlaylistItem | undefined;
@@ -31,6 +31,7 @@ export function AudioPlayer({
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
   const [lastVolume, setLastVolume] = useState(75);
+  const ttsEndTimer = useRef<NodeJS.Timeout | null>(null);
 
   const formatTime = (time: number) => {
     if (isNaN(time) || !isFinite(time)) return '0:00';
@@ -68,14 +69,15 @@ export function AudioPlayer({
     }
   }, [audioRef, volume, lastVolume]);
 
-
+  // Gère la mise à jour de la barre de progression pour les pistes audio
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || ttsMessage) return;
     
     const updateProgress = () => {
       if (audio.duration && isFinite(audio.currentTime) && isFinite(audio.duration) && audio.duration > 0) {
         setCurrentTime(audio.currentTime);
+        setDuration(audio.duration);
         setProgress((audio.currentTime / audio.duration) * 100);
       } else {
         setCurrentTime(0);
@@ -84,20 +86,10 @@ export function AudioPlayer({
     };
 
     const handleLoadedMetadata = () => {
-      if (isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      } else {
-        setDuration(0);
-      }
+      if (isFinite(audio.duration)) setDuration(audio.duration);
       updateProgress();
     };
     
-    if (!track) {
-        setDuration(0);
-        setCurrentTime(0);
-        setProgress(0);
-    }
-
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleLoadedMetadata);
@@ -109,25 +101,62 @@ export function AudioPlayer({
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('durationchange', handleLoadedMetadata);
     };
-  }, [audioRef, track, volume]);
+  }, [audioRef, ttsMessage, volume]);
+  
+  // Gère la barre de progression pour les messages TTS
+  useEffect(() => {
+    if (ttsMessage && isPlaying) {
+      const estimatedDuration = (ttsMessage.length / 15) * 1000; // Estimer la durée
+      setDuration(estimatedDuration / 1000);
+      let startTime = Date.now();
+      
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        setCurrentTime(elapsed / 1000);
+        setProgress(Math.min(100, (elapsed / estimatedDuration) * 100));
+      }, 100);
+
+      // S'assurer que la barre va à 100% à la fin
+      if(ttsEndTimer.current) clearTimeout(ttsEndTimer.current);
+      ttsEndTimer.current = setTimeout(() => {
+        setProgress(100);
+      }, estimatedDuration - 100);
+
+      return () => {
+        clearInterval(interval);
+        if(ttsEndTimer.current) clearTimeout(ttsEndTimer.current);
+      };
+    } else if (!isPlaying) {
+      // Ne rien faire si en pause
+    } else {
+      // Reset pour les pistes audio normales
+      setProgress(0);
+      setCurrentTime(0);
+    }
+  }, [ttsMessage, isPlaying]);
+
+
+  // Reset l'état quand il n'y a plus de piste
+  useEffect(() => {
+    if (!track) {
+      setDuration(0);
+      setCurrentTime(0);
+      setProgress(0);
+    }
+  }, [track]);
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
-  
   const displayTitle = isLoading ? 'Chargement...' : (track ? track.title : "Silence radio");
 
   return (
-    <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
+    <div className="vintage-radio-frame p-6 shadow-2xl relative overflow-hidden static-noise">
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none"></div>
-      
-      <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-pulse"></div>
-      </div>
 
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
-          <div className="bg-primary/10 border-2 border-primary/40 rounded-lg p-3 shadow-lg radioactive-pulse">
+          <div className="bg-card border-2 border-primary/40 rounded-lg p-3 shadow-inner">
             { isLoading ? <Loader2 className="h-8 w-8 text-primary phosphor-glow animate-spin"/> :
-              !track ? <Radio className="h-8 w-8 text-primary phosphor-glow animate-pulse" /> :
+              !track ? <Radio className="h-8 w-8 text-primary/50" /> :
               track.type === 'music' ? 
               <Music className="h-8 w-8 text-primary phosphor-glow" /> : 
               <MessageSquare className="h-8 w-8 text-accent phosphor-glow" />
@@ -142,11 +171,6 @@ export function AudioPlayer({
                 {track.artist}
               </p>
             )}
-            {ttsMessage && (
-              <p className="text-sm text-accent phosphor-glow truncate italic font-mono">
-                "🎤 {ttsMessage.substring(0, 80)}{ttsMessage.length > 80 ? '...' : ''}"
-              </p>
-            )}
             {errorMessage && (
               <p className="text-sm text-destructive phosphor-glow truncate font-mono">
                 ⚠️ {errorMessage}
@@ -154,27 +178,12 @@ export function AudioPlayer({
             )}
              <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">
               { !track || isLoading ? '>>> SIGNAL PERDU <<<' :
-                ttsMessage ? '>>> TRANSMISSION <<<' :
-                track.type === 'music' ? '>>> MUSIQUE <<<' : '>>> MESSAGE <<<'
+                isPlaying && ttsMessage ? '>>> TRANSMISSION VOCALE <<<' :
+                track.type === 'music' ? '>>> PISTE MUSICALE <<<' : '>>> MESSAGE PRÉ-ENREGISTRÉ <<<'
               }
             </p>
           </div>
           
-          {isPlaying && (
-            <div className="flex gap-1">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-primary phosphor-glow rounded-full animate-pulse"
-                  style={{
-                    height: `${12 + Math.random() * 8}px`,
-                    animationDelay: `${i * 0.15}s`,
-                    animationDuration: '0.8s'
-                  }}
-                />
-              ))}
-            </div>
-          )}
         </div>
         
         <div className="space-y-3">
@@ -186,7 +195,6 @@ export function AudioPlayer({
               style={{ width: `${isNaN(progress) ? 0 : progress}%` }}
             >
               <div className="absolute inset-0 bg-primary/30 animate-pulse"></div>
-              <div className="absolute inset-0 phosphor-glow"></div>
             </div>
           </div>
           
@@ -197,29 +205,18 @@ export function AudioPlayer({
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-mono uppercase tracking-wide">
-              Vol:
-            </span>
-            <div className="vintage-knob" onClick={toggleMute}>
-              <VolumeIcon className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-4 w-4 text-primary phosphor-glow" />
-            </div>
-          </div>
+            <Button variant="ghost" size="icon" onClick={toggleMute} className="vintage-knob">
+              <VolumeIcon className="h-5 w-5 text-primary phosphor-glow" />
+            </Button>
           
-          <div className="flex items-center gap-3 min-w-0 flex-shrink">
-            <div className="w-24">
-              <Slider
-                value={[isMuted ? 0 : volume]}
-                onValueChange={handleVolumeChange}
-                max={100}
-                step={1}
-                className="cursor-pointer"
-              />
-            </div>
-            
-            <div className="frequency-display min-w-[50px] text-sm">
-              {Math.round(isMuted ? 0 : volume)}%
-            </div>
+          <div className="flex items-center gap-3 w-48">
+            <Slider
+              value={[isMuted ? 0 : volume]}
+              onValueChange={handleVolumeChange}
+              max={100}
+              step={1}
+              className="cursor-pointer flex-grow"
+            />
           </div>
         </div>
       </div>
