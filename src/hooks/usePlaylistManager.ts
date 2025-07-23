@@ -3,7 +3,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
-import { getAudioForTrack } from '@/app/actions';
+import { getAudioForTrackImproved } from '@/app/actions';
 
 interface PlaylistManagerProps {
   station: Station | null;
@@ -41,7 +41,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setIsPlaying(false);
     if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
   }, []);
-
+  
   const playTrackById = useCallback(async (trackId: string): Promise<void> => {
     if (isLoadingTrack || !isMountedRef.current) return;
     
@@ -53,9 +53,15 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
     
     const track = station.playlist.find(t => t.id === trackId);
-
     if (!track) {
       console.warn(`Piste ${trackId} non trouvée. Passage à la suivante.`);
+      if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
+      nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 100);
+      return;
+    }
+
+    if (track.type === 'message' && !track.content?.trim()) {
+      setFailedTracks(prev => new Set(prev).add(track.id));
       if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
       nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 100);
       return;
@@ -66,12 +72,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setErrorMessage(null);
     setTtsMessage(null);
     
-    const result = await getAudioForTrack(track, station.djCharacterId, user?.uid);
+    const result = await getAudioForTrackImproved(track, station.djCharacterId, user?.uid);
 
     if (!isMountedRef.current) return;
 
     if (result.error || !result.audioUrl) {
-      setErrorMessage(result.error || `Impossible d'obtenir l'audio pour ${track.title}.`);
+      setErrorMessage(result.error || `Impossible d'obtenir l'audio pour "${track.title}".`);
       setFailedTracks(prev => new Set(prev).add(track.id));
       setIsLoadingTrack(false);
       if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
@@ -84,6 +90,17 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
     if (result.audioUrl.startsWith('data:audio')) {
       if (!audioRef.current) return;
+      setTtsMessage(`Message de ${track.artist}: ${track.content}`);
+      audioRef.current.src = result.audioUrl;
+      try {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch (e) {
+        setErrorMessage("La lecture automatique a été bloquée.");
+        setIsPlaying(false);
+      }
+    } else {
+      if (!audioRef.current) return;
       audioRef.current.src = result.audioUrl;
       try {
         await audioRef.current.play();
@@ -93,7 +110,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         setIsPlaying(false);
       }
     }
-  }, [station, user, stopPlayback, isLoadingTrack]);
+  }, [station, user, stopPlayback, isLoadingTrack]); // `nextTrack` retiré des dépendances
 
   const playNextTrackInQueue = useCallback(() => {
       if (!station || station.playlist.length === 0) return;
@@ -101,22 +118,21 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       const currentId = currentTrackRef.current?.id;
       const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
       
+      let nextIndex = (currentIndex + 1) % station.playlist.length;
       for (let i = 0; i < station.playlist.length; i++) {
-          const nextIndex = (currentIndex + 1 + i) % station.playlist.length;
           const nextTrackToPlay = station.playlist[nextIndex];
   
           if (!failedTracks.has(nextTrackToPlay.id)) {
               if(nextTrackToPlay.type === 'message' && !nextTrackToPlay.content?.trim()) {
-                  // Marquer la piste comme échouée et continuer la recherche
                   setFailedTracks(prev => new Set(prev).add(nextTrackToPlay.id));
-                  continue; 
+              } else {
+                  playTrackById(nextTrackToPlay.id);
+                  return;
               }
-              playTrackById(nextTrackToPlay.id);
-              return; 
           }
+          nextIndex = (nextIndex + 1) % station.playlist.length;
       }
   
-      // Si toutes les pistes ont échoué
       setErrorMessage("Toutes les pistes de la playlist ont échoué.");
       stopPlayback();
   }, [station, playTrackById, failedTracks, stopPlayback]);

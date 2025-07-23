@@ -63,10 +63,33 @@ export function OndeSpectraleRadio() {
     user,
     allDjs
   });
+  
+  const fetchStationData = useDebouncedCallback(async (freq: number) => {
+      setIsLoadingStation(true);
+      setError(null);
+
+      try {
+        const station = await getStationForFrequency(freq);
+        
+        const newSignalStrength = station 
+          ? Math.floor(Math.random() * 20) + 80 
+          : Math.floor(Math.random() * 30) + 10;
+        
+        setSignalStrength(newSignalStrength);
+        setCurrentStation(station);
+        
+      } catch (err: any) {
+        setError(`Erreur de données: ${err.message}`);
+      } finally {
+        setIsLoadingStation(false);
+      }
+  }, 500);
 
   useEffect(() => {
     setIsClient(true);
     
+    fetchStationData(frequency);
+
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
         left: `${Math.random() * 100}%`,
@@ -90,32 +113,8 @@ export function OndeSpectraleRadio() {
     });
 
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchStationData = useDebouncedCallback(async (freq: number) => {
-      setIsLoadingStation(true);
-      setError(null);
-
-      try {
-        const station = await getStationForFrequency(freq);
-        
-        const newSignalStrength = station 
-          ? Math.floor(Math.random() * 20) + 80 
-          : Math.floor(Math.random() * 30) + 10;
-        
-        setSignalStrength(newSignalStrength);
-        setCurrentStation(station);
-        
-      } catch (err: any) {
-        setError(`Erreur de données: ${err.message}`);
-      } finally {
-        setIsLoadingStation(false);
-      }
-  }, 500);
-
-  useEffect(() => {
-    fetchStationData(frequency);
-  }, [frequency, fetchStationData]);
 
   useEffect(() => {
     setSliderValue(frequency);
@@ -125,34 +124,34 @@ export function OndeSpectraleRadio() {
   const handleScanUp = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
-    setFrequency(prev => {
-        const newFreq = Math.min(108.0, prev + 0.5);
-        if (user) updateUserFrequency(user.uid, newFreq);
-        return newFreq;
-    });
+    const newFreq = Math.min(108.0, frequency + 0.5);
+    setFrequency(newFreq);
+    if (user) updateUserFrequency(user.uid, newFreq);
+    fetchStationData(newFreq);
     setTimeout(() => setIsScanning(false), 300);
-  }, [isScanning, user]);
+  }, [isScanning, user, frequency, fetchStationData]);
 
   const handleScanDown = useCallback(() => {
     if (isScanning) return;
     setIsScanning(true);
-    setFrequency(prev => {
-        const newFreq = Math.max(87.0, prev - 0.5);
-        if (user) updateUserFrequency(user.uid, newFreq);
-        return newFreq;
-    });
+    const newFreq = Math.max(87.0, frequency - 0.5);
+    setFrequency(newFreq);
+    if (user) updateUserFrequency(user.uid, newFreq);
+    fetchStationData(newFreq);
     setTimeout(() => setIsScanning(false), 300);
-  }, [isScanning, user]);
+  }, [isScanning, user, frequency, fetchStationData]);
 
   const handleSliderChange = (value: number[]) => {
     setSliderValue(value[0]);
   };
 
   const handleSliderCommit = async (value: number[]) => {
-    setFrequency(value[0]);
+    const newFreq = value[0];
+    setFrequency(newFreq);
     if (user) {
-      await updateUserFrequency(user.uid, value[0]);
+      await updateUserFrequency(user.uid, newFreq);
     }
+    fetchStationData(newFreq);
   };
 
   const isRadioActive = useMemo(() => {
