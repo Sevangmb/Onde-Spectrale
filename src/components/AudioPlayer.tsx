@@ -13,13 +13,17 @@ interface AudioPlayerProps {
   isPlaying: boolean;
   isLoading: boolean;
   audioRef: React.RefObject<HTMLAudioElement>;
+  ttsMessage?: string | null;
+  errorMessage?: string | null;
 }
 
 export function AudioPlayer({
   track,
   isPlaying,
   isLoading,
-  audioRef
+  audioRef,
+  ttsMessage,
+  errorMessage
 }: AudioPlayerProps) {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -138,8 +142,19 @@ export function AudioPlayer({
                 {track.artist}
               </p>
             )}
+            {ttsMessage && (
+              <p className="text-sm text-blue-300 truncate italic">
+                "🎤 {ttsMessage.substring(0, 80)}{ttsMessage.length > 80 ? '...' : ''}"
+              </p>
+            )}
+            {errorMessage && (
+              <p className="text-sm text-red-300 truncate">
+                ⚠️ {errorMessage}
+              </p>
+            )}
              <p className="text-xs text-orange-400/60 uppercase tracking-wider">
               { !track || isLoading ? 'HORS LIGNE' :
+                ttsMessage ? 'SYNTHÈSE VOCALE' :
                 track.type === 'music' ? 'MUSIQUE' : 'MESSAGE'
               }
             </p>

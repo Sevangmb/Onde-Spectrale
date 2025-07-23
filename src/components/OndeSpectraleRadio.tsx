@@ -400,7 +400,9 @@ export function OndeSpectraleRadio() {
                         track={playlistManager.currentTrack} 
                         isPlaying={playlistManager.isPlaying} 
                         isLoading={playlistManager.isLoadingTrack}
-                        audioRef={playlistManager.audioRef} 
+                        audioRef={playlistManager.audioRef}
+                        ttsMessage={playlistManager.ttsMessage}
+                        errorMessage={playlistManager.errorMessage}
                       />
                     </div>
                   </CardContent>

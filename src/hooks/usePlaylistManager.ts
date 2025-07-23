@@ -31,20 +31,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   // Ref pour suivre l'utterance TTS en cours
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Ajout : passer à la piste suivante à la fin d'une chanson
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleEnded = () => {
-      if (isMountedRef.current) {
-        nextTrack();
-      }
-    };
-    audio.addEventListener('ended', handleEnded);
-    return () => {
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [currentTrackIndex, station]);
+  // Référence pour nextTrack
+  const nextTrackRef = useRef<() => void>();
 
   // Reset when station changes
   useEffect(() => {
@@ -81,9 +69,17 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
 
   const nextTrack = useCallback(() => {
-    if (!station || station.playlist.length === 0 || isSeekingRef.current) return;
+    if (!station || station.playlist.length === 0 || isSeekingRef.current) {
+      console.log('nextTrack bloqué:', { 
+        hasStation: !!station, 
+        playlistLength: station?.playlist.length || 0, 
+        isSeekingRef: isSeekingRef.current 
+      });
+      return;
+    }
     
     isSeekingRef.current = true;
+    console.log('nextTrack: passage de', currentTrackIndex, 'vers', (currentTrackIndex + 1) % station.playlist.length);
     let nextIndex = (currentTrackIndex + 1) % station.playlist.length;
     
     // eslint-disable-next-line @typescript-eslint/no-use-before-define
@@ -94,6 +90,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     });
 
   }, [station, currentTrackIndex]);
+
+  // Mettre à jour la référence
+  nextTrackRef.current = nextTrack;
 
 
   const playTrack = useCallback(async (trackIndex: number): Promise<boolean> => {
@@ -115,6 +114,18 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setCurrentTrack(track);
     
     console.log(`Lecture piste ${trackIndex}: "${track.title}" (${track.type})`);
+
+    // Log vers Firestore si disponible
+    if (station?.id) {
+      try {
+        await pushPlayerLog(station.id, {
+          type: 'info',
+          message: `Lecture de "${track.title}" (${track.type})`,
+        });
+      } catch (error) {
+        console.warn('Erreur log Firestore:', error);
+      }
+    }
 
     let retryCount = 0;
     const maxRetries = 2;
@@ -157,22 +168,24 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               let finished = false;
               const timeout = setTimeout(() => {
                 if (!finished) {
+                  console.log('TTS timeout après 30s');
                   window.speechSynthesis.cancel();
                   utteranceRef.current = null;
                   setTtsMessage(null);
                   setErrorMessage('Le message vocal a mis trop de temps à être lu. Passage à la piste suivante.');
                   finished = true;
                   reject(new Error('TTS timeout - passage à la piste suivante'));
+                  // Utiliser nextTrackRef.current() au lieu de playTrack() directement
                   setTimeout(() => {
-                    if (isMountedRef.current) {
-                      const nextIndex = (trackIndex + 1) % station.playlist.length;
-                      playTrack(nextIndex);
+                    if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                      nextTrackRef.current();
                     }
                   }, 1000);
                 }
               }, 30000);
 
               utterance.onstart = () => {
+                console.log('TTS démarré:', textToSpeak.substring(0, 50) + '...');
                 setIsLoadingTrack(false);
                 setIsPlaying(true);
                 setErrorMessage(null);
@@ -180,18 +193,17 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               
               utterance.onend = () => {
                 if (!finished) {
+                  console.log('TTS terminé naturellement');
                   clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
                   setTtsMessage(null);
                   finished = true;
                   resolve(true);
-                  // Passer automatiquement à la piste suivante après TTS
+                  // Utiliser nextTrackRef.current() au lieu de playTrack() directement
                   setTimeout(() => {
-                    if (isMountedRef.current) {
-                      const nextIndex = (trackIndex + 1) % station.playlist.length;
-                      console.log(`TTS terminé, passage de l'index ${trackIndex} à ${nextIndex}`);
-                      playTrack(nextIndex);
+                    if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                      nextTrackRef.current();
                     }
                   }, 500);
                 }
@@ -199,6 +211,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               
               utterance.onerror = (e) => {
                 if (!finished) {
+                  console.error('Erreur TTS:', e.error);
                   clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
@@ -206,10 +219,10 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   setErrorMessage('Erreur lors de la lecture du message vocal. Passage à la piste suivante.');
                   finished = true;
                   reject(new Error(`Erreur TTS: ${e.error}`));
+                  // Utiliser nextTrackRef.current() au lieu de playTrack() directement
                   setTimeout(() => {
-                    if (isMountedRef.current) {
-                      const nextIndex = (trackIndex + 1) % station.playlist.length;
-                      playTrack(nextIndex);
+                    if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                      nextTrackRef.current();
                     }
                   }, 1000);
                 }
@@ -218,6 +231,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               try {
                 window.speechSynthesis.speak(utterance);
               } catch (speechError) {
+                console.error('Impossible de lancer TTS:', speechError);
                 clearTimeout(timeout);
                 utteranceRef.current = null;
                 setTtsMessage(null);
@@ -225,25 +239,25 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 finished = true;
                 reject(new Error(`Impossible de lancer TTS: ${speechError}`));
                 setTimeout(() => {
-                  if (isMountedRef.current) {
-                    const nextIndex = (trackIndex + 1) % station.playlist.length;
-                    playTrack(nextIndex);
+                  if (isMountedRef.current && !isSeekingRef.current) {
+                    nextTrack();
                   }
                 }, 1000);
               }
             });
           } else {
+            console.error('Synthèse vocale non supportée');
             setErrorMessage('Synthèse vocale non supportée par ce navigateur. Passage à la piste suivante.');
             setTimeout(() => {
-              if (isMountedRef.current) {
-                const nextIndex = (trackIndex + 1) % station.playlist.length;
-                playTrack(nextIndex);
+              if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                nextTrackRef.current();
               }
             }, 1000);
             throw new Error('Synthèse vocale non supportée par ce navigateur');
           }
         } else {
           // Audio normal
+          console.log('Chargement audio:', result.audioUrl);
           audioRef.current.src = result.audioUrl;
           audioRef.current.load();
           
@@ -256,6 +270,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             };
             
             const handleError = (e: any) => {
+              console.error('Erreur chargement audio:', e);
               audioRef.current?.removeEventListener('canplay', handleCanPlay);
               audioRef.current?.removeEventListener('error', handleError);
               reject(new Error(`Erreur de lecture audio: ${e.message || 'Format non supporté'}`));
@@ -274,17 +289,20 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           
           try {
             await audioRef.current.play();
+            console.log('Audio démarré avec succès');
             setIsLoadingTrack(false);
+            setIsPlaying(true);
+            setErrorMessage(null);
           } catch (playError: any) {
             console.warn('Autoplay bloqué par le navigateur:', playError);
             setIsLoadingTrack(false);
             setIsPlaying(false);
-            // Ne pas jeter d'erreur, juste arrêter silencieusement
+            setErrorMessage('Lecture automatique bloquée - cliquez pour démarrer');
             return true;
           }
         }
         
-        setIsPlaying(true);
+        // Mettre à jour l'historique uniquement si la piste a commencé avec succès
         if (playlistHistory[playlistHistory.length - 1] !== trackIndex) {
             setPlaylistHistory(prev => [...prev.slice(-9), trackIndex]);
         }
@@ -298,8 +316,27 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           if(isMountedRef.current) {
             setIsLoadingTrack(false);
             setFailedTracks(prev => new Set(prev).add(trackId));
+            setErrorMessage(`Piste "${track.title}" non disponible après ${maxRetries + 1} tentatives`);
             console.error(`Piste "${track.title}" marquée comme défaillante après ${maxRetries + 1} tentatives`);
-            nextTrack();
+            
+            // Log l'erreur vers Firestore
+            if (station?.id) {
+              try {
+                await pushPlayerLog(station.id, {
+                  type: 'error',
+                  message: `Échec de lecture "${track.title}" après ${maxRetries + 1} tentatives`,
+                });
+              } catch (logError) {
+                console.warn('Erreur log Firestore:', logError);
+              }
+            }
+            
+            // Attendre avant de passer à la suivante pour éviter les loops
+            setTimeout(() => {
+              if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                nextTrackRef.current();
+              }
+            }, 2000);
           }
           return false;
         }
@@ -346,11 +383,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
   // Track end handler
   const handleTrackEnd = useCallback(() => {
-    if (isMountedRef.current) {
+    if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+        console.log('Audio terminé, passage à la suivante');
         setIsPlaying(false);
-        nextTrack();
+        nextTrackRef.current();
     }
-  }, [nextTrack]);
+  }, []);
 
   // Setup audio events
   useEffect(() => {
@@ -366,11 +404,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
   // Auto-play when a station is loaded
   useEffect(() => {
-    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && !currentTrack && currentTrackIndex === 0) {
+    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && !currentTrack && currentTrackIndex === 0 && !isSeekingRef.current) {
       console.log('Auto-démarrage de la lecture pour la station:', station.name);
-      playTrack(0);
+      // Petite pause pour éviter les race conditions
+      setTimeout(() => {
+        if (isMountedRef.current && !isSeekingRef.current && !isLoadingTrack && !currentTrack) {
+          playTrack(0);
+        }
+      }, 100);
     }
-  }, [station?.id, playTrack]);
+  }, [station?.id, isPlaying, isLoadingTrack, currentTrack, currentTrackIndex, playTrack]);
 
 
   return {
@@ -386,5 +429,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     togglePlayPause,
     canGoBack: playlistHistory.length > 1,
     playlistLength: station?.playlist.length || 0,
+    // Nouveaux états pour le monitoring
+    ttsMessage,
+    errorMessage,
   };
 }
