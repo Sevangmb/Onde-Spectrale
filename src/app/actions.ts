@@ -10,7 +10,7 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, 
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generateThemedMessage, type GenerateThemedMessageInput } from '@/ai/flows/generate-themed-message';
-import { searchMusicAdvanced, getAudioForTrackImproved as getAudioForTrack } from './actions-improved';
+import { searchMusicAdvanced } from './actions-improved';
 
 
 const CreateStationSchema = z.object({
@@ -361,5 +361,64 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
   }
 }
 
-// Remplacé par `getAudioForTrackImproved` dans `actions-improved.ts`
-export { getAudioForTrack };
+export async function getAudioForTrack(
+  track: PlaylistItem,
+  djCharacterId: string,
+  ownerId: string
+): Promise<{ audioUrl?: string; error?: string }> {
+  try {
+    if (track.type === 'message') {
+      if (!track.content) {
+        return { error: 'Contenu du message vide.' };
+      }
+
+      const { getCustomCharactersForUser } = await import('./actions');
+      const customDjs = await getCustomCharactersForUser(ownerId);
+      const allDjs = [...DJ_CHARACTERS, ...customDjs];
+      const dj = allDjs.find(d => d.id === djCharacterId);
+
+      if (!dj) {
+        return { error: 'Personnage DJ non trouvé' };
+      }
+
+      let audioResult;
+      if ('isCustom' in dj && dj.isCustom) {
+        audioResult = await generateCustomDjAudio({
+          message: track.content,
+          voice: (dj as CustomDJCharacter).voice,
+        });
+      } else {
+        audioResult = await generateDjAudio({
+          message: track.content,
+          characterId: dj.id,
+        });
+      }
+
+      if (!audioResult?.audioBase64) {
+        throw new Error('Aucune donnée audio générée');
+      }
+      return { audioUrl: `data:audio/wav;base64,${audioResult.audioBase64}` };
+    }
+
+    if (track.type === 'music') {
+      if (track.url && !track.url.startsWith('https://archive.org')) {
+        return { audioUrl: track.url };
+      }
+
+      const searchTerm = track.content || track.title;
+      const searchResults = await searchMusicAdvanced(searchTerm, 1);
+      if (searchResults.length > 0 && searchResults[0].url) {
+        return { audioUrl: searchResults[0].url };
+      } else {
+        return { error: `Aucune piste trouvée pour "${searchTerm}"` };
+      }
+    }
+
+    return { error: 'Type de piste non reconnu' };
+  } catch (error: any) {
+    console.error("Erreur dans getAudioForTrack:", error);
+    return {
+      error: `La génération de la voix IA a échoué: ${error.message}`,
+    };
+  }
+}

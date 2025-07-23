@@ -47,8 +47,20 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (!station) return;
     
     const track = station.playlist.find(t => t.id === trackId);
-    if (!track) return;
+    if (!track) {
+      console.warn(`Piste ${trackId} non trouvée. Passage à la suivante.`);
+      nextTrack();
+      return;
+    }
     
+    // Vérification cruciale pour éviter les messages vides
+    if (track.type === 'message' && !track.content?.trim()) {
+        console.warn(`Message vide pour la piste ${track.id}. Passage à la suivante.`);
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        nextTrack(); // Passer à la suivante sans bloquer
+        return;
+    }
+
     stopPlayback();
     setIsLoadingTrack(true);
     setCurrentTrack(track);
@@ -70,7 +82,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
     setIsLoadingTrack(false);
 
-    if (result.audioUrl.startsWith('data:audio')) { // Base64 audio for TTS or music
+    if (result.audioUrl.startsWith('data:audio')) {
       if (!audioRef.current) return;
       audioRef.current.src = result.audioUrl;
       try {
@@ -88,9 +100,10 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
       const currentId = currentTrackRef.current?.id;
       const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
+      
       let nextIndex = (currentIndex + 1) % station.playlist.length;
-
       let attempts = 0;
+      
       while (failedTracks.has(station.playlist[nextIndex].id) && attempts < station.playlist.length) {
           nextIndex = (nextIndex + 1) % station.playlist.length;
           attempts++;
@@ -140,7 +153,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
   }, [isLoadingTrack, isPlaying, currentTrack, station, playTrackById]);
   
-  // Auto-play first track of new station
   useEffect(() => {
     isMountedRef.current = true;
     stopPlayback();
@@ -161,7 +173,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       isMountedRef.current = false;
       stopPlayback();
     };
-  }, [station?.id, stopPlayback, playTrackById]);
+  }, [station?.id, playTrackById, stopPlayback]);
 
 
   useEffect(() => {
