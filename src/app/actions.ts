@@ -134,21 +134,49 @@ export async function createStation(ownerId: string, formData: FormData) {
       theme: theme,
   };
 
-  const initialPlaylist = await generatePlaylist(playlistInput);
-  
-  if (!initialPlaylist || !initialPlaylist.items) {
-      return { error: { general: "Impossible de générer la playlist initiale pour la station."}};
-  }
-  
-  const playlistWithIds: PlaylistItem[] = initialPlaylist.items.map((item, index) => ({
-      ...item,
-      id: `${Date.now()}-${index}`,
-      title: item.type === 'message' ? item.content.substring(0, 50) + '...' : item.content,
-      artist: item.type === 'message' ? dj.name : 'Artiste Inconnu',
-      duration: item.type === 'message' ? 15 : 180, // Default durations
-      url: '', // Will be resolved at playback time
+  // TEMPORAIRE: Créer une playlist statique pour éviter les problèmes d'IA
+  const playlistWithIds: PlaylistItem[] = [
+    {
+      id: `${Date.now()}-0`,
+      type: 'message',
+      title: 'Message de bienvenue',
+      content: `Bonjour et bienvenue sur ${name}. Je suis ${dj.name}, votre DJ. Nous diffusons de la musique sur le thème ${theme}.`,
+      artist: dj.name,
+      duration: 8,
+      url: '',
       addedAt: new Date().toISOString()
-  }));
+    },
+    {
+      id: `${Date.now()}-1`,
+      type: 'music',
+      title: 'Première chanson',
+      content: 'jazz',
+      artist: 'Artiste Inconnu',
+      duration: 180,
+      url: '',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${Date.now()}-2`,
+      type: 'message',
+      title: 'Transition musicale',
+      content: `Voici une belle chanson pour accompagner votre écoute sur ${name}. Restez à l'écoute !`,
+      artist: dj.name,
+      duration: 5,
+      url: '',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${Date.now()}-3`,
+      type: 'music',
+      title: 'Deuxième chanson',
+      content: 'classical',
+      artist: 'Artiste Inconnu',
+      duration: 200,
+      url: '',
+      addedAt: new Date().toISOString()
+    }
+  ];
 
 
   const newStationData = {
@@ -413,7 +441,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             // Fallback: utiliser TTS du navigateur côté client
             const silentAudio = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW==';
             
-            return { audioUrl: silentAudio };
+            return { audioUrl: `tts:${encodeURIComponent(track.content)}` };
             
         } catch(err: any) {
             console.error("Erreur de génération vocale IA:", err);

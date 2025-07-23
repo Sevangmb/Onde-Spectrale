@@ -95,35 +95,78 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           throw new Error(result.error || 'URL audio introuvable');
         }
 
-        audioRef.current.src = result.audioUrl;
-        audioRef.current.load();
-        
-        // Attendre que l'audio soit prêt
-        await new Promise((resolve, reject) => {
-          const handleCanPlay = () => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
-            resolve(null);
-          };
+        // Gérer TTS ou audio normal
+        if (result.audioUrl.startsWith('tts:')) {
+          // C'est un message TTS
+          const textToSpeak = decodeURIComponent(result.audioUrl.substring(4));
           
-          const handleError = (e: any) => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
-            reject(new Error(`Erreur de lecture audio: ${e.message || 'Format non supporté'}`));
-          };
+          // Utiliser la Web Speech API
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // Essayer de trouver une voix française
+            const voices = window.speechSynthesis.getVoices();
+            const frenchVoice = voices.find(voice => voice.lang.startsWith('fr'));
+            if (frenchVoice) {
+              utterance.voice = frenchVoice;
+            }
+            
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            return new Promise((resolve, reject) => {
+              utterance.onstart = () => {
+                setIsPlaying(true);
+              };
+              
+              utterance.onend = () => {
+                setIsPlaying(false);
+                resolve(null);
+              };
+              
+              utterance.onerror = (e) => {
+                setIsPlaying(false);
+                reject(new Error(`Erreur TTS: ${e.error}`));
+              };
+              
+              window.speechSynthesis.speak(utterance);
+            });
+          } else {
+            throw new Error('Synthèse vocale non supportée par ce navigateur');
+          }
+        } else {
+          // Audio normal
+          audioRef.current.src = result.audioUrl;
+          audioRef.current.load();
           
-          audioRef.current?.addEventListener('canplay', handleCanPlay);
-          audioRef.current?.addEventListener('error', handleError);
+          // Attendre que l'audio soit prêt
+          await new Promise((resolve, reject) => {
+            const handleCanPlay = () => {
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              resolve(null);
+            };
+            
+            const handleError = (e: any) => {
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              reject(new Error(`Erreur de lecture audio: ${e.message || 'Format non supporté'}`));
+            };
+            
+            audioRef.current?.addEventListener('canplay', handleCanPlay);
+            audioRef.current?.addEventListener('error', handleError);
+            
+            // Timeout de 10 secondes
+            setTimeout(() => {
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              reject(new Error('Timeout lors du chargement audio'));
+            }, 10000);
+          });
           
-          // Timeout de 10 secondes
-          setTimeout(() => {
-            audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            audioRef.current?.removeEventListener('error', handleError);
-            reject(new Error('Timeout lors du chargement audio'));
-          }, 10000);
-        });
-        
-        await audioRef.current.play();
+          await audioRef.current.play();
+        }
         
         setIsPlaying(true);
         if (playlistHistory[playlistHistory.length - 1] !== trackIndex) {
