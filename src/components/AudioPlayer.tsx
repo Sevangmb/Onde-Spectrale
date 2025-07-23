@@ -116,60 +116,60 @@ export function AudioPlayer({
   const displayTitle = isLoading ? 'Chargement...' : (track ? track.title : "Silence radio");
 
   return (
-    <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-orange-900/10 via-transparent to-red-900/10 pointer-events-none"></div>
+    <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none"></div>
       
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/30 to-transparent animate-scanline-slow"></div>
+      <div className="absolute inset-0 opacity-30 pointer-events-none">
+        <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-pulse"></div>
       </div>
 
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
-          <div className="bg-orange-900/30 border border-orange-500/30 rounded-lg p-3 shadow-lg shadow-orange-500/10">
-            { isLoading ? <Loader2 className="h-8 w-8 text-orange-400 animate-spin"/> :
-              !track ? <Radio className="h-8 w-8 text-orange-400" /> :
+          <div className="bg-primary/10 border-2 border-primary/40 rounded-lg p-3 shadow-lg radioactive-pulse">
+            { isLoading ? <Loader2 className="h-8 w-8 text-primary phosphor-glow animate-spin"/> :
+              !track ? <Radio className="h-8 w-8 text-primary phosphor-glow animate-pulse" /> :
               track.type === 'music' ? 
-              <Music className="h-8 w-8 text-orange-400" /> : 
-              <MessageSquare className="h-8 w-8 text-orange-400" />
+              <Music className="h-8 w-8 text-primary phosphor-glow" /> : 
+              <MessageSquare className="h-8 w-8 text-accent phosphor-glow" />
             }
           </div>
           <div className="flex-grow overflow-hidden">
-            <p className="text-lg font-medium text-orange-100 truncate drop-shadow-lg animate-flicker-subtle">
+            <p className="text-lg font-retro font-bold text-primary phosphor-glow truncate drop-shadow-lg uppercase tracking-wider">
               {displayTitle}
             </p>
             {track?.artist && !isLoading && (
-              <p className="text-sm text-orange-300/80 truncate">
+              <p className="text-sm text-muted-foreground font-mono truncate uppercase tracking-wide">
                 {track.artist}
               </p>
             )}
             {ttsMessage && (
-              <p className="text-sm text-blue-300 truncate italic">
+              <p className="text-sm text-accent phosphor-glow truncate italic font-mono">
                 "🎤 {ttsMessage.substring(0, 80)}{ttsMessage.length > 80 ? '...' : ''}"
               </p>
             )}
             {errorMessage && (
-              <p className="text-sm text-red-300 truncate">
+              <p className="text-sm text-destructive phosphor-glow truncate font-mono">
                 ⚠️ {errorMessage}
               </p>
             )}
-             <p className="text-xs text-orange-400/60 uppercase tracking-wider">
-              { !track || isLoading ? 'HORS LIGNE' :
-                ttsMessage ? 'SYNTHÈSE VOCALE' :
-                track.type === 'music' ? 'MUSIQUE' : 'MESSAGE'
+             <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">
+              { !track || isLoading ? '>>> SIGNAL PERDU <<<' :
+                ttsMessage ? '>>> TRANSMISSION <<<' :
+                track.type === 'music' ? '>>> MUSIQUE <<<' : '>>> MESSAGE <<<'
               }
             </p>
           </div>
           
           {isPlaying && (
             <div className="flex gap-1">
-              {[...Array(3)].map((_, i) => (
+              {[...Array(5)].map((_, i) => (
                 <div
                   key={i}
-                  className="w-1 bg-orange-400 rounded-full animate-equalizer"
+                  className="w-1 bg-primary phosphor-glow rounded-full animate-pulse"
                   style={{
-                    height: '16px',
-                    animationDelay: `${i * 0.1}s`,
-                    animationDuration: '0.6s'
+                    height: `${12 + Math.random() * 8}px`,
+                    animationDelay: `${i * 0.15}s`,
+                    animationDuration: '0.8s'
                   }}
                 />
               ))}
@@ -177,36 +177,37 @@ export function AudioPlayer({
           )}
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div 
-            className="relative w-full h-2 bg-black/60 border border-orange-500/30 rounded-full overflow-hidden group"
+            className="relative w-full h-3 bg-black/80 border-2 border-primary/40 rounded-sm overflow-hidden group"
           >
             <div 
-              className="h-full bg-gradient-to-r from-orange-600 to-red-500 transition-all duration-200 relative"
+              className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-200 relative"
               style={{ width: `${isNaN(progress) ? 0 : progress}%` }}
             >
-              <div className="absolute inset-0 bg-orange-400/30 animate-pulse"></div>
+              <div className="absolute inset-0 bg-primary/30 animate-pulse"></div>
+              <div className="absolute inset-0 phosphor-glow"></div>
             </div>
           </div>
           
-          <div className="flex justify-between text-xs text-orange-300/80 font-mono">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(duration)}</span>
+          <div className="flex justify-between text-xs text-muted-foreground font-mono uppercase tracking-wider">
+            <span className="phosphor-glow">{formatTime(currentTime)}</span>
+            <span className="phosphor-glow">{formatTime(duration)}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono uppercase tracking-wide">
+              Vol:
+            </span>
+            <div className="vintage-knob" onClick={toggleMute}>
+              <VolumeIcon className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-4 w-4 text-primary phosphor-glow" />
+            </div>
+          </div>
+          
           <div className="flex items-center gap-3 min-w-0 flex-shrink">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={toggleMute}
-              className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 hover:text-orange-100 transition-all h-8 w-8"
-            >
-              <VolumeIcon className="h-4 w-4" />
-            </Button>
-            
-            <div className="w-20">
+            <div className="w-24">
               <Slider
                 value={[isMuted ? 0 : volume]}
                 onValueChange={handleVolumeChange}
@@ -216,9 +217,9 @@ export function AudioPlayer({
               />
             </div>
             
-            <span className="text-xs text-orange-300/60 font-mono w-8 text-right">
+            <div className="frequency-display min-w-[50px] text-sm">
               {Math.round(isMuted ? 0 : volume)}%
-            </span>
+            </div>
           </div>
         </div>
       </div>

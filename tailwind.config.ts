@@ -17,9 +17,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['"Space Grotesk"', 'sans-serif'],
-        code: ['monospace'],
+        body: ['Orbitron', 'monospace'],
+        headline: ['Orbitron', 'monospace'],
+        mono: ['"Share Tech Mono"', 'monospace'],
+        retro: ['Orbitron', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

@@ -203,20 +203,20 @@ export function OndeSpectraleRadio() {
               
               {/* Panneau de contrôle principal */}
               <div className="lg:col-span-2">
-                <Card className="w-full border-2 border-orange-500/30 bg-black/80 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+                <Card className="w-full vintage-radio-frame pip-boy-terminal shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
                   <div className="absolute inset-0 pointer-events-none">
-                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
+                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-pulse"></div>
                   </div>
-                  <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
+                  <div className="absolute inset-1 border border-primary/20 rounded-lg pointer-events-none animate-pulse"></div>
                   
-                  <CardHeader className="relative border-b-2 border-orange-500/30 pb-4 bg-gradient-to-r from-black/90 to-zinc-900/90">
+                  <CardHeader className="relative border-b-2 border-primary/40 pb-4 bg-gradient-to-r from-background to-card wasteland-texture">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <OndeSpectraleLogo className="h-8 w-8 text-orange-400 drop-shadow-lg" />
-                          <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
+                        <div className="relative radioactive-pulse">
+                          <OndeSpectraleLogo className="h-8 w-8 text-primary phosphor-glow drop-shadow-lg" />
+                          <div className="absolute inset-0 bg-primary/30 blur-sm animate-pulse"></div>
                         </div>
-                        <CardTitle className="font-headline text-3xl text-orange-100 tracking-wider drop-shadow-lg">
+                        <CardTitle className="font-headline text-3xl text-primary phosphor-glow tracking-wider drop-shadow-lg uppercase">
                           <span className="inline-block animate-flicker">Onde Spectrale</span>
                         </CardTitle>
                       </div>
@@ -228,7 +228,7 @@ export function OndeSpectraleRadio() {
                             variant="outline" 
                             size="sm" 
                             onClick={() => setShowPlaylist(!showPlaylist)}
-                            className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300"
+                            className="retro-button"
                           >
                             <ListMusic className="mr-2 h-4 w-4" /> 
                             Playlist ({playlistManager.playlistLength})
@@ -242,7 +242,7 @@ export function OndeSpectraleRadio() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" 
+                                className="retro-button" 
                                 onClick={() => router.push(`/admin/stations/${currentStation.id}`)}
                               >
                                 <Settings className="mr-2 h-4 w-4" /> Gérer
@@ -250,7 +250,7 @@ export function OndeSpectraleRadio() {
                             )}
                             <Button 
                               variant="default" 
-                              className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" 
+                              className="retro-button bg-primary/20 hover:bg-primary/30" 
                               onClick={() => router.push('/admin')}
                             >
                               <UserCog className="mr-2 h-4 w-4" /> Admin
@@ -259,7 +259,7 @@ export function OndeSpectraleRadio() {
                         ) : (
                           <Button 
                             variant="default" 
-                            className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" 
+                            className="retro-button bg-accent/20 hover:bg-accent/30" 
                             onClick={() => router.push('/login')}
                           >
                             <Rss className="mr-2 h-4 w-4" /> Créer ou Gérer
@@ -273,51 +273,51 @@ export function OndeSpectraleRadio() {
                     <div className="flex flex-col gap-6">
                       
                       {/* Syntoniseur */}
-                      <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className={`w-full h-full bg-gradient-to-r from-transparent via-orange-400/30 to-transparent ${isScanning ? 'animate-scan' : ''}`}></div>
+                      <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
+                        <div className="absolute inset-0 opacity-30 pointer-events-none">
+                          <div className={`w-full h-full bg-gradient-to-r from-transparent via-primary/40 to-transparent ${isScanning ? 'animate-pulse' : ''}`}></div>
                         </div>
                         
                         <div className="relative z-10 space-y-4">
                           <div className="flex items-center justify-between">
-                            <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider uppercase">
-                              Syntoniseur
+                            <label htmlFor="frequency" className="text-sm font-mono font-bold text-primary phosphor-glow tracking-wider uppercase">
+                              >>> Syntoniseur <<<
                             </label>
                             <div className="flex items-center gap-2">
-                              <Zap className="h-4 w-4 text-orange-400" />
+                              <Zap className="h-4 w-4 text-primary phosphor-glow" />
                               <div className="flex gap-1">
                                 {[...Array(5)].map((_, i) => (
                                   <div
                                     key={i}
-                                    className={`w-1 h-4 rounded-full transition-all duration-300 ${
+                                    className={`w-2 h-5 rounded-sm transition-all duration-300 ${
                                       i < Math.floor(signalStrength / 20) 
-                                        ? 'bg-orange-400 shadow-lg shadow-orange-400/50' 
-                                        : 'bg-gray-600'
+                                        ? 'bg-primary phosphor-glow shadow-lg' 
+                                        : 'bg-muted'
                                     }`}
                                   />
                                 ))}
                               </div>
-                              <span className="text-xs text-orange-300/60 font-mono w-8">
-                                {signalStrength}%
+                              <span className="text-xs text-muted-foreground font-mono w-12 phosphor-glow">
+                                SIG:{signalStrength}%
                               </span>
                             </div>
                           </div>
 
                           <div className="text-center">
-                            <div className="text-6xl font-headline font-bold text-orange-400 tracking-widest drop-shadow-lg relative">
-                              <span className={`${currentStation ? 'animate-flicker-subtle' : 'animate-flicker'}`}>
+                            <div className="frequency-display text-6xl font-mono font-bold tracking-widest relative mb-2">
+                              <span className={`${currentStation ? 'animate-flicker' : 'animate-pulse'}`}>
                                 {frequency.toFixed(1)}
                               </span>
-                              <span className="text-3xl text-orange-300 ml-2">MHz</span>
+                              <span className="text-2xl ml-3">MHz</span>
                               
                               {currentStation && (
-                                <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
+                                <div className="absolute -top-2 -right-2 w-4 h-4 bg-primary rounded-full radioactive-pulse shadow-lg"></div>
                               )}
                             </div>
                             
                             {isScanning && (
-                              <div className="text-orange-300/60 text-sm mt-2 animate-pulse">
-                                SCAN EN COURS...
+                              <div className="text-accent phosphor-glow text-sm mt-2 animate-pulse font-mono uppercase tracking-wider">
+                                >>> SCAN EN COURS <<<
                               </div>
                             )}
                           </div>
@@ -328,11 +328,11 @@ export function OndeSpectraleRadio() {
                               size="sm" 
                               onClick={handleScanDown} 
                               disabled={frequency <= 87.0 || isScanning} 
-                              className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50"
+                              className="retro-button disabled:opacity-50"
                             >
-                              <ChevronLeft className="h-4 w-4 mr-1" /> SCAN
+                              <ChevronLeft className="h-4 w-4 mr-1" /> SCAN-
                             </Button>
-                            <div className="px-4 py-2 bg-black/60 border border-orange-500/20 rounded text-orange-300/80 text-xs font-mono">
+                            <div className="frequency-display px-4 py-2 text-xs">
                               87.0 - 108.0 MHz
                             </div>
                             <Button 
@@ -340,9 +340,9 @@ export function OndeSpectraleRadio() {
                               size="sm" 
                               onClick={handleScanUp} 
                               disabled={frequency >= 108.0 || isScanning} 
-                              className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50"
+                              className="retro-button disabled:opacity-50"
                             >
-                              SCAN <ChevronRight className="h-4 w-4 ml-1" />
+                              SCAN+ <ChevronRight className="h-4 w-4 ml-1" />
                             </Button>
                           </div>
 
