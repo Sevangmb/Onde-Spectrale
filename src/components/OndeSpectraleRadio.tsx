@@ -1,4 +1,3 @@
-// src/components/OndeSpectraleRadio.tsx - Version mise à jour avec le nouveau système de playlist
 
 'use client';
 
@@ -397,22 +396,24 @@ export function OndeSpectraleRadio() {
               </div>
 
               {/* Panneau playlist (conditionnellement affiché) */}
-              {(showPlaylist && isRadioActive) && (
-                <div className="lg:col-span-1">
-                  <EnhancedPlaylist
-                    playlist={currentStation.playlist}
-                    currentTrackIndex={playlistManager.currentTrackIndex}
-                    currentTrack={playlistManager.currentTrack}
-                    isPlaying={playlistManager.isPlaying}
-                    isLoadingTrack={playlistManager.isLoadingTrack}
-                    failedTracks={playlistManager.failedTracks}
-                    onTrackSelect={playlistManager.playTrack}
-                    onPlayPause={playlistManager.togglePlayPause}
-                    onNext={playlistManager.nextTrack}
-                    onPrevious={playlistManager.previousTrack}
-                    canGoBack={playlistManager.canGoBack}
-                    className="h-full"
-                  />
+              {(isRadioActive && currentStation.playlist.length > 0) && (
+                <div className={`lg:col-span-1 transition-opacity duration-500 ${showPlaylist ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                   {showPlaylist && (
+                     <EnhancedPlaylist
+                        playlist={currentStation.playlist}
+                        currentTrackIndex={playlistManager.currentTrackIndex}
+                        currentTrack={playlistManager.currentTrack}
+                        isPlaying={playlistManager.isPlaying}
+                        isLoadingTrack={playlistManager.isLoadingTrack}
+                        failedTracks={playlistManager.failedTracks}
+                        onTrackSelect={playlistManager.playTrack}
+                        onPlayPause={playlistManager.togglePlayPause}
+                        onNext={playlistManager.nextTrack}
+                        onPrevious={playlistManager.previousTrack}
+                        canGoBack={playlistManager.canGoBack}
+                        className="h-full"
+                      />
+                   )}
                 </div>
               )}
             </div>

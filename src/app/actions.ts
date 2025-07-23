@@ -12,6 +12,7 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, 
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
+import { searchMusicAdvanced } from './actions-improved';
 
 
 const CreateStationSchema = z.object({
@@ -229,7 +230,7 @@ export async function searchMusic(searchTerm: string): Promise<{ data?: Playlist
       return { error: "Search term is empty" };
     }
 
-    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=5&page=1&output=json`;
+    const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=downloads%20desc&rows=5&page=1&output=json`;
     
     try {
         const response = await fetch(searchUrl, {
@@ -412,6 +413,10 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
 }
 
 export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string): Promise<{ audioUrl?: string; error?: string }> {
+    if (!track) {
+      return { error: "Piste non fournie." };
+    }
+
     const allDjs = await getCustomCharactersForUser(ownerId);
     const fullDjList: (DJCharacter | CustomDJCharacter)[] = [...DJ_CHARACTERS, ...allDjs];
     const dj = fullDjList.find(d => d.id === djCharacterId);
@@ -445,15 +450,9 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: 'Terme de recherche musical vide.' };
         }
         
-        const searchResult = await searchMusic(track.content);
-        if (searchResult.error) {
-            return { error: `La recherche de musique a échoué: ${searchResult.error}` };
-        }
-        if (searchResult.data && searchResult.data.length > 0 && searchResult.data[0].url) {
-            const response = await fetch(searchResult.data[0].url, { method: 'HEAD' });
-            if (response.ok) {
-                return { audioUrl: searchResult.data[0].url };
-            }
+        const searchResults = await searchMusicAdvanced(track.content, 1);
+        if (searchResults.length > 0) {
+            return { audioUrl: searchResults[0].url };
         }
         
         return { error: `Impossible de trouver une source valide pour "${track.content}"` };

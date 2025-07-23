@@ -1,4 +1,3 @@
-// src/lib/types.ts - Version corrigée
 
 export type DJCharacter = {
   id: string;
@@ -22,14 +21,14 @@ export type PlaylistItem = {
   id: string;
   type: 'message' | 'music';
   title: string;
-  content: string; // ✅ AJOUTÉ - Contenu réel (texte du message ou nom de recherche)
+  content: string; 
   artist?: string;
   url: string; // URL to the audio file in Firebase Storage or Archive.org
   duration: number; // in seconds
   addedAt?: string; // ISO string
-  archiveId?: string; // ✅ AJOUTÉ - ID spécifique Archive.org pour les musiques
-  isLoading?: boolean; // ✅ AJOUTÉ - État de chargement
-  error?: string; // ✅ AJOUTÉ - Message d'erreur
+  archiveId?: string; 
+  isLoading?: boolean; 
+  error?: string; 
 };
 
 export type Station = {
@@ -40,7 +39,7 @@ export type Station = {
   djCharacterId: string;
   playlist: PlaylistItem[];
   createdAt: string; // ISO string
-  theme?: string; // ✅ AJOUTÉ - Thème de la station
+  theme?: string;
 };
 
 export type User = {

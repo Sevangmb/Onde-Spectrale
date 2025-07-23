@@ -1,3 +1,4 @@
+
 // src/hooks/usePlaylistManager.ts
 'use client';
 
@@ -104,8 +105,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       console.error(`Échec du chargement de la piste "${track.title}":`, error);
       if(isMountedRef.current) {
         setFailedTracks(prev => new Set(prev).add(trackId));
-        // Important: move to the next track on failure
-        nextTrack();
+        nextTrack(); // Important: move to the next track on failure
       }
       return false;
     } finally {
