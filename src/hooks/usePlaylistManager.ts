@@ -65,6 +65,12 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (!station) return;
     const track = station.playlist.find(t => t.id === trackId);
     if (!track) return;
+
+    if (track.type === 'message' && !track.content?.trim()) {
+        console.warn(`Skipping empty message track: ${track.id}`);
+        nextTrack();
+        return;
+    }
     
     stopPlayback();
     setIsLoadingTrack(true);

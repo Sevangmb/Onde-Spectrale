@@ -1,3 +1,4 @@
+
 // src/app/actions-improved.ts - Fonctions améliorées à ajouter aux actions existantes
 
 'use server';
@@ -242,7 +243,7 @@ async function getAudioForMessage(
     const { DJ_CHARACTERS } = await import('@/lib/data');
     
     if (!track.content) {
-      return { error: 'Contenu du message vide' };
+      return { error: 'Contenu du message vide.' };
     }
 
     // Récupérer le DJ
