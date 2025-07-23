@@ -178,8 +178,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             }, 10000);
           });
           
-          await audioRef.current.play();
-          setIsLoadingTrack(false);
+          try {
+            await audioRef.current.play();
+            setIsLoadingTrack(false);
+          } catch (playError: any) {
+            console.warn('Autoplay bloqué par le navigateur:', playError);
+            setIsLoadingTrack(false);
+            setIsPlaying(false);
+            // Ne pas jeter d'erreur, juste arrêter silencieusement
+            return true;
+          }
         }
         
         setIsPlaying(true);
@@ -264,10 +272,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
   // Auto-play when a station is loaded
   useEffect(() => {
-    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && !currentTrack) {
+    if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && currentTrackIndex === 0 && !currentTrack) {
+      console.log('Auto-démarrage de la lecture pour la station:', station.name);
       playTrack(0);
     }
-  }, [station, isPlaying, isLoadingTrack, currentTrack, playTrack]);
+  }, [station?.id, playTrack]);
 
 
   return {

@@ -365,10 +365,22 @@ export function OndeSpectraleRadio() {
 
                           <div className="text-center">
                             {currentStation ? (
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
-                                 playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
+                              <div className="space-y-2">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
+                                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                  {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
+                                   playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
+                                </div>
+                                {!playlistManager.isPlaying && !playlistManager.isLoadingTrack && playlistManager.currentTrack && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => playlistManager.togglePlayPause()}
+                                    className="border-green-500/30 hover:bg-green-500/20 text-green-300 text-xs"
+                                  >
+                                    ▶ Lancer la lecture
+                                  </Button>
+                                )}
                               </div>
                             ) : (
                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
