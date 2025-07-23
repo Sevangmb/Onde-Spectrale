@@ -114,11 +114,12 @@ export default function LoginPage() {
       const userCredential = await signInWithPopup(auth, provider);
       await updateUserOnLogin(userCredential.user.uid, userCredential.user.email);
       router.push('/admin');
-    } catch (err: any)      if (err.code === 'auth/popup-closed-by-user') {
-        setError('La fenêtre de connexion a été fermée.');
-      } else {
-        setError('Erreur de connexion Google. Réessayez.');
-      }
+    } catch (err: any) {
+        if (err.code === 'auth/popup-closed-by-user') {
+            setError('La fenêtre de connexion a été fermée.');
+        } else {
+            setError('Erreur de connexion Google. Réessayez.');
+        }
     } finally {
       setIsLoading(false);
     }

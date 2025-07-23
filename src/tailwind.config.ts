@@ -19,8 +19,8 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        body: ['Orbitron', 'monospace'],
+        sans: ['"Share Tech Mono"', 'monospace'],
+        body: ['"Share Tech Mono"', 'monospace'],
         headline: ['Orbitron', 'monospace'],
         mono: ['"Share Tech Mono"', 'monospace'],
         retro: ['Orbitron', 'monospace'],

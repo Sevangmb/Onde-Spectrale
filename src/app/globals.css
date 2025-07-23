@@ -58,3 +58,149 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  /* Style de terminal Pip-Boy pour les cartes et conteneurs */
+  .pip-boy-terminal {
+    @apply bg-black/70 border-2 border-primary/40 rounded-sm shadow-lg shadow-primary/10;
+    backdrop-filter: blur(1px);
+    
+    /* Effet de scanline */
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      animation: scanline 10s linear infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+  }
+
+  /* Cadre rétro pour les éléments interactifs */
+  .vintage-radio-frame {
+    @apply bg-black/50 border-2 border-primary/30 rounded-sm p-4 relative;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  }
+
+  /* Style pour les boutons rétro */
+  .retro-button {
+    @apply border border-primary/50 bg-primary/10 text-primary font-mono uppercase tracking-wider;
+    @apply hover:bg-primary/20 hover:shadow-lg hover:shadow-primary/20;
+    @apply focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-black;
+  }
+
+  .frequency-display {
+    @apply text-primary font-mono phosphor-glow;
+    text-shadow: 0 0 8px hsl(var(--primary) / 0.7);
+  }
+
+  /* Bruit statique pour les arrière-plans */
+  .static-noise {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .static-noise::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48ZmlsdGVyIGlkPSJub2lzZSI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuOCIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWx0ZXI9InVybCgjbm9pc2UpIi8+PC9zdmc+');
+    opacity: 0.05;
+    animation: grain 8s steps(10) infinite;
+    pointer-events: none;
+  }
+}
+
+@layer utilities {
+  /* Effet de lueur phosphorescente */
+  .phosphor-glow {
+    text-shadow:
+      0 0 2px hsl(var(--primary) / 0.6),
+      0 0 5px hsl(var(--primary) / 0.4),
+      0 0 10px hsl(var(--primary) / 0.2);
+  }
+  
+  .radioactive-pulse {
+    animation: radioactive-pulse 2s infinite ease-in-out;
+  }
+  
+  .wasteland-texture {
+    background-image:
+      linear-gradient(to right, transparent, transparent),
+      url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCI+PHJlY3Qgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjMDAwMDAwIj48L3JlY3Q+PHJlY3Qgd2lkdGg9IjEiIGhlaWdodD0iMSIgZmlsbD0iI2ZmZmZmZiIgeD0iMTAiIHk9IjIwIj48L3JlY3Q+PC9zdmc+');
+    background-blend-mode: color-burn;
+  }
+
+  @keyframes scanline {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-20px); }
+  }
+
+  @keyframes grain {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-5%, -10%); }
+    20% { transform: translate(-15%, 5%); }
+    30% { transform: translate(7%, -25%); }
+    40% { transform: translate(-5%, 25%); }
+    50% { transform: translate(-15%, 10%); }
+    60% { transform: translate(15%, 0%); }
+    70% { transform: translate(0%, 15%); }
+    80% { transform: translate(3%, 35%); }
+    90% { transform: translate(-10%, 10%); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0.3; }
+    25% { transform: translateY(-20px) translateX(10px); opacity: 0.7; }
+    50% { transform: translateY(-40px) translateX(-5px); opacity: 1; }
+    75% { transform: translateY(-20px) translateX(-10px); opacity: 0.7; }
+  }
+  .animate-float {
+    animation: float linear infinite;
+  }
+
+  @keyframes flicker {
+    0%, 18%, 22%, 25%, 53%, 57%, 100% {
+      opacity: 1;
+    }
+    20%, 24%, 55% {
+      opacity: 0.4;
+    }
+  }
+  .animate-flicker {
+    animation: flicker 3s linear infinite;
+  }
+
+  @keyframes equalizer {
+    0%, 100% { height: 4px; }
+    25% { height: 12px; }
+    50% { height: 20px; }
+    75% { height: 16px; }
+  }
+  .animate-equalizer {
+    animation: equalizer ease-in-out infinite;
+  }
+
+   @keyframes radioactive-pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 10px hsl(var(--primary) / 0);
+    }
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+    }
+  }
+}

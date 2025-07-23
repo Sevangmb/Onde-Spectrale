@@ -186,7 +186,7 @@ export function OndeSpectraleRadio() {
                         <div className="relative radioactive-pulse">
                           <OndeSpectraleLogo className="h-8 w-8 text-primary phosphor-glow drop-shadow-lg" />
                         </div>
-                        <CardTitle className="font-headline text-3xl text-primary phosphor-glow tracking-wider drop-shadow-lg uppercase">
+                        <CardTitle className="font-headline text-3xl text-primary phosphor-glow tracking-wider uppercase">
                           <span className="inline-block animate-flicker">Onde Spectrale</span>
                         </CardTitle>
                       </div>

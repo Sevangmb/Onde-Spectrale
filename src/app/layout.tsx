@@ -24,7 +24,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-body antialiased bg-background text-foreground">
+      <body className="font-mono antialiased bg-background text-foreground">
         <noscript>
            <div className="bg-destructive text-destructive-foreground p-4 text-center flex items-center justify-center gap-4">
                 <AlertTriangle />
