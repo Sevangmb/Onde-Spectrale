@@ -30,7 +30,6 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
-  const [lastVolume, setLastVolume] = useState(75);
   const ttsEndTimer = useRef<NodeJS.Timeout | null>(null);
 
   const formatTime = (time: number) => {
@@ -48,26 +47,24 @@ export function AudioPlayer({
     }
     if (newVolume > 0 && isMuted) {
       setIsMuted(false);
+    } else if (newVolume === 0 && !isMuted) {
+      setIsMuted(true);
     }
   }, [audioRef, isMuted]);
 
   const toggleMute = useCallback(() => {
     if (audioRef.current) {
-        setIsMuted(prev => {
-            const newMuted = !prev;
-            if (newMuted) {
-                setLastVolume(volume);
-                setVolume(0);
-                audioRef.current!.volume = 0;
-            } else {
-                const resumeVolume = lastVolume > 0 ? lastVolume : 75;
-                setVolume(resumeVolume);
-                audioRef.current!.volume = resumeVolume / 100;
-            }
-            return newMuted;
-        });
+        if (isMuted) {
+            const resumeVolume = volume > 0 ? volume : 75;
+            setVolume(resumeVolume);
+            audioRef.current.volume = resumeVolume / 100;
+        } else {
+            audioRef.current.volume = 0;
+        }
+        setIsMuted(prev => !prev);
     }
-  }, [audioRef, volume, lastVolume]);
+  }, [audioRef, isMuted, volume]);
+
 
   // Gère la mise à jour de la barre de progression pour les pistes audio
   useEffect(() => {
@@ -94,14 +91,19 @@ export function AudioPlayer({
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleLoadedMetadata);
     
-    audio.volume = volume / 100;
-    
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('durationchange', handleLoadedMetadata);
     };
-  }, [audioRef, ttsMessage, volume]);
+  }, [audioRef, ttsMessage]);
+
+  useEffect(() => {
+      const audio = audioRef.current;
+      if(audio) {
+          audio.volume = isMuted ? 0 : volume / 100;
+      }
+  }, [volume, isMuted, audioRef]);
   
   // Gère la barre de progression pour les messages TTS
   useEffect(() => {
