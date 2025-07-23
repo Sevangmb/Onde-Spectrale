@@ -24,6 +24,21 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const isMountedRef = useRef(true);
   const isSeekingRef = useRef(false);
 
+  // Ajout : passer à la piste suivante à la fin d'une chanson
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleEnded = () => {
+      if (isMountedRef.current) {
+        nextTrack();
+      }
+    };
+    audio.addEventListener('ended', handleEnded);
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [currentTrackIndex, station]);
+
   // Reset when station changes
   useEffect(() => {
     isMountedRef.current = true;
@@ -81,6 +96,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setIsLoadingTrack(true);
     setCurrentTrackIndex(trackIndex);
     setCurrentTrack(track);
+    
+    console.log(`Lecture piste ${trackIndex}: "${track.title}" (${track.type})`);
 
     let retryCount = 0;
     const maxRetries = 2;
@@ -133,7 +150,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 // Passer automatiquement à la piste suivante après TTS
                 setTimeout(() => {
                   if (isMountedRef.current) {
-                    nextTrack();
+                    const nextIndex = (trackIndex + 1) % station.playlist.length;
+                    console.log(`TTS terminé, passage de l'index ${trackIndex} à ${nextIndex}`);
+                    playTrack(nextIndex);
                   }
                 }, 500);
               };
