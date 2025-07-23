@@ -155,6 +155,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           const textToSpeak = decodeURIComponent(result.audioUrl.substring(4));
           setTtsMessage(textToSpeak); // Affiche le TTS en cours
           
+          // Limiter la longueur des messages TTS pour éviter les coupures
+          if (textToSpeak.length > 200) {
+            console.log('⚠️ Message TTS très long (' + textToSpeak.length + ' caractères), risque de coupure');
+          }
+          
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
             // Empêcher les TTS simultanés
@@ -197,13 +202,15 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               utterance.voice = frenchVoice;
             }
             
-            // Ralentir la vitesse pour une meilleure compréhension
-            utterance.rate = 0.7;
+            // Paramètres de voix optimisés pour éviter les coupures
+            utterance.rate = 0.8; // Vitesse légèrement plus rapide
             utterance.pitch = 1;
             utterance.volume = 1;
             
             return new Promise((resolve, reject) => {
               let finished = false;
+              const startTime = Date.now(); // Mesurer le temps réel de lecture
+              
               const timeout = setTimeout(() => {
                 if (!finished && !shouldIgnoreTtsRef.current) {
                   console.log('TTS timeout après 30s');
@@ -237,8 +244,18 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               };
               
               utterance.onend = () => {
+                const endTime = Date.now();
+                const actualDuration = (endTime - startTime) / 1000; // en secondes
+                
                 if (!finished && !shouldIgnoreTtsRef.current) {
-                  console.log('TTS terminé naturellement');
+                  console.log(`🎵 TTS terminé naturellement après ${actualDuration.toFixed(1)}s pour:`, textToSpeak.substring(0, 30) + '...');
+                  
+                  // Vérifier si le message était vraiment trop court (possiblement coupé)
+                  const expectedMinDuration = textToSpeak.length / 10; // ~10 caractères par seconde
+                  if (actualDuration < expectedMinDuration && textToSpeak.length > 50) {
+                    console.log(`⚠️ ATTENTION: Message possiblement coupé! Durée réelle: ${actualDuration.toFixed(1)}s, attendue: ~${expectedMinDuration.toFixed(1)}s`);
+                  }
+                  
                   clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
@@ -246,12 +263,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   ttsInProgressRef.current = false;
                   finished = true;
                   resolve(true);
-                  // Attendre 2 secondes avant le prochain message pour laisser le temps
+                  // Attendre 3 secondes avant le prochain message pour laisser le temps
+                  console.log('⏰ Planification prochaine piste dans 3 secondes');
                   setTimeout(() => {
                     if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                      console.log('▶️ Passage automatique à la piste suivante');
                       nextTrackRef.current();
+                    } else {
+                      console.log('❌ Passage automatique annulé (conditions non remplies)');
                     }
-                  }, 2000);
+                  }, 3000);
                 } else if (shouldIgnoreTtsRef.current) {
                   console.log('TTS terminé mais ignoré (flag)');
                   ttsInProgressRef.current = false;
