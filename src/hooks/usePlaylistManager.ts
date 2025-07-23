@@ -30,6 +30,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const isSeekingRef = useRef(false);
   // Ref pour suivre l'utterance TTS en cours
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  // Flag pour savoir si on doit ignorer les événements TTS
+  const shouldIgnoreTtsRef = useRef(false);
 
   // Référence pour nextTrack
   const nextTrackRef = useRef<() => void>();
@@ -39,8 +41,13 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     isMountedRef.current = true;
     // Annule le TTS en cours si changement de station
     if (utteranceRef.current) {
+      shouldIgnoreTtsRef.current = true;
       window.speechSynthesis.cancel();
       utteranceRef.current = null;
+      // Réactiver après un délai
+      setTimeout(() => {
+        shouldIgnoreTtsRef.current = false;
+      }, 500);
     }
     if (station) {
       setCurrentTrackIndex(0);
@@ -61,6 +68,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       isMountedRef.current = false;
       // Nettoie le TTS si le composant est démonté
       if (utteranceRef.current) {
+        shouldIgnoreTtsRef.current = true;
         window.speechSynthesis.cancel();
         utteranceRef.current = null;
       }
@@ -82,7 +90,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     console.log('nextTrack: passage de', currentTrackIndex, 'vers', (currentTrackIndex + 1) % station.playlist.length);
     let nextIndex = (currentTrackIndex + 1) % station.playlist.length;
     
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     playTrack(nextIndex).finally(() => {
         if(isMountedRef.current) {
             isSeekingRef.current = false;
@@ -148,12 +155,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
-            // Annule tout TTS en cours avant d'en lancer un nouveau
+            // Si il y a déjà un TTS, le marquer comme devant être ignoré
             if (utteranceRef.current) {
+              shouldIgnoreTtsRef.current = true;
               window.speechSynthesis.cancel();
-              // Attendre un peu que l'annulation soit effective
-              await new Promise(resolve => setTimeout(resolve, 100));
+              // Attendre plus longtemps pour que le cancel soit effectif
+              await new Promise(resolve => setTimeout(resolve, 300));
             }
+            
+            // Réinitialiser le flag d'ignore
+            shouldIgnoreTtsRef.current = false;
             
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utteranceRef.current = utterance;
@@ -173,8 +184,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             return new Promise((resolve, reject) => {
               let finished = false;
               const timeout = setTimeout(() => {
-                if (!finished) {
+                if (!finished && !shouldIgnoreTtsRef.current) {
                   console.log('TTS timeout après 30s');
+                  shouldIgnoreTtsRef.current = true;
                   window.speechSynthesis.cancel();
                   utteranceRef.current = null;
                   setTtsMessage(null);
@@ -184,6 +196,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   // Utiliser nextTrackRef.current() au lieu de playTrack() directement
                   setTimeout(() => {
                     if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
+                      shouldIgnoreTtsRef.current = false;
                       nextTrackRef.current();
                     }
                   }, 1000);
@@ -191,6 +204,10 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               }, 30000);
 
               utterance.onstart = () => {
+                if (shouldIgnoreTtsRef.current) {
+                  console.log('TTS démarré mais ignoré (flag)');
+                  return;
+                }
                 console.log('TTS démarré:', textToSpeak.substring(0, 50) + '...');
                 setIsLoadingTrack(false);
                 setIsPlaying(true);
@@ -198,7 +215,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               };
               
               utterance.onend = () => {
-                if (!finished) {
+                if (!finished && !shouldIgnoreTtsRef.current) {
                   console.log('TTS terminé naturellement');
                   clearTimeout(timeout);
                   setIsPlaying(false);
@@ -212,11 +229,13 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                       nextTrackRef.current();
                     }
                   }, 2000);
+                } else if (shouldIgnoreTtsRef.current) {
+                  console.log('TTS terminé mais ignoré (flag)');
                 }
               };
               
               utterance.onerror = (e) => {
-                if (!finished) {
+                if (!finished && !shouldIgnoreTtsRef.current) {
                   console.error('Erreur TTS:', e.error);
                   clearTimeout(timeout);
                   setIsPlaying(false);
@@ -231,6 +250,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                       nextTrackRef.current();
                     }
                   }, 1000);
+                } else if (shouldIgnoreTtsRef.current) {
+                  console.log('Erreur TTS ignorée (flag):', e.error);
                 }
               };
               
