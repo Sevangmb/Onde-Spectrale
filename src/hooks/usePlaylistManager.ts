@@ -146,7 +146,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               utterance.onend = () => {
                 clearTimeout(timeout);
                 setIsPlaying(false);
-                resolve(null);
+                resolve(true);
                 // Passer automatiquement à la piste suivante après TTS
                 setTimeout(() => {
                   if (isMountedRef.current) {
@@ -183,7 +183,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             const handleCanPlay = () => {
               audioRef.current?.removeEventListener('canplay', handleCanPlay);
               audioRef.current?.removeEventListener('error', handleError);
-              resolve(null);
+              resolve(true);
             };
             
             const handleError = (e: any) => {
