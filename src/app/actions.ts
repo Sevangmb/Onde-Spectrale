@@ -360,25 +360,31 @@ export async function createCustomDj(userId: string, formData: FormData) {
 
 export async function getCustomCharactersForUser(userId: string): Promise<CustomDJCharacter[]> {
   if (!userId) return [];
-  const charactersCol = collection(db, 'users', userId, 'characters');
-  const querySnapshot = await getDocs(charactersCol);
   
-  if (querySnapshot.empty) {
+  try {
+    const charactersCol = collection(db, 'users', userId, 'characters');
+    const querySnapshot = await getDocs(charactersCol);
+    
+    if (querySnapshot.empty) {
+      return [];
+    }
+
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        description: data.description,
+        voice: data.voice,
+        isCustom: true,
+        ownerId: data.ownerId,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+      };
+    });
+  } catch (error: any) {
+    console.error(`Erreur chargement DJ personnalisés: ${error.message}`, error);
     return [];
   }
-
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      description: data.description,
-      voice: data.voice,
-      isCustom: true,
-      ownerId: data.ownerId,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
-    };
-  });
 }
 
 export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string): Promise<{ audioUrl?: string; error?: string }> {
