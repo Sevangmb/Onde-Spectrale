@@ -224,8 +224,10 @@ export async function addMessageToStation(stationId: string, message: string): P
 }
 
 
-export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
-    if (!searchTerm) return [];
+export async function searchMusic(searchTerm: string): Promise<{ data?: PlaylistItem[]; error?: string }> {
+    if (!searchTerm || !searchTerm.trim()) {
+      return { error: "Search term is empty" };
+    }
 
     const searchUrl = `https://archive.org/advancedsearch.php?q=title:(${searchTerm})%20AND%20mediatype:(audio)&fl=identifier,title,creator,duration&sort=-week%20desc&rows=5&page=1&output=json`;
     
@@ -237,12 +239,12 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
         });
         if (!response.ok) {
             console.error(`Erreur Archive.org: ${response.statusText}`);
-            return [];
+            return { error: `Archive.org error: ${response.statusText}` };
         }
         const data = await response.json();
         const responseData = data.response;
         if (!responseData || !responseData.docs || responseData.docs.length === 0) {
-          return [];
+          return { data: [] };
         }
         const docs = responseData.docs;
 
@@ -259,11 +261,11 @@ export async function searchMusic(searchTerm: string): Promise<PlaylistItem[]> {
             addedAt: new Date().toISOString(),
         }));
         
-        return searchResults;
+        return { data: searchResults };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("La recherche sur Archive.org a échoué:", error);
-        return [];
+        return { error: error.message || "Unknown search error" };
     }
 }
 
@@ -419,10 +421,10 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
     }
 
     if (track.type === 'message') {
+        if (!track.content) {
+             return { error: 'Contenu du message vide.' };
+        }
         try {
-            if (!track.content) {
-                 return { error: 'Contenu du message vide.' };
-            }
             let audioResult;
             if ('isCustom' in dj && dj.isCustom) {
                 audioResult = await generateCustomDjAudio({ message: track.content, voice: dj.voice });
@@ -442,19 +444,18 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         if (!track.content) {
             return { error: 'Terme de recherche musical vide.' };
         }
-        for (let i = 0; i < 3; i++) { // Retry logic
-            try {
-                const searchResults = await searchMusic(track.content);
-                if (searchResults.length > 0 && searchResults[0].url) {
-                    const response = await fetch(searchResults[0].url, { method: 'HEAD' });
-                    if (response.ok) {
-                        return { audioUrl: searchResults[0].url };
-                    }
-                }
-            } catch (error) {
-                console.warn(`Tentative de recherche musicale ${i+1} échouée pour "${track.content}"`, error);
+        
+        const searchResult = await searchMusic(track.content);
+        if (searchResult.error) {
+            return { error: `La recherche de musique a échoué: ${searchResult.error}` };
+        }
+        if (searchResult.data && searchResult.data.length > 0 && searchResult.data[0].url) {
+            const response = await fetch(searchResult.data[0].url, { method: 'HEAD' });
+            if (response.ok) {
+                return { audioUrl: searchResult.data[0].url };
             }
         }
+        
         return { error: `Impossible de trouver une source valide pour "${track.content}"` };
     }
 }

@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDebounce } from 'use-debounce';
+import { useDebouncedCallback } from 'use-debounce';
 import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -45,7 +45,6 @@ interface ParticleStyle {
 export function OndeSpectraleRadio() {
   // État de base
   const [frequency, setFrequency] = useState(92.1);
-  const [debouncedFrequency] = useDebounce(frequency, 500);
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,14 +99,12 @@ export function OndeSpectraleRadio() {
     return unsubscribe;
   }, []);
 
-  // Récupération des données de station
-  useEffect(() => {
-    const fetchStationData = async () => {
+  const fetchStationData = useDebouncedCallback(async (freq: number) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const station = await getStationForFrequency(debouncedFrequency);
+        const station = await getStationForFrequency(freq);
         
         // Calcul de la force du signal
         const newSignalStrength = station 
@@ -122,10 +119,13 @@ export function OndeSpectraleRadio() {
       } finally {
         setIsLoading(false);
       }
-    };
+  }, 500);
 
-    fetchStationData();
-  }, [debouncedFrequency]);
+
+  // Récupération des données de station
+  useEffect(() => {
+    fetchStationData(frequency)
+  }, [frequency, fetchStationData]);
 
   // Gestion du scan des fréquences
   const handleScanUp = useCallback(() => {
@@ -224,7 +224,7 @@ export function OndeSpectraleRadio() {
                       
                       <div className="flex items-center gap-2">
                         {/* Bouton playlist */}
-                        {currentStation && currentStation.playlist.length > 0 && (
+                        {isRadioActive && (
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -397,7 +397,7 @@ export function OndeSpectraleRadio() {
               </div>
 
               {/* Panneau playlist (conditionnellement affiché) */}
-              {(showPlaylist && currentStation && currentStation.playlist.length > 0) && (
+              {(showPlaylist && isRadioActive) && (
                 <div className="lg:col-span-1">
                   <EnhancedPlaylist
                     playlist={currentStation.playlist}
