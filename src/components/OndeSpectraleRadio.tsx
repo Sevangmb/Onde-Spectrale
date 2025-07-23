@@ -281,7 +281,7 @@ export function OndeSpectraleRadio() {
                         <div className="relative z-10 space-y-4">
                           <div className="flex items-center justify-between">
                             <label htmlFor="frequency" className="text-sm font-mono font-bold text-primary phosphor-glow tracking-wider uppercase">
-                              >>> Syntoniseur <<<
+                              {'>>>'} Syntoniseur {'<<<'}
                             </label>
                             <div className="flex items-center gap-2">
                               <Zap className="h-4 w-4 text-primary phosphor-glow" />
@@ -317,7 +317,7 @@ export function OndeSpectraleRadio() {
                             
                             {isScanning && (
                               <div className="text-accent phosphor-glow text-sm mt-2 animate-pulse font-mono uppercase tracking-wider">
-                                >>> SCAN EN COURS <<<
+                                {'>>>'} SCAN EN COURS {'<<<'}
                               </div>
                             )}
                           </div>
