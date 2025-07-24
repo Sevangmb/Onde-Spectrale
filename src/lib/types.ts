@@ -23,10 +23,11 @@ export type PlaylistItem = {
   title: string;
   content: string; 
   artist?: string;
-  url: string; // URL to the audio file in Firebase Storage or Archive.org
+  url: string; // URL to the audio file in Firebase Storage, Archive.org, or Plex
   duration: number; // in seconds
   addedAt?: string; // ISO string
   archiveId?: string; 
+  plexKey?: string; // Plex media key
   isLoading?: boolean; 
   error?: string; 
 };

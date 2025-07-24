@@ -2,11 +2,28 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // RÈGLES TEMPORAIRES TRÈS PERMISSIVES POUR DEBUG
-    // TODO: Restreindre après résolution du problème
+    // Règles sécurisées pour la production
     
-    match /{allPaths=**} {
-      allow read, write: if true; // Temporairement complètement ouvert
+    // Fichiers audio publics (lectures, playlists, DJ audio)
+    match /audio/{allPaths=**} {
+      allow read: if true; // Lecture publique pour tous
+      allow write: if request.auth != null; // Écriture pour utilisateurs authentifiés
+    }
+    
+    // Fichiers temporaires pour génération audio
+    match /temp/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Fichiers système (logos, assets)
+    match /assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // Seulement via Admin SDK
+    }
+    
+    // Uploads utilisateur
+    match /uploads/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

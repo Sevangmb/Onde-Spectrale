@@ -24,6 +24,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const [ttsMessage, setTtsMessage] = useState<string | null>(null);
   // Ajout : dernier message d'erreur
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const isMountedRef = useRef(true);
@@ -105,7 +106,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
 
   const playTrack = useCallback(async (trackIndex: number): Promise<boolean> => {
-    if (!station || !station.playlist[trackIndex] || !isMountedRef.current) {
+    if (!station || !station.playlist[trackIndex] || !isMountedRef.current || !user) {
+      console.log('playTrack bloqué:', { hasStation: !!station, hasTrack: !!station?.playlist[trackIndex], isMounted: isMountedRef.current, hasUser: !!user });
       return false;
     }
 
@@ -114,7 +116,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
     if (failedTracks.has(trackId)) {
         console.log(`Piste ${track.title} déjà en échec, passage à la suivante.`);
-        nextTrack();
+        if (nextTrackRef.current) {
+            nextTrackRef.current();
+        }
         return false;
     }
 
@@ -141,7 +145,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
     while (retryCount <= maxRetries && isMountedRef.current) {
       try {
-        const result = await getAudioForTrack(track, station.djCharacterId, user.uid);
+        const result = await getAudioForTrack(track, station.djCharacterId, user?.uid || 'anonymous', station.theme);
         
         if (!isMountedRef.current || !audioRef.current) return false;
 
@@ -162,6 +166,18 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
+            // Vérifier si TTS est autorisé
+            if (!ttsEnabled) {
+              console.log('🎤 TTS nécessite une interaction utilisateur');
+              setErrorMessage('Cliquez sur Play pour activer la synthèse vocale');
+              setIsLoadingTrack(false);
+              // Passer à la piste suivante après un délai
+              setTimeout(() => {
+                if (nextTrackRef.current) nextTrackRef.current();
+              }, 3000);
+              return false;
+            }
+            
             // Empêcher les TTS simultanés
             if (ttsInProgressRef.current) {
               console.log('TTS déjà en cours, annulation du précédent');
@@ -211,37 +227,8 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               let finished = false;
               const startTime = Date.now(); // Mesurer le temps réel de lecture
               
-              const timeout = setTimeout(() => {
-                if (!finished && !shouldIgnoreTtsRef.current) {
-                  console.log('TTS timeout après 30s');
-                  shouldIgnoreTtsRef.current = true;
-                  window.speechSynthesis.cancel();
-                  utteranceRef.current = null;
-                  setTtsMessage(null);
-                  ttsInProgressRef.current = false;
-                  setErrorMessage('Le message vocal a mis trop de temps à être lu. Passage à la piste suivante.');
-                  finished = true;
-                  reject(new Error('TTS timeout - passage à la piste suivante'));
-                  // Utiliser nextTrackRef.current() au lieu de playTrack() directement
-                  setTimeout(() => {
-                    if (isMountedRef.current && !isSeekingRef.current && nextTrackRef.current) {
-                      shouldIgnoreTtsRef.current = false;
-                      nextTrackRef.current();
-                    }
-                  }, 1000);
-                }
-              }, 30000);
+              // Pas de timeout - laisser le TTS se terminer naturellement
 
-              utterance.onstart = () => {
-                if (shouldIgnoreTtsRef.current) {
-                  console.log('TTS démarré mais ignoré (flag)');
-                  return;
-                }
-                console.log('TTS démarré:', textToSpeak.substring(0, 50) + '...');
-                setIsLoadingTrack(false);
-                setIsPlaying(true);
-                setErrorMessage(null);
-              };
               
               utterance.onend = () => {
                 const endTime = Date.now();
@@ -249,14 +236,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 
                 if (!finished && !shouldIgnoreTtsRef.current) {
                   console.log(`🎵 TTS terminé naturellement après ${actualDuration.toFixed(1)}s pour:`, textToSpeak.substring(0, 30) + '...');
-                  
-                  // Vérifier si le message était vraiment trop court (possiblement coupé)
-                  const expectedMinDuration = textToSpeak.length / 10; // ~10 caractères par seconde
-                  if (actualDuration < expectedMinDuration && textToSpeak.length > 50) {
-                    console.log(`⚠️ ATTENTION: Message possiblement coupé! Durée réelle: ${actualDuration.toFixed(1)}s, attendue: ~${expectedMinDuration.toFixed(1)}s`);
-                  }
-                  
-                  clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
                   setTtsMessage(null);
@@ -284,7 +263,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                   // Ignorer les erreurs "interrupted" car elles sont normales lors du passage à la piste suivante
                   if (e.error === 'interrupted') {
                     console.log('TTS interrupted (normal lors du changement de piste)');
-                    clearTimeout(timeout);
                     setIsPlaying(false);
                     utteranceRef.current = null;
                     setTtsMessage(null);
@@ -293,9 +271,23 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                     resolve(true); // Considérer comme succès
                     return;
                   }
+
+                  // Gestion spéciale pour l'erreur "not-allowed"
+                  if (e.error === 'not-allowed') {
+                    console.log('TTS non autorisé - activation requise');
+                    setTtsEnabled(false);
+                    setErrorMessage('Cliquez sur Play pour activer la synthèse vocale');
+                    setIsPlaying(false);
+                    setIsLoadingTrack(false);
+                    utteranceRef.current = null;
+                    setTtsMessage(null);
+                    ttsInProgressRef.current = false;
+                    finished = true;
+                    resolve(false);
+                    return;
+                  }
                   
                   console.error('Erreur TTS:', e.error);
-                  clearTimeout(timeout);
                   setIsPlaying(false);
                   utteranceRef.current = null;
                   setTtsMessage(null);
@@ -315,22 +307,59 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
                 }
               };
               
+              // Vérifier si le TTS démarre dans les 3 secondes
+              const startCheckTimeout = setTimeout(() => {
+                if (!finished && !window.speechSynthesis.speaking) {
+                  console.log('🔄 TTS ne démarre pas, forçage...');
+                  window.speechSynthesis.cancel();
+                  // Réessayer une fois
+                  setTimeout(() => {
+                    if (!finished) {
+                      try {
+                        window.speechSynthesis.speak(utterance);
+                      } catch (e) {
+                        console.log('❌ TTS définitivement en échec, passage suivante');
+                        finished = true;
+                        resolve(true);
+                        setTimeout(() => {
+                          if (nextTrackRef.current) nextTrackRef.current();
+                        }, 500);
+                      }
+                    }
+                  }, 100);
+                }
+              }, 3000);
+              
               try {
+                console.log('🎤 Lancement TTS...');
                 window.speechSynthesis.speak(utterance);
+                
+                // Nettoyer le timeout de vérification si ça démarre
+                utterance.onstart = () => {
+                  clearTimeout(startCheckTimeout);
+                  if (shouldIgnoreTtsRef.current) {
+                    console.log('TTS démarré mais ignoré (flag)');
+                    return;
+                  }
+                  console.log('🎤 TTS démarré:', textToSpeak.substring(0, 50) + '...');
+                  setIsLoadingTrack(false);
+                  setIsPlaying(true);
+                  setErrorMessage(null);
+                };
+                
               } catch (speechError) {
-                console.error('Impossible de lancer TTS:', speechError);
-                clearTimeout(timeout);
+                clearTimeout(startCheckTimeout);
+                console.error('❌ Impossible de lancer TTS:', speechError);
                 utteranceRef.current = null;
                 setTtsMessage(null);
                 ttsInProgressRef.current = false;
-                setErrorMessage('Impossible de lancer la synthèse vocale. Passage à la piste suivante.');
                 finished = true;
-                reject(new Error(`Impossible de lancer TTS: ${speechError}`));
+                resolve(true); // Continuer quand même
                 setTimeout(() => {
-                  if (isMountedRef.current && !isSeekingRef.current) {
-                    nextTrack();
+                  if (isMountedRef.current && nextTrackRef.current) {
+                    nextTrackRef.current();
                   }
-                }, 1000);
+                }, 500);
               }
             });
           } else {
@@ -448,8 +477,56 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     await playTrack(prevIndex);
   }, [station, playlistHistory, playTrack]);
 
+  const enableTTS = useCallback(() => {
+    if ('speechSynthesis' in window && !ttsEnabled) {
+      try {
+        // Créer un utterance de test pour déclencher l'autorisation
+        const testUtterance = new SpeechSynthesisUtterance('');
+        testUtterance.volume = 0;
+        
+        // Gestionnaire pour confirmer le succès
+        const onTestStart = () => {
+          setTtsEnabled(true);
+          setErrorMessage(null);
+          console.log('✅ TTS activé avec succès');
+        };
+        
+        const onTestError = (e: any) => {
+          console.warn('TTS toujours non autorisé:', e.error);
+          if (e.error === 'not-allowed') {
+            setErrorMessage('Synthèse vocale toujours bloquée - essayez de cliquer à nouveau');
+          }
+        };
+        
+        testUtterance.onstart = onTestStart;
+        testUtterance.onerror = onTestError;
+        
+        window.speechSynthesis.speak(testUtterance);
+        window.speechSynthesis.cancel();
+        
+        // Fallback - considérer comme activé si pas d'erreur immédiate
+        setTimeout(() => {
+          if (!ttsEnabled) {
+            setTtsEnabled(true);
+            setErrorMessage(null);
+            console.log('✅ TTS activé (fallback)');
+          }
+        }, 500);
+        
+      } catch (error) {
+        console.warn('Impossible d\'activer TTS:', error);
+        setErrorMessage('Erreur d\'activation de la synthèse vocale');
+      }
+    }
+  }, [ttsEnabled]);
+
   const togglePlayPause = useCallback(async () => {
     if (!audioRef.current || isLoadingTrack) return;
+
+    // Activer TTS lors du premier clic
+    if (!ttsEnabled) {
+      enableTTS();
+    }
 
     if (isPlaying) {
       audioRef.current.pause();
@@ -467,7 +544,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         }
       }
     }
-  }, [isPlaying, isLoadingTrack, currentTrack, playTrack, nextTrack]);
+  }, [isPlaying, isLoadingTrack, currentTrack, playTrack, nextTrack, ttsEnabled, enableTTS]);
 
   // Track end handler
   const handleTrackEnd = useCallback(() => {
@@ -492,12 +569,25 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
 
   // Auto-play when a station is loaded
   useEffect(() => {
+    console.log('🔍 Auto-play check:', {
+      hasStation: !!station,
+      playlistLength: station?.playlist.length || 0,
+      isPlaying,
+      isLoadingTrack,
+      hasCurrentTrack: !!currentTrack,
+      currentTrackIndex,
+      isSeekingRef: isSeekingRef.current
+    });
+    
     if (station && station.playlist.length > 0 && !isPlaying && !isLoadingTrack && !currentTrack && currentTrackIndex === 0 && !isSeekingRef.current) {
-      console.log('Auto-démarrage de la lecture pour la station:', station.name);
+      console.log('🎵 Auto-démarrage de la lecture pour la station:', station.name);
       // Petite pause pour éviter les race conditions
       setTimeout(() => {
         if (isMountedRef.current && !isSeekingRef.current && !isLoadingTrack && !currentTrack) {
+          console.log('🚀 Lancement playTrack(0)');
           playTrack(0);
+        } else {
+          console.log('❌ Auto-play annulé - conditions changées');
         }
       }, 100);
     }
@@ -520,5 +610,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     // Nouveaux états pour le monitoring
     ttsMessage,
     errorMessage,
+    ttsEnabled,
+    enableTTS,
   };
 }

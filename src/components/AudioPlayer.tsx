@@ -15,6 +15,10 @@ interface AudioPlayerProps {
   audioRef: React.RefObject<HTMLAudioElement>;
   ttsMessage?: string | null;
   errorMessage?: string | null;
+  ttsEnabled?: boolean;
+  onEnableTTS?: () => void;
+  onPlayPause?: () => void;
+  onEnded?: () => void;
 }
 
 export function AudioPlayer({
@@ -23,7 +27,11 @@ export function AudioPlayer({
   isLoading,
   audioRef,
   ttsMessage,
-  errorMessage
+  errorMessage,
+  ttsEnabled,
+  onEnableTTS,
+  onPlayPause,
+  onEnded
 }: AudioPlayerProps) {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -91,6 +99,10 @@ export function AudioPlayer({
       }
       updateProgress();
     };
+
+    const handleEnded = () => {
+      if (onEnded) onEnded();
+    };
     
     if (!track) {
         setDuration(0);
@@ -101,6 +113,7 @@ export function AudioPlayer({
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
     
     audio.volume = volume / 100;
     
@@ -108,8 +121,9 @@ export function AudioPlayer({
       audio.removeEventListener('timeupdate', updateProgress);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('durationchange', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioRef, track, volume]);
+  }, [audioRef, track, volume, onEnded]);
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   
@@ -195,6 +209,45 @@ export function AudioPlayer({
             <span className="phosphor-glow">{formatTime(duration)}</span>
           </div>
         </div>
+
+        {/* Message d'erreur et activation TTS */}
+        {errorMessage && (
+          <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-red-400 font-mono">
+                {errorMessage}
+              </p>
+              {!ttsEnabled && errorMessage && errorMessage.includes('synthèse') && onEnableTTS && onPlayPause && (
+                <Button
+                  onClick={() => {
+                    onEnableTTS();
+                    onPlayPause();
+                  }}
+                  size="sm"
+                  className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30"
+                >
+                  <Volume2 className="h-4 w-4 mr-2" />
+                  Activer TTS
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Message TTS en cours */}
+        {ttsMessage && (
+          <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageSquare className="h-4 w-4 text-blue-400" />
+              <span className="text-xs text-blue-400 font-mono uppercase tracking-wide">
+                Synthèse vocale
+              </span>
+            </div>
+            <p className="text-sm text-blue-100 font-mono leading-relaxed">
+              {ttsMessage}
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

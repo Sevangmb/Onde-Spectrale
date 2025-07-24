@@ -12,38 +12,102 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, 
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
-import { searchMusicAdvanced } from './actions-improved';
+import { searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
 
 /**
- * URLs de fallback pour les pistes musicales de test
+ * Obtient les URLs thématiques pour la musique selon le thème de la station
+ */
+function getThemedMusicUrls(stationTheme: string, searchTerm: string): string[] {
+  const themedUrls = {
+    'post-apocalyptic': {
+      'jazz': [
+        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3', // Vintage jazz
+        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Atmospheric
+      ],
+      'classical': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Orchestral
+        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Classical
+      ],
+      'ambient': [
+        'https://freesound.org/data/previews/235/235777_4062622-lq.mp3', // Dark ambient
+        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Atmospheric
+      ]
+    },
+    'pre-war-music': {
+      'jazz': [
+        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3', // Jazz standards
+        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Swing
+      ],
+      'classical': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Classical piano
+        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Orchestra
+      ]
+    },
+    'propaganda': {
+      'march': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Military march
+        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Patriotic
+      ],
+      'orchestral': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Full orchestra
+        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3'  // Brass band
+      ]
+    },
+    'classical': {
+      'classical': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Symphony
+        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Chamber music
+      ],
+      'piano': [
+        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Piano solo
+        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3'  // Piano classical
+      ]
+    }
+  };
+
+  const theme = themedUrls[stationTheme as keyof typeof themedUrls];
+  if (theme) {
+    for (const [genre, urls] of Object.entries(theme)) {
+      if (searchTerm.toLowerCase().includes(genre)) {
+        return urls;
+      }
+    }
+  }
+
+  // Fallback vers l'ancienne fonction si pas de thème spécifique
+  return getFallbackMusicUrls(searchTerm);
+}
+
+/**
+ * URLs de fallback pour les pistes musicales de test (ancienne version)
  */
 function getFallbackMusicUrls(searchTerm: string): string[] {
-  // URLs fonctionnelles de sources ouvertes et accessibles
+  // URLs plus fiables de sources audio libres
   const fallbackMusic = {
     'jazz': [
-      'https://archive.org/download/test_202405/Jazz_Atmosphere.mp3',
-      'https://archive.org/download/classical-music-for-relaxation/Classical_Relaxation.mp3',
-      'https://freesound.org/data/previews/316/316847_5123451-lq.mp3'
+      'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
+      'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
     ],
     'classical': [
-      'https://archive.org/download/ImslpComposerChopin/Chopin_Nocturne_Op9_No2.mp3',
-      'https://archive.org/download/classical-music-for-relaxation/Classical_Morning.mp3',
-      'https://freesound.org/data/previews/376/376968_7037445-lq.mp3'
+      'https://freesound.org/data/previews/376/376968_7037445-lq.mp3',
+      'https://freesound.org/data/previews/317/317828_5123451-lq.mp3',
+      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
     ],
     'rock': [
-      'https://archive.org/download/rock-samples-2024/Rock_Energy.mp3',
       'https://freesound.org/data/previews/317/317828_5123451-lq.mp3',
-      'https://archive.org/download/indie-rock-collection/Indie_Vibes.mp3'
+      'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
     ],
     'ambient': [
-      'https://archive.org/download/ambient-soundscapes/Wasteland_Winds.mp3',
       'https://freesound.org/data/previews/235/235777_4062622-lq.mp3',
-      'https://archive.org/download/post-apocalyptic-ambient/Desert_Storm.mp3'
+      'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
+      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
     ],
     'electronic': [
-      'https://archive.org/download/electronic-samples/Synth_Wave.mp3',
       'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
-      'https://archive.org/download/retro-synth/Retro_Future.mp3'
+      'https://freesound.org/data/previews/235/235777_4062622-lq.mp3',
+      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
     ]
   };
 
@@ -80,6 +144,211 @@ function serializeStation(doc: any): Station {
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
         playlist: data.playlist || [],
     } as Station;
+}
+
+export async function createDefaultStations(): Promise<void> {
+  const stations = [
+    {
+      frequency: 100.7,
+      name: 'Radio Wasteland',
+      djId: 'three-dog',
+      theme: 'post-apocalyptic'
+    },
+    {
+      frequency: 94.5,
+      name: 'Diamond City Radio',
+      djId: 'travis',
+      theme: 'pre-war-music'
+    },
+    {
+      frequency: 102.1,
+      name: 'Enclave Radio',
+      djId: 'john-henry-eden',
+      theme: 'propaganda'
+    },
+    {
+      frequency: 98.2,
+      name: 'Classical Radio',
+      djId: 'classical-dj',
+      theme: 'classical'
+    }
+  ];
+
+  for (const stationConfig of stations) {
+    try {
+      // Vérifier si existe déjà
+      const existing = await getStationForFrequency(stationConfig.frequency);
+      if (existing) continue;
+
+      const dj = DJ_CHARACTERS.find(d => d.id === stationConfig.djId) || DJ_CHARACTERS[0];
+      
+      const playlist = createPlaylistForTheme(stationConfig.theme, stationConfig.name, dj);
+      
+      const stationData = {
+        name: stationConfig.name,
+        frequency: stationConfig.frequency,
+        djCharacterId: dj.id,
+        theme: stationConfig.theme,
+        ownerId: 'system',
+        playlist: playlist,
+        createdAt: serverTimestamp(),
+      };
+      
+      await addDoc(collection(db, 'stations'), stationData);
+      console.log(`✅ Station créée: ${stationConfig.name} (${stationConfig.frequency})`);
+      
+    } catch (error) {
+      console.error(`Erreur création station ${stationConfig.name}:`, error);
+    }
+  }
+}
+
+function createPlaylistForTheme(theme: string, stationName: string, dj: any): PlaylistItem[] {
+  const baseId = Date.now();
+  
+  if (theme === 'classical') {
+    return [
+      {
+        id: `${baseId}-1`,
+        type: 'message',
+        title: 'Ouverture Classique',
+        content: `Bonsoir, ici ${dj.name} sur ${stationName}. Voici les plus belles œuvres d'avant-guerre.`,
+        artist: dj.name,
+        duration: 8,
+        url: '',
+        addedAt: new Date().toISOString()
+      },
+      {
+        id: `${baseId}-2`,
+        type: 'music',
+        title: 'Musique Classique',
+        content: 'classical piano symphony',
+        artist: 'À découvrir',
+        duration: 180,
+        url: '',
+        addedAt: new Date().toISOString()
+      },
+      {
+        id: `${baseId}-3`,
+        type: 'music',
+        title: 'Orchestre Symphonique',
+        content: 'orchestra symphony classical',
+        artist: 'À découvrir',
+        duration: 200,
+        url: '',
+        addedAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  if (theme === 'propaganda') {
+    return [
+      {
+        id: `${baseId}-1`,
+        type: 'message',
+        title: 'Message Enclave',
+        content: `Citoyens américains, ici votre président ${dj.name}. L'Enclave veille sur vous.`,
+        artist: dj.name,
+        duration: 8,
+        url: '',
+        addedAt: new Date().toISOString()
+      },
+      {
+        id: `${baseId}-2`,
+        type: 'music',
+        title: 'Marche Patriotique',
+        content: 'patriotic',
+        artist: 'Enclave Band',
+        duration: 30,
+        url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+        addedAt: new Date().toISOString()
+      }
+    ];
+  }
+
+  // Station par défaut (Wasteland/Diamond City)
+  const vintageJazzTracks = [
+    { title: "Moonlight Serenade", artist: "Glenn Miller Orchestra" },
+    { title: "Take Five", artist: "Dave Brubeck" },
+    { title: "Summertime", artist: "Ella Fitzgerald" },
+    { title: "In the Mood", artist: "Glenn Miller" },
+    { title: "Sing Sing Sing", artist: "Benny Goodman" }
+  ];
+  
+  const randomTrack = vintageJazzTracks[Math.floor(Math.random() * vintageJazzTracks.length)];
+  
+  return [
+    {
+      id: `${baseId}-1`,
+      type: 'message',
+      title: 'Ouverture Radio',
+      content: `Salut les survivants ! Ici ${dj.name} sur ${stationName}. Bienvenue dans les terres désolées ! On commence avec du jazz d'avant-guerre.`,
+      artist: dj.name,
+      duration: 8,
+      url: '',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${baseId}-2`,
+      type: 'music',
+      title: randomTrack.title,
+      content: 'jazz',
+      artist: randomTrack.artist,
+      duration: 45,
+      url: 'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${baseId}-3`,
+      type: 'message',
+      title: 'Info du jour',
+      content: `Flash info ! Des raiders ont été aperçus près du Vault 101. Ils semblent chercher de vieux disques de jazz. Coïncidence ? Je ne pense pas...`,
+      artist: dj.name,
+      duration: 8,
+      url: '',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${baseId}-4`,
+      type: 'music',
+      title: 'Blue Suede Shoes',
+      content: 'rockabilly',
+      artist: 'Carl Perkins',
+      duration: 40,
+      url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+      addedAt: new Date().toISOString()
+    },
+    {
+      id: `${baseId}-5`,
+      type: 'message',
+      title: 'Message de fin',
+      content: `C'était ${dj.name} sur ${stationName}. On se retrouve bientôt avec plus de classiques d'avant-guerre. Restez à l'écoute !`,
+      artist: dj.name,
+      duration: 6,
+      url: '',
+      addedAt: new Date().toISOString()
+    }
+  ];
+}
+
+export async function createDefaultStation(): Promise<Station | null> {
+  try {
+    const frequency = 100.7;
+    
+    // Vérifier si la station par défaut existe déjà
+    const existing = await getStationForFrequency(frequency);
+    if (existing) return existing;
+    
+    // Créer toutes les stations par défaut
+    await createDefaultStations();
+    
+    // Retourner la station principale
+    return await getStationForFrequency(frequency);
+    
+  } catch (error) {
+    console.error('Erreur création station par défaut:', error);
+    return null;
+  }
 }
 
 export async function getStationForFrequency(frequency: number): Promise<Station | null> {
@@ -197,81 +466,81 @@ export async function createStation(ownerId: string, formData: FormData) {
     },
     {
       id: `${Date.now()}-1`,
-      type: 'music',
-      title: 'Ambiance Wasteland',
-      content: 'ambient',
-      artist: 'Wasteland Radio',
-      duration: 180,
+      type: 'message',
+      title: 'Ouverture de Station',
+      content: `Salut les survivants ! Ici ${dj.name} sur ${name}. Bienvenue dans les terres désolées radioactives ! On va vous faire passer un bon moment avec de la musique d'avant-guerre et les dernières nouvelles de l'apocalypse.`,
+      artist: dj.name,
+      duration: 12,
       url: '',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-2`,
-      type: 'message',
-      title: 'Actualités des Terres Désolées',
-      content: `Ici ${dj.name} avec les dernières nouvelles. Les caravanes commerciales rapportent une activité accrue dans le secteur 7. Surveillez les ondes pour plus d'informations.`,
-      artist: dj.name,
-      duration: 8,
-      url: '',
+      type: 'music',
+      title: 'Cantina Band',
+      content: 'jazz',
+      artist: 'Pre-War Classics',
+      duration: 30,
+      url: 'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-3`,
-      type: 'music',
-      title: 'Oldies but Goldies',
-      content: 'jazz',
-      artist: 'Pre-War Classics',
-      duration: 200,
+      type: 'message',
+      title: 'Bulletin Info',
+      content: `Flash info ! Une caravane de marchands a été aperçue près du Vault 101. Ils échangent des capsules contre de l'eau purifiée et des stimpaks. Méfiez-vous tout de même des raiders dans le secteur.`,
+      artist: dj.name,
+      duration: 10,
       url: '',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-4`,
-      type: 'message',
-      title: 'Prévisions météo',
-      content: `Les conditions météorologiques pour demain : tempête de sable légère à modérée avec des radiations faibles à normales. Restez à l'abri et gardez vos compteurs Geiger à portée de main.`,
-      artist: dj.name,
-      duration: 7,
-      url: '',
+      type: 'music',
+      title: 'Star Wars Theme',
+      content: 'classical',
+      artist: 'Orchestre Pré-Guerre',
+      duration: 30,
+      url: 'https://freesound.org/data/previews/376/376968_7037445-lq.mp3',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-5`,
-      type: 'music',
-      title: 'Electronic Wasteland',
-      content: 'electronic',
-      artist: 'Synth Survivors',
-      duration: 240,
+      type: 'message',
+      title: 'Météo des Terres Désolées',
+      content: `Prévisions météo : tempête de sable radioactive prévue ce soir. Niveau de radiation : modéré à élevé. Portez vos masques à gaz et évitez les sorties non essentielles. La température chutera à moins 10 degrés.`,
+      artist: dj.name,
+      duration: 15,
       url: '',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-6`,
       type: 'music',
-      title: 'Rock the Apocalypse',
-      content: 'rock',
-      artist: 'Vault Rockers',
-      duration: 190,
-      url: '',
+      title: 'Test Audio MP3',
+      content: 'electronic',
+      artist: 'Archive.org Test',
+      duration: 30,
+      url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-7`,
       type: 'message',
-      title: 'Conseil de survie',
-      content: `Conseil du jour : Vérifiez toujours vos réserves d'eau purifiée avant de partir en exploration. L'hydratation est cruciale dans les terres désolées. Bonne écoute sur ${name} !`,
+      title: 'Conseil de Survie',
+      content: `Conseil de survie du jour : Les goules ferales sont plus actives la nuit. Si vous entendez des grognements, ne courez pas ! Marchez lentement et évitez le contact visuel. Gardez vos armes à portée de main.`,
       artist: dj.name,
-      duration: 6,
+      duration: 18,
       url: '',
       addedAt: new Date().toISOString()
     },
     {
       id: `${Date.now()}-8`,
-      type: 'music',
-      title: 'Classical Remnants',
-      content: 'classical',
-      artist: 'Lost Symphony',
-      duration: 220,
+      type: 'message',
+      title: 'Merci d\'écoute',
+      content: `Merci d'écouter ${name} ! C'était ${dj.name}. À bientôt !`,
+      artist: dj.name,
+      duration: 5,
       url: '',
       addedAt: new Date().toISOString()
     }
@@ -581,12 +850,13 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
   }
 }
 
-export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string): Promise<{ audioUrl?: string; error?: string }> {
+export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string, stationTheme?: string): Promise<{ audioUrl?: string; error?: string }> {
     if (!track) {
       return { error: "Piste non fournie." };
     }
 
-    const allDjs = await getCustomCharactersForUser(ownerId);
+    // Gérer l'utilisateur anonyme
+    const allDjs = ownerId && ownerId !== 'anonymous' ? await getCustomCharactersForUser(ownerId) : [];
     const fullDjList: (DJCharacter | CustomDJCharacter)[] = [...DJ_CHARACTERS, ...allDjs];
     const dj = fullDjList.find(d => d.id === djCharacterId);
     
@@ -627,7 +897,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         // Essayer l'URL existante d'abord si elle existe
         if (track.url) {
             try {
-                const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+                const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
                 if (response.ok && response.headers.get('content-type')?.includes('audio')) {
                     return { audioUrl: track.url };
                 }
@@ -636,43 +906,23 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             }
         }
         
-        // Nouvelle recherche avec validation
+        // UNIQUEMENT PLEX - Piste aléatoire
         try {
-            const searchResults = await searchMusicAdvanced(track.content, 3);
+            console.log(`🎵 Récupération d'une piste aléatoire sur Plex`);
             
-            for (const result of searchResults) {
-                try {
-                    const response = await fetch(result.url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
-                    if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                        console.log(`Piste trouvée: ${result.title} - ${result.url}`);
-                        return { audioUrl: result.url };
-                    }
-                } catch (err) {
-                    console.warn(`URL invalide pour ${result.title}:`, err);
-                    continue;
-                }
+            const randomTracks = await getRandomPlexTracks(undefined, 1);
+            
+            if (randomTracks.length > 0) {
+                const randomTrack = randomTracks[0];
+                console.log(`✅ Piste Plex aléatoire: ${randomTrack.title} par ${randomTrack.artist}`);
+                return { audioUrl: randomTrack.url };
             }
-        } catch (searchError) {
-            console.error('Erreur de recherche musicale:', searchError);
+            
+        } catch (plexError) {
+            console.error('❌ Plex non disponible:', plexError);
+            return { error: 'Serveur Plex non disponible - Vérifiez la connexion' };
         }
         
-        // Fallback avec URLs de test fiables
-        console.log(`Utilisation d'URLs de test pour "${track.content}"`);
-        const fallbackUrls = getFallbackMusicUrls(track.content);
-        
-        for (const url of fallbackUrls) {
-            try {
-                const response = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
-                if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                    console.log(`Fallback URL trouvée: ${url}`);
-                    return { audioUrl: url };
-                }
-            } catch (err) {
-                console.warn(`Fallback URL échouée: ${url}`, err);
-                continue;
-            }
-        }
-        
-        return { error: `Impossible de trouver une source audio valide pour "${track.content}"` };
+        return { error: 'Aucune musique trouvée sur Plex' };
     }
 }

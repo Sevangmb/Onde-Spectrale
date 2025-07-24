@@ -24,7 +24,8 @@ import {
   Headphones,
   ArrowRight,
   AlertTriangle,
-  LayoutDashboard
+  LayoutDashboard,
+  Server
 } from 'lucide-react';
 
 interface ParticleStyle {
@@ -164,6 +165,16 @@ export default function AdminDashboard() {
                   <div>
                     <p className="font-semibold">Gérer les DJs</p>
                     <p className="text-xs text-muted-foreground text-left">Créer des voix IA personnalisées</p>
+                  </div>
+                </div>
+            </Button>
+
+            <Button onClick={() => router.push('/admin/plex')} variant="outline" className="justify-start p-4 h-auto">
+                <div className="flex items-center gap-3">
+                  <Server className="h-5 w-5 text-blue-500"/>
+                  <div>
+                    <p className="font-semibold">Serveur Plex</p>
+                    <p className="text-xs text-muted-foreground text-left">Gérer la bibliothèque musicale</p>
                   </div>
                 </div>
             </Button>

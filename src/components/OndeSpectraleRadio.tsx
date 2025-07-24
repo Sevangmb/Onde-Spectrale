@@ -3,7 +3,9 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
-import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser } from '@/app/actions';
+import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser, createDefaultStation } from '@/app/actions';
+import { testPlexConnectionAction, searchPlexMusicAction, getRandomPlexTracksAction } from '@/app/actions-plex';
+import { searchMusicAdvanced, generateMusicSuggestions } from '@/app/actions-improved';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -31,7 +33,10 @@ import {
   Zap, 
   UserCog, 
   Settings,
-  ListMusic
+  ListMusic,
+  Server,
+  Search,
+  Shuffle
 } from 'lucide-react';
 
 interface ParticleStyle {
@@ -43,13 +48,18 @@ interface ParticleStyle {
 
 export function OndeSpectraleRadio() {
   // État de base
-  const [frequency, setFrequency] = useState(92.1);
+  const [frequency, setFrequency] = useState(100.7);
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
+  
+  // Fonctionnalités Plex
+  const [plexConnected, setPlexConnected] = useState(false);
+  const [plexLibraries, setPlexLibraries] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   
   // Interface
   const [showPlaylist, setShowPlaylist] = useState(false);
@@ -98,12 +108,82 @@ export function OndeSpectraleRadio() {
     return unsubscribe;
   }, []);
 
+  // Test de connexion Plex au démarrage
+  useEffect(() => {
+    const checkPlexConnection = async () => {
+      try {
+        const result = await testPlexConnectionAction();
+        setPlexConnected(result.connected);
+        setPlexLibraries(result.libraries);
+        
+        if (result.connected) {
+          console.log('✅ Plex connecté avec', result.libraries.length, 'bibliothèques');
+        }
+      } catch (error) {
+        console.warn('Plex non disponible:', error);
+      }
+    };
+    
+    checkPlexConnection();
+  }, []);
+
+  // Fonction de recherche améliorée
+  const handleAdvancedSearch = useCallback(async (term: string) => {
+    if (!term.trim()) return;
+    
+    try {
+      // Essayer d'abord Plex si connecté
+      if (plexConnected) {
+        const plexResults = await searchPlexMusicAction(term);
+        if (plexResults.length > 0) {
+          playlistManager.addToPlaylist(plexResults);
+          return;
+        }
+      }
+      
+      // Fallback vers recherche avancée
+      const advancedResults = await searchMusicAdvanced(term, 5);
+      if (advancedResults.length > 0) {
+        playlistManager.addToPlaylist(advancedResults);
+      }
+    } catch (error) {
+      console.error('Erreur recherche avancée:', error);
+    }
+  }, [plexConnected, playlistManager]);
+
+  // Fonction pour ajouter des pistes aléatoires
+  const handleAddRandomTracks = useCallback(async () => {
+    try {
+      if (plexConnected) {
+        const randomTracks = await getRandomPlexTracksAction(10);
+        if (randomTracks.length > 0) {
+          playlistManager.addToPlaylist(randomTracks);
+          return;
+        }
+      }
+      
+      // Fallback vers suggestions thématiques
+      if (currentStation?.theme) {
+        const suggestions = await generateMusicSuggestions(currentStation.theme, 5);
+        playlistManager.addToPlaylist(suggestions);
+      }
+    } catch (error) {
+      console.error('Erreur ajout pistes aléatoires:', error);
+    }
+  }, [plexConnected, currentStation, playlistManager]);
+
   const fetchStationData = useDebouncedCallback(async (freq: number) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const station = await getStationForFrequency(freq);
+        let station = await getStationForFrequency(freq);
+        
+        // Si pas de station, vérifier si on doit créer les stations par défaut
+        if (!station && [100.7, 94.5, 102.1, 98.2].includes(freq)) {
+          console.log('Création des stations par défaut...');
+          station = await createDefaultStation();
+        }
         
         // Calcul de la force du signal
         const newSignalStrength = station 
@@ -233,6 +313,52 @@ export function OndeSpectraleRadio() {
                             <ListMusic className="mr-2 h-4 w-4" /> 
                             Playlist ({playlistManager.playlistLength})
                           </Button>
+                        )}
+                        
+                        {/* Contrôles Plex */}
+                        {isRadioActive && (
+                          <div className="flex items-center gap-2">
+                            {/* Indicateur Plex */}
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-mono ${
+                              plexConnected 
+                                ? 'bg-green-600/20 text-green-400 border border-green-600/30' 
+                                : 'bg-red-600/20 text-red-400 border border-red-600/30'
+                            }`}>
+                              <Server className="h-3 w-3" />
+                              {plexConnected ? `Plex (${plexLibraries.length})` : 'Plex Off'}
+                            </div>
+                            
+                            {/* Recherche rapide */}
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                placeholder="Rechercher..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleAdvancedSearch(searchTerm)}
+                                className="px-2 py-1 text-xs bg-black/30 border border-primary/30 rounded text-primary placeholder-primary/50 w-32"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAdvancedSearch(searchTerm)}
+                                className="retro-button px-2"
+                              >
+                                <Search className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            
+                            {/* Pistes aléatoires */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleAddRandomTracks}
+                              className="retro-button"
+                              title="Ajouter des pistes aléatoires"
+                            >
+                              <Shuffle className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                         
                         {/* Boutons utilisateur */}
@@ -403,6 +529,9 @@ export function OndeSpectraleRadio() {
                         audioRef={playlistManager.audioRef}
                         ttsMessage={playlistManager.ttsMessage}
                         errorMessage={playlistManager.errorMessage}
+                        ttsEnabled={playlistManager.ttsEnabled}
+                        onEnableTTS={playlistManager.enableTTS}
+                        onPlayPause={playlistManager.togglePlayPause}
                       />
                     </div>
                   </CardContent>
