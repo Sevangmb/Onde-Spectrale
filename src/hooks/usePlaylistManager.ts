@@ -26,10 +26,16 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const nextTrackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTrackRef = useRef<PlaylistItem | undefined>();
+  const playTrackByIdRef = useRef<(trackId: string) => Promise<void>>();
 
   useEffect(() => {
     currentTrackRef.current = currentTrack;
   }, [currentTrack]);
+
+  // Mettre à jour la référence de playTrackById
+  useEffect(() => {
+    playTrackByIdRef.current = playTrackById;
+  });
 
   const stopPlayback = useCallback(() => {
     if (audioRef.current) {
@@ -111,7 +117,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         setIsPlaying(false);
       }
     }
-  }, [station, user, stopPlayback, isLoadingTrack]); // `nextTrack` retiré des dépendances
+  }, [station?.id, user?.uid]);
 
   const playNextTrackInQueue = useCallback(() => {
       if (!station || station.playlist.length === 0) return;
@@ -127,7 +133,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
               if(nextTrackToPlay.type === 'message' && !nextTrackToPlay.content?.trim()) {
                   setFailedTracks(prev => new Set(prev).add(nextTrackToPlay.id));
               } else {
-                  playTrackById(nextTrackToPlay.id);
+                  if (playTrackByIdRef.current) {
+                    playTrackByIdRef.current(nextTrackToPlay.id);
+                  }
                   return;
               }
           }
@@ -136,7 +144,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   
       setErrorMessage("Toutes les pistes de la playlist ont échoué.");
       stopPlayback();
-  }, [station, playTrackById, failedTracks, stopPlayback]);
+  }, [station?.id, station?.playlist, failedTracks]);
   
   const nextTrack = useCallback(() => {
     playNextTrackInQueue();
@@ -146,8 +154,10 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (playlistHistory.length < 2) return;
     const prevTrackId = playlistHistory[playlistHistory.length - 2];
     setPlaylistHistory(prev => prev.slice(0, -2));
-    playTrackById(prevTrackId);
-  }, [playlistHistory, playTrackById]);
+    if (playTrackByIdRef.current) {
+      playTrackByIdRef.current(prevTrackId);
+    }
+  }, [playlistHistory]);
 
   const enableTTS = useCallback(() => {
     if ('speechSynthesis' in window && !ttsEnabled) {
@@ -201,7 +211,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       setIsPlaying(false);
     } else {
       if (!currentTrack && station && station.playlist.length > 0) {
-        playNextTrackInQueue();
+        // Démarrer la première piste directement
+        const firstTrack = station.playlist[0];
+        if (firstTrack && playTrackByIdRef.current) {
+          playTrackByIdRef.current(firstTrack.id);
+        }
       } else {
         if (utteranceRef.current && window.speechSynthesis.paused) window.speechSynthesis.resume();
         if (audioRef.current && audioRef.current.src) {
@@ -214,7 +228,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         }
       }
     }
-  }, [isLoadingTrack, isPlaying, currentTrack, station, playNextTrackInQueue]);
+  }, [isLoadingTrack, isPlaying, currentTrack, station?.playlist]);
   
   useEffect(() => {
     isMountedRef.current = true;
@@ -232,9 +246,13 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         console.log('🎵 Station chargée, auto-démarrage dans 500ms:', station.name);
         if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
         nextTrackTimeoutRef.current = setTimeout(() => {
-          if (isMountedRef.current && !isLoadingTrack) {
+          if (isMountedRef.current) {
             console.log('🚀 Lancement auto-play');
-            playNextTrackInQueue();
+            // Utiliser directement la fonction sans dépendance sur le callback
+            const firstTrack = station.playlist[0];
+            if (firstTrack && playTrackByIdRef.current) {
+              playTrackByIdRef.current(firstTrack.id);
+            }
           }
         }, 500);
     }
@@ -243,7 +261,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       isMountedRef.current = false;
       stopPlayback();
     };
-  }, [station?.id, playNextTrackInQueue, stopPlayback]);
+  }, [station?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
