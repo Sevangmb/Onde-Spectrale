@@ -93,6 +93,14 @@ const generatePlaylistFlow = ai.defineFlow(
         if (!output || !output.items || output.items.length === 0) {
           throw new Error("L'IA n'a pas réussi à générer de script pour la playlist.");
         }
+        
+        // Validation supplémentaire pour s'assurer qu'aucun contenu n'est vide
+        for (const item of output.items) {
+          if (!item.content || item.content.trim() === '') {
+            throw new Error(`L'IA a généré un élément de playlist avec un contenu vide (type: ${item.type}).`);
+          }
+        }
+
         return output;
 
       } catch (e: any) {

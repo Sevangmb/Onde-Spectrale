@@ -6,12 +6,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
 import { getStationById, addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
+import type { Station, PlaylistItem, CustomDJCharacter, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlayerStatusCard } from '@/components/PlayerStatusCard';
-import { usePlayerState } from '@/hooks/usePlayerState';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -21,26 +20,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle } from 'lucide-react';
-
-function PlayerStatusMonitor({ stationId }: { stationId: string }) {
-  const { playerState, loading: playerLoading, error: playerError } = usePlayerState(stationId);
-  const { toast } = useToast();
-  
-  if (playerLoading) return <div className="my-4"><Skeleton className="h-24 w-full" /></div>;
-  if (playerError) return <div className="my-4 text-red-600">Erreur monitoring player : {playerError.message}</div>;
-  
-  return (
-    <PlayerStatusCard
-      currentTrack={playerState?.currentTrack}
-      ttsMessage={playerState?.ttsMessage}
-      errorMessage={playerState?.errorMessage}
-      isPlaying={!!playerState?.isPlaying}
-      isLoading={playerLoading}
-      onNext={() => toast({ title: 'Contrôle', description: 'Passer à la suivante (fonction à connecter)' })}
-      onReplay={() => toast({ title: 'Contrôle', description: 'Rejouer la piste (fonction à connecter)' })}
-    />
-  );
-}
 
 import { 
   ArrowLeft,
@@ -183,7 +162,7 @@ export default function StationDetailPage() {
         </Button>
         <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
         <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
-        <PlayerStatusMonitor stationId={station.id} />
+        <PlayerStatusCard stationId={station.id} />
 
       </div>
 
@@ -346,9 +325,9 @@ export default function StationDetailPage() {
                                     <Clock className="h-4 w-4"/>
                                     <span>{formatDuration(item.duration)}</span>
                                 </div>
-                                 {item.type === 'music' && item.id.startsWith('ftr-') === false && (
+                                 {item.type === 'music' && item.archiveId && (
                                      <Button asChild variant="ghost" size="icon">
-                                        <a href={`https://archive.org/details/${item.id}`} target="_blank" rel="noopener noreferrer" title="Voir sur Archive.org">
+                                        <a href={`https://archive.org/details/${item.archiveId}`} target="_blank" rel="noopener noreferrer" title="Voir sur Archive.org">
                                            <ExternalLink className="h-4 w-4"/>
                                         </a>
                                      </Button>

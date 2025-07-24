@@ -1,7 +1,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Play, Pause, AlertTriangle, Music } from 'lucide-react';
+import { Play, Pause, AlertTriangle, Music, Loader2 } from 'lucide-react';
 import { usePlayerState } from '@/hooks/usePlayerState';
 
 interface StationStatusCardProps {
@@ -14,40 +14,37 @@ export function StationStatusCard({ stationId, name, frequency }: StationStatusC
   const { playerState, loading, error } = usePlayerState(stationId);
 
   return (
-    <div className="p-3 rounded-md border bg-card flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <span className="font-semibold">{name}</span>
-        <Badge variant="secondary">{frequency.toFixed(1)} MHz</Badge>
+    <div className="p-3 rounded-md border bg-card flex flex-col gap-1 w-full">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{name}</span>
+          <Badge variant="secondary">{frequency.toFixed(1)} MHz</Badge>
+        </div>
+         <div className="flex items-center gap-1 text-xs">
+            {loading ? <Loader2 className="h-3 w-3 animate-spin"/> :
+             playerState?.isPlaying ? <Play className="h-3 w-3 text-green-500"/> :
+             <Pause className="h-3 w-3 text-yellow-500"/>
+            }
+            {loading ? "Sync..." : playerState?.isPlaying ? 'Actif' : 'Inactif'}
+        </div>
       </div>
       {loading ? (
-        <Skeleton className="h-4 w-32 my-1" />
+        <Skeleton className="h-4 w-3/4 mt-1" />
       ) : error ? (
-        <div className="flex items-center text-red-600 gap-1 text-xs"><AlertTriangle className="h-4 w-4" />Erreur monitoring</div>
+        <div className="flex items-center text-destructive-foreground gap-1 text-xs"><AlertTriangle className="h-3 w-3" />Erreur monitoring</div>
       ) : playerState ? (
-        <div className="flex flex-col gap-1 text-xs">
-          <div className="flex items-center gap-2">
-            {playerState.isPlaying ? (
-              <Play className="h-4 w-4 text-green-600" />
-            ) : (
-              <Pause className="h-4 w-4 text-yellow-600" />
-            )}
-            <span>{playerState.isPlaying ? 'Lecture' : 'En pause'}</span>
-            {playerState.currentTrack && (
+        <div className="text-xs text-muted-foreground truncate max-w-full">
+            {playerState.currentTrack ? (
               <>
-                <Music className="h-3 w-3 ml-2 text-muted-foreground" />
-                <span className="truncate max-w-[120px]">{playerState.currentTrack.title}</span>
+                <Music className="h-3 w-3 inline mr-1" />
+                <span>{playerState.currentTrack.title}</span>
               </>
+            ) : (
+                <span>Aucune piste.</span>
             )}
-          </div>
-          {playerState.errorMessage && (
-            <div className="flex items-center gap-1 text-red-600"><AlertTriangle className="h-3 w-3" />{playerState.errorMessage}</div>
-          )}
-          {playerState.logs && playerState.logs.length > 0 && !playerState.errorMessage && (
-            <div className="text-muted-foreground truncate max-w-[180px]">{playerState.logs[playerState.logs.length-1].message}</div>
-          )}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground">Aucun état de player</div>
+        <div className="text-xs text-muted-foreground">Aucun état de lecteur</div>
       )}
     </div>
   );

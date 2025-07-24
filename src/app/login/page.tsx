@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -114,12 +115,11 @@ export default function LoginPage() {
       await updateUserOnLogin(userCredential.user.uid, userCredential.user.email);
       router.push('/admin');
     } catch (err: any) {
-      console.error('Erreur de connexion Google:', err);
-       if (err.code === 'auth/popup-closed-by-user') {
-        setError('La fenêtre de connexion a été fermée.');
-      } else {
-        setError('Erreur de connexion Google. Réessayez.');
-      }
+        if (err.code === 'auth/popup-closed-by-user') {
+            setError('La fenêtre de connexion a été fermée.');
+        } else {
+            setError('Erreur de connexion Google. Réessayez.');
+        }
     } finally {
       setIsLoading(false);
     }
@@ -127,91 +127,56 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4">
-      {/* Background post-apocalyptique */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-background to-black"></div>
       
-      {/* Effets de radiation */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-red-700/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-yellow-500/30 rounded-full blur-xl animate-pulse delay-500"></div>
-      </div>
-
-      {/* Grille déformée */}
-      <div className="absolute inset-0 opacity-10">
-        <div 
-          className="w-full h-full"
-          style={{
-            backgroundImage: `
-              radial-gradient(circle at 20% 50%, rgba(255, 165, 0, 0.3) 0%, transparent 50%),
-              radial-gradient(circle at 80% 20%, rgba(255, 69, 0, 0.2) 0%, transparent 50%),
-              linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
-              linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)
-            `,
-            backgroundSize: '100px 100px, 150px 150px, 50px 50px, 50px 50px',
-            animation: 'drift 20s linear infinite'
-          }}
-        />
-      </div>
-
-      {/* Particules flottantes */}
       {isClient && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {particleStyles.map((style, i) => (
             <div
               key={i}
-              className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float"
+              className="absolute w-px h-px bg-primary/50 rounded-full animate-float"
               style={style}
             />
           ))}
         </div>
       )}
 
-      {/* Interface de connexion */}
       <div className="relative z-10 w-full max-w-md mx-auto">
-        <Card className="border-2 border-orange-500/30 bg-black/90 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
-          {/* Effet de scanline */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
-          </div>
-          
-          {/* Bordure intérieure */}
-          <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
-
-          <CardHeader className="text-center border-b-2 border-orange-500/30 pb-6 bg-gradient-to-r from-black/90 to-zinc-900/90">
+        <Card className="pip-boy-terminal">
+          <CardHeader className="text-center border-b-2 border-primary/40 pb-6">
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
-                <OndeSpectraleLogo className="h-12 w-12 text-orange-400 drop-shadow-lg" />
-                <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
+                <OndeSpectraleLogo className="h-12 w-12 text-primary phosphor-glow drop-shadow-lg" />
+                <div className="absolute inset-0 bg-primary/30 blur-sm animate-pulse"></div>
               </div>
-              <CardTitle className="font-headline text-2xl text-orange-100 tracking-wider drop-shadow-lg">
+              <CardTitle className="font-headline text-2xl text-primary tracking-wider drop-shadow-lg">
                 <span className="inline-block animate-flicker">Onde Spectrale</span>
               </CardTitle>
-              <p className="text-orange-300/80 text-sm">
-                Accédez aux transmissions secrètes
+              <p className="text-muted-foreground text-sm">
+                Accès à la console d'administration
               </p>
             </div>
           </CardHeader>
 
-          <CardContent className="p-6 bg-gradient-to-br from-black/70 to-zinc-900/70">
+          <CardContent className="p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-900/30 border border-red-500/30 rounded-lg text-red-300 text-sm flex items-center gap-2">
+              <div className="mb-4 p-3 bg-destructive/20 border border-destructive/50 rounded-lg text-destructive-foreground text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                 {error}
               </div>
             )}
 
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-black/60 border border-orange-500/20">
+              <TabsList className="grid w-full grid-cols-2 bg-black/60 border border-border">
                 <TabsTrigger 
                   value="login"
-                  className="data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-100 text-orange-300/70"
+                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
                 >
                   Connexion
                 </TabsTrigger>
                 <TabsTrigger 
                   value="signup"
-                  className="data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-100 text-orange-300/70"
+                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
                 >
                   Inscription
                 </TabsTrigger>
@@ -220,36 +185,36 @@ export default function LoginPage() {
               <TabsContent value="login" className="space-y-4 mt-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-orange-300/80 font-medium">
+                    <Label htmlFor="email">
                       Signal d'identification
                     </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-orange-400/60" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
                       <Input
                         id="email"
                         type="email"
                         placeholder="votre@transmission.net"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
+                        className="pl-10"
                         disabled={isLoading}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-orange-300/80 font-medium">
+                    <Label htmlFor="password">
                       Code de cryptage
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-orange-400/60" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
                       <Input
                         id="password"
                         type="password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
+                        className="pl-10"
                         disabled={isLoading}
                         onKeyPress={(e) => e.key === 'Enter' && handleAuthAction(false)}
                       />
@@ -259,15 +224,12 @@ export default function LoginPage() {
                   <Button
                     onClick={() => handleAuthAction(false)}
                     disabled={isLoading}
-                    className="w-full bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20 relative overflow-hidden"
+                    className="w-full retro-button"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <RadioTower className="h-4 w-4" />
                       {isLoading ? 'Connexion...' : 'Établir la connexion'}
                     </div>
-                    {isLoading && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-pulse"></div>
-                    )}
                   </Button>
                 </div>
               </TabsContent>
@@ -275,36 +237,36 @@ export default function LoginPage() {
               <TabsContent value="signup" className="space-y-4 mt-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-orange-300/80 font-medium">
+                    <Label htmlFor="signup-email">
                       Nouveau signal d'identification
                     </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-orange-400/60" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
                       <Input
                         id="signup-email"
                         type="email"
                         placeholder="votre@transmission.net"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
+                        className="pl-10"
                         disabled={isLoading}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-orange-300/80 font-medium">
+                    <Label htmlFor="signup-password">
                       Code de cryptage (min. 6 caractères)
                     </Label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-orange-400/60" />
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
                       <Input
                         id="signup-password"
                         type="password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 bg-black/60 border-orange-500/30 text-orange-100 placeholder-orange-400/40 focus:border-orange-400/50"
+                        className="pl-10"
                         disabled={isLoading}
                         onKeyPress={(e) => e.key === 'Enter' && handleAuthAction(true)}
                       />
@@ -314,15 +276,12 @@ export default function LoginPage() {
                   <Button
                     onClick={() => handleAuthAction(true)}
                     disabled={isLoading}
-                    className="w-full bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20 relative overflow-hidden"
+                    className="w-full retro-button"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Zap className="h-4 w-4" />
-                      {isLoading ? 'Création...' : 'Créer une nouvelle station'}
+                      {isLoading ? 'Création...' : 'Créer un nouvel accès'}
                     </div>
-                    {isLoading && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/20 to-transparent animate-pulse"></div>
-                    )}
                   </Button>
                 </div>
               </TabsContent>
@@ -331,10 +290,10 @@ export default function LoginPage() {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-orange-500/30" />
+                  <span className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-black/80 px-2 text-orange-400/60">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Transmission alternative
                   </span>
                 </div>
@@ -344,7 +303,7 @@ export default function LoginPage() {
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
                 variant="outline"
-                className="w-full mt-4 border-orange-500/30 text-orange-300 hover:bg-orange-500/10 hover:text-orange-100 hover:border-orange-400/50"
+                className="w-full mt-4"
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                   <path
@@ -364,17 +323,17 @@ export default function LoginPage() {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Connexion Google
+                Connexion avec Google
               </Button>
             </div>
 
             <div className="mt-6 text-center">
               <Button
-                variant="ghost"
+                variant="link"
                 onClick={() => router.push('/')}
-                className="text-orange-400/60 hover:text-orange-300 text-sm"
+                className="text-muted-foreground hover:text-primary text-sm"
               >
-                ← Retour à la radio
+                ← Retour au scanner
               </Button>
             </div>
           </CardContent>
