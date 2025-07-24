@@ -566,15 +566,14 @@ export function OndeSpectraleRadio() {
                    {showPlaylist && (
                      <EnhancedPlaylist
                         playlist={currentStation.playlist}
-                        currentTrackIndex={playlistManager.currentTrackIndex}
-                        currentTrack={playlistManager.currentTrack}
+                        currentTrackId={playlistManager.currentTrack?.id}
                         isPlaying={playlistManager.isPlaying}
                         isLoadingTrack={playlistManager.isLoadingTrack}
                         failedTracks={playlistManager.failedTracks}
-                        onTrackSelect={async (index: number) => { await playlistManager.playTrack(index); }}
-                        onPlayPause={async () => { await playlistManager.togglePlayPause(); }}
-                        onNext={async () => { playlistManager.nextTrack(); }}
-                        onPrevious={async () => { await playlistManager.previousTrack(); }}
+                        onTrackSelect={playlistManager.playTrackById}
+                        onPlayPause={playlistManager.togglePlayPause}
+                        onNext={playlistManager.nextTrack}
+                        onPrevious={playlistManager.previousTrack}
                         canGoBack={playlistManager.canGoBack}
                         className="h-full"
                       />
