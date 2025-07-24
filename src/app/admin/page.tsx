@@ -13,6 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { StationStatusCard } from '@/components/StationStatusCard';
+import { RealtimeMonitoring } from '@/components/admin/RealtimeMonitoring';
+import { StationManager } from '@/components/admin/StationManager';
+import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 
 import { 
   RadioTower, 
@@ -40,6 +43,7 @@ export default function AdminDashboard() {
   const { user, userData, stations, isLoading, customCharacters } = useAdminLayout();
   const [isClient, setIsClient] = useState(false);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'monitoring' | 'stations' | 'analytics'>('overview');
   const router = useRouter();
 
   useEffect(() => {
@@ -87,12 +91,22 @@ export default function AdminDashboard() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tableau de bord</h1>
-        <p className="text-muted-foreground">Bienvenue, {user?.email}. Voici un aperçu de vos activités.</p>
-      </div>
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'monitoring':
+        return <RealtimeMonitoring />;
+      case 'stations':
+        return <StationManager stations={stations} />;
+      case 'analytics':
+        return <AdminAnalytics />;
+      default:
+        return renderOverview();
+    }
+  };
+
+  const renderOverview = () => (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>

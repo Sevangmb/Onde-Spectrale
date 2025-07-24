@@ -23,6 +23,10 @@ export type PlaylistItem = {
   title: string;
   content: string; 
   artist?: string;
+  album?: string; // Album name
+  year?: number; // Release year
+  genre?: string; // Comma-separated genres
+  artwork?: string; // Album/track artwork URL
   url: string; // URL to the audio file in Firebase Storage, Archive.org, or Plex
   duration: number; // in seconds
   addedAt?: string; // ISO string

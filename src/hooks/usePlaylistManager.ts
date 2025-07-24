@@ -98,16 +98,23 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (result.audioUrl.startsWith('data:audio')) {
       if (!audioRef.current) return;
       setTtsMessage(`Message de ${track.artist}: ${track.content}`);
-      audioRef.current.src = result.audioUrl;
-      try {
-        await audioRef.current.play();
-        setIsPlaying(true);
-      } catch (e) {
-        setErrorMessage("La lecture automatique a été bloquée.");
-        setIsPlaying(false);
+      if (result.audioUrl && audioRef.current) {
+        audioRef.current.src = result.audioUrl;
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (e) {
+          setErrorMessage("La lecture automatique a été bloquée.");
+          setIsPlaying(false);
+        }
+      } else {
+        setErrorMessage("URL audio non disponible pour cette piste.");
       }
     } else {
-      if (!audioRef.current) return;
+      if (!audioRef.current || !result.audioUrl) {
+        setErrorMessage("Erreur de lecture - piste non disponible.");
+        return;
+      }
       audioRef.current.src = result.audioUrl;
       try {
         await audioRef.current.play();
@@ -273,9 +280,29 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
             nextTrackTimeoutRef.current = setTimeout(nextTrack, 1000);
         }
     };
-    audio.addEventListener('ended', handleEnd);
+
+    const handleError = (e: Event) => {
+        console.warn('Audio error:', e);
+        setErrorMessage("Erreur de lecture audio - piste suivante...");
+        setIsPlaying(false);
+        // Passer à la piste suivante après une erreur
+        if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
+        nextTrackTimeoutRef.current = setTimeout(nextTrack, 2000);
+    };
+
+    const handleCanPlay = () => {
+        setErrorMessage(null);
+    };
     
-    return () => audio.removeEventListener('ended', handleEnd);
+    audio.addEventListener('ended', handleEnd);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('canplay', handleCanPlay);
+    
+    return () => {
+        audio.removeEventListener('ended', handleEnd);
+        audio.removeEventListener('error', handleError);
+        audio.removeEventListener('canplay', handleCanPlay);
+    };
   }, [isPlaying, nextTrack]);
 
   return {
