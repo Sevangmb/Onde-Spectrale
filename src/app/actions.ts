@@ -906,10 +906,31 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             }
         }
         
-        // UNIQUEMENT PLEX - Piste aléatoire
+        // PLEX - Recherche dans le répertoire musique
         try {
-            console.log(`🎵 Récupération d'une piste aléatoire sur Plex`);
+            console.log(`🎵 Recherche Plex pour "${track.content}"`);
             
+            // D'abord essayer de chercher spécifiquement
+            const searchResults = await searchPlexMusic(track.content, 3);
+            
+            if (searchResults.length > 0) {
+                const plexTrack = searchResults[0];
+                console.log(`✅ Piste Plex trouvée: ${plexTrack.title} par ${plexTrack.artist}`);
+                return { audioUrl: plexTrack.url };
+            }
+            
+            // Fallback: essayer avec le titre de la piste
+            if (track.title && track.title !== track.content) {
+                const titleResults = await searchPlexMusic(track.title, 1);
+                if (titleResults.length > 0) {
+                    const plexTrack = titleResults[0];
+                    console.log(`✅ Piste Plex trouvée par titre: ${plexTrack.title} par ${plexTrack.artist}`);
+                    return { audioUrl: plexTrack.url };
+                }
+            }
+            
+            // Dernier recours: une piste aléatoire du même genre
+            console.log(`🎲 Aucune correspondance exacte, piste aléatoire du thème "${stationTheme}"`);
             const randomTracks = await getRandomPlexTracks(undefined, 1);
             
             if (randomTracks.length > 0) {
@@ -920,9 +941,27 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             
         } catch (plexError) {
             console.error('❌ Plex non disponible:', plexError);
-            return { error: 'Serveur Plex non disponible - Vérifiez la connexion' };
+            // Continuer vers le fallback Archive.org au lieu de retourner une erreur
         }
         
-        return { error: 'Aucune musique trouvée sur Plex' };
+        // Fallback vers Archive.org si Plex échoue
+        try {
+            console.log(`🌐 Fallback vers Archive.org pour "${track.content}"`);
+            const searchResults = await searchMusicAdvanced(track.content, 3);
+            
+            for (const result of searchResults) {
+                if (result.url) {
+                    const isValid = await validateAudioUrl(result.url);
+                    if (isValid) {
+                        console.log(`✅ Piste Archive.org: ${result.title} par ${result.artist}`);
+                        return { audioUrl: result.url };
+                    }
+                }
+            }
+        } catch (archiveError) {
+            console.error('❌ Archive.org non disponible:', archiveError);
+        }
+        
+        return { error: `Aucune musique trouvée pour "${track.content}"` };
     }
 }

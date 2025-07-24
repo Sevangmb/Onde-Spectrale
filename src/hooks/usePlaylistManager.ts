@@ -154,8 +154,54 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         }
 
         // Gérer TTS ou audio normal
-        if (result.audioUrl.startsWith('tts:')) {
-          // C'est un message TTS
+        if (track.type === 'message' && result.audioUrl.startsWith('data:audio/wav;base64,')) {
+          // C'est un message généré par TTS - utiliser directement l'audio généré
+          console.log('🎤 Lecture audio TTS généré par IA');
+          audioRef.current.src = result.audioUrl;
+          audioRef.current.load();
+          
+          // Afficher le contenu du message
+          setTtsMessage(`Message de ${track.artist}: ${track.content}`);
+          
+          // Attendre que l'audio soit prêt et le jouer
+          await new Promise((resolve, reject) => {
+            const handleCanPlay = () => {
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              setIsLoadingTrack(false);
+              audioRef.current?.play().then(() => {
+                setIsPlaying(true);
+                setErrorMessage(null);
+                resolve(true);
+              }).catch((playError) => {
+                console.warn('Autoplay bloqué, lecture manuelle requise:', playError);
+                setIsPlaying(false);
+                setErrorMessage('Cliquez pour démarrer la lecture');
+                resolve(true); // Ne pas bloquer, juste informer
+              });
+            };
+            
+            const handleError = (e: any) => {
+              console.error('Erreur chargement audio TTS:', e);
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              reject(new Error(`Erreur de lecture audio TTS: ${e.message || 'Format non supporté'}`));
+            };
+            
+            audioRef.current?.addEventListener('canplay', handleCanPlay);
+            audioRef.current?.addEventListener('error', handleError);
+            
+            // Timeout de 5 secondes
+            setTimeout(() => {
+              audioRef.current?.removeEventListener('canplay', handleCanPlay);
+              audioRef.current?.removeEventListener('error', handleError);
+              reject(new Error('Timeout chargement audio TTS'));
+            }, 5000);
+          });
+          
+          return true;
+        } else if (track.type === 'message' && result.audioUrl.startsWith('tts:')) {
+          // Fallback: synthèse vocale manuelle
           const textToSpeak = decodeURIComponent(result.audioUrl.substring(4));
           setTtsMessage(textToSpeak); // Affiche le TTS en cours
           
@@ -166,16 +212,10 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
           
           // Utiliser la Web Speech API
           if ('speechSynthesis' in window) {
-            // Vérifier si TTS est autorisé
+            // Activer automatiquement le TTS si pas encore fait
             if (!ttsEnabled) {
-              console.log('🎤 TTS nécessite une interaction utilisateur');
-              setErrorMessage('Cliquez sur Play pour activer la synthèse vocale');
-              setIsLoadingTrack(false);
-              // Passer à la piste suivante après un délai
-              setTimeout(() => {
-                if (nextTrackRef.current) nextTrackRef.current();
-              }, 3000);
-              return false;
+              console.log('🎤 Activation automatique du TTS');
+              setTtsEnabled(true);
             }
             
             // Empêcher les TTS simultanés

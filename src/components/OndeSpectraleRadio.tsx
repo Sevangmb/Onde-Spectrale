@@ -233,6 +233,38 @@ export function OndeSpectraleRadio() {
     }
   };
 
+  // Gestion de l'activation audio automatique
+  const [audioContextEnabled, setAudioContextEnabled] = useState(false);
+  
+  // Activer l'audio au premier clic utilisateur
+  const handleUserInteraction = useCallback(() => {
+    if (!audioContextEnabled) {
+      console.log('🎵 Activation du contexte audio par interaction utilisateur');
+      setAudioContextEnabled(true);
+      
+      // Essayer de relancer la lecture si elle était bloquée
+      if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
+        playlistManager.togglePlayPause();
+      }
+    }
+  }, [audioContextEnabled, playlistManager]);
+  
+  // Ajouter l'écouteur d'événement global
+  useEffect(() => {
+    if (!audioContextEnabled) {
+      const events = ['click', 'touchstart', 'keydown'];
+      events.forEach(event => {
+        document.addEventListener(event, handleUserInteraction, { once: true });
+      });
+      
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleUserInteraction);
+        });
+      };
+    }
+  }, [audioContextEnabled, handleUserInteraction]);
+
   // État calculé
   const isRadioActive = useMemo(() => {
     return isClient && !isLoading && currentStation !== null;
@@ -497,16 +529,6 @@ export function OndeSpectraleRadio() {
                                   {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
                                    playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
                                 </div>
-                                {!playlistManager.isPlaying && !playlistManager.isLoadingTrack && playlistManager.currentTrack && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => playlistManager.togglePlayPause()}
-                                    className="border-green-500/30 hover:bg-green-500/20 text-green-300 text-xs"
-                                  >
-                                    ▶ Lancer la lecture
-                                  </Button>
-                                )}
                               </div>
                             ) : (
                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
