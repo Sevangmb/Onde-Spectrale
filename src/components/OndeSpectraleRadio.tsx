@@ -152,15 +152,24 @@ export function OndeSpectraleRadio() {
     setIsScanning(true);
     radioSounds.playTuning();
     
-    const newFrequency = frequency + (direction === 'up' ? 0.5 : -0.5);
-    const clampedFrequency = Math.max(87.0, Math.min(108.0, newFrequency));
-    
-    setFrequency(clampedFrequency);
-    setSliderValue(clampedFrequency);
-    fetchStationData(clampedFrequency);
+    let newFrequency = sliderValue;
+    const intervalId = setInterval(() => {
+      newFrequency += direction === 'up' ? 0.1 : -0.1;
+      const clampedFrequency = Math.max(87.0, Math.min(108.0, newFrequency));
+      setSliderValue(clampedFrequency);
+    }, 50);
 
-    setTimeout(() => setIsScanning(false), 1000);
-  }
+    setTimeout(() => {
+      clearInterval(intervalId);
+      const finalFrequency = Math.round(newFrequency * 2)/2; // Arrondi au .5 le plus proche
+      const clampedFrequency = Math.max(87.0, Math.min(108.0, finalFrequency));
+
+      setFrequency(clampedFrequency);
+      setSliderValue(clampedFrequency);
+      fetchStationData(clampedFrequency);
+      setIsScanning(false);
+    }, 1000);
+  };
 
   const handleScanUp = () => handleScan('up');
   const handleScanDown = () => handleScan('down');
@@ -216,7 +225,6 @@ export function OndeSpectraleRadio() {
         preload="metadata"
         onEnded={playlistManager.nextTrack}
         onError={(e) => {
-          console.log('⚠️ Audio non disponible, passage à la piste suivante');
           if(playlistManager.currentTrack) {
             playlistManager.addFailedTrack(playlistManager.currentTrack.id);
           }

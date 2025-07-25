@@ -29,7 +29,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const currentOperationRef = useRef<string | null>(null);
   const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Correction de la dépendance circulaire
   const playTrackByIdRef = useRef<((trackId: string) => Promise<void>) | null>(null);
 
 
@@ -37,7 +36,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const isPlaying = playbackState === 'playing';
   const isLoadingTrack = playbackState === 'loading';
 
-  // Fonction utilitaire pour nettoyer les timeouts
   const clearAutoPlayTimeout = useCallback(() => {
     if (autoPlayTimeoutRef.current) {
       clearTimeout(autoPlayTimeoutRef.current);
@@ -45,13 +43,13 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
   }, []);
 
-  // Fonction pour arrêter complètement la lecture
   const stopPlayback = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
+      if (audioRef.current.src) {
+        audioRef.current.removeAttribute('src');
+        audioRef.current.load();
+      }
     }
     
     if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
@@ -64,23 +62,20 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setTtsMessage(null);
   }, [clearAutoPlayTimeout]);
 
-  // Fonction pour trouver la prochaine piste valide
   const findNextValidTrack = useCallback((currentId?: string): PlaylistItem | null => {
     if (!station || station.playlist.length === 0) return null;
 
     const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
-    const startIndex = (currentIndex + 1) % station.playlist.length;
-    
-    // Parcourir la playlist à partir de la position suivante
-    for (let i = 0; i < station.playlist.length; i++) {
-      const index = (startIndex + i) % station.playlist.length;
-      const track = station.playlist[index];
-      
-      // Ignorer les pistes échouées et les messages vides
-      if (!failedTracks.has(track.id) && 
-          !(track.type === 'message' && !track.content?.trim())) {
+    let attempts = 0;
+    let nextIndex = (currentIndex + 1) % station.playlist.length;
+
+    while (attempts < station.playlist.length) {
+      const track = station.playlist[nextIndex];
+      if (!failedTracks.has(track.id) && !(track.type === 'message' && !track.content?.trim())) {
         return track;
       }
+      nextIndex = (nextIndex + 1) % station.playlist.length;
+      attempts++;
     }
 
     return null;
@@ -90,117 +85,116 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (!isMountedRef.current) return;
     
     const nextPlayableTrack = findNextValidTrack(currentTrack?.id);
+
     if (nextPlayableTrack) {
         playTrackByIdRef.current?.(nextPlayableTrack.id);
     } else {
-      setErrorMessage("Aucune piste disponible dans la playlist");
+      setErrorMessage("Fin de la playlist. Aucune piste valide trouvée.");
       stopPlayback();
     }
   }, [currentTrack?.id, findNextValidTrack, stopPlayback]);
 
-  useEffect(() => {
-    playTrackByIdRef.current = async (trackId: string): Promise<void> => {
-        if (!isMountedRef.current || !station) return;
+  const playTrackById = useCallback(async (trackId: string): Promise<void> => {
+    if (!isMountedRef.current || !station) return;
+    
+    if (currentOperationRef.current === trackId) {
+      return;
+    }
+    
+    currentOperationRef.current = trackId;
 
-        if (currentOperationRef.current === trackId) return;
-        currentOperationRef.current = trackId;
+    try {
+      stopPlayback();
+      const track = station.playlist.find(t => t.id === trackId);
 
+      if (!track) {
+        console.warn(`Piste ${trackId} non trouvée dans la playlist`);
+        nextTrack();
+        return;
+      }
+
+      if (track.type === 'message' && !track.content?.trim()) {
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        nextTrack();
+        return;
+      }
+
+      setCurrentTrack(track);
+      setPlaybackState('loading');
+      setErrorMessage(null);
+      setTtsMessage(null);
+
+      const result = await getAudioForTrack(track, station.djCharacterId, user?.uid || 'anonymous', station.theme);
+
+      if (!isMountedRef.current || currentOperationRef.current !== trackId) return;
+
+      if (result.error || !result.audioUrl) {
+        const errorMsg = result.error || 'URL audio manquante';
+        setErrorMessage(`Piste indisponible: ${errorMsg}`);
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        setPlaybackState('error');
+        autoPlayTimeoutRef.current = setTimeout(() => nextTrack(), 1500);
+        return;
+      }
+
+      if (!audioRef.current) {
+        setErrorMessage("Lecteur audio non disponible");
+        setPlaybackState('error');
+        return;
+      }
+      const audio = audioRef.current;
+      
+      const handleCanPlay = async () => {
+        if (!isMountedRef.current || currentOperationRef.current !== trackId) return;
         try {
-            stopPlayback();
+          await audio.play();
+          setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
+          setPlaybackState('playing');
+          setErrorMessage(null);
+        } catch (e) {
+          setErrorMessage("Cliquez pour activer la lecture");
+          setPlaybackState('paused');
+        }
+      };
+      
+      const handleError = () => {
+        if (!isMountedRef.current || currentOperationRef.current !== trackId) return;
+        setErrorMessage("Erreur de lecture, passage à la suivante...");
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        setPlaybackState('error');
+        autoPlayTimeoutRef.current = setTimeout(() => nextTrack(), 800);
+      };
 
-            const track = station.playlist.find(t => t.id === trackId);
-            if (!track) {
-                console.warn(`Piste ${trackId} non trouvée dans la playlist`);
-                nextTrack();
-                return;
-            }
+      audio.addEventListener('canplay', handleCanPlay, { once: true });
+      audio.addEventListener('error', handleError, { once: true });
+      
+      if (result.audioUrl.startsWith('data:audio')) {
+        setTtsMessage(`Message de ${track.artist}: ${track.content}`);
+      }
 
-            if (track.type === 'message' && !track.content?.trim()) {
-                setFailedTracks(prev => new Set(prev).add(track.id));
-                nextTrack();
-                return;
-            }
+      audio.src = result.audioUrl;
+      audio.load();
 
-            setCurrentTrack(track);
-            setPlaybackState('loading');
-            setErrorMessage(null);
-            setTtsMessage(null);
-
-            const result = await getAudioForTrack(track, station.djCharacterId, user?.uid || 'anonymous', station.theme);
-
-            if (!isMountedRef.current) return;
-
-            if (result.error || !result.audioUrl) {
-                const errorMsg = result.error || 'URL audio manquante';
-                
-                if (errorMsg.includes('Mode démo')) {
-                    setPlaybackState('playing');
-                    setErrorMessage('🎨 Mode démo - Interface fonctionnelle');
-                    autoPlayTimeoutRef.current = setTimeout(() => { if (isMountedRef.current) { setPlaybackState('idle'); nextTrack(); } }, 30000);
-                    return;
-                }
-                
-                setErrorMessage(`Piste non disponible: ${track.title}`);
-                setFailedTracks(prev => new Set(prev).add(track.id));
-                setPlaybackState('error');
-                
-                autoPlayTimeoutRef.current = setTimeout(() => { if (isMountedRef.current) nextTrack(); }, 1500);
-                return;
-            }
-
-            setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
-
-            if (!audioRef.current) {
-                setErrorMessage("Lecteur audio non disponible");
-                setPlaybackState('error');
-                return;
-            }
-            const audio = audioRef.current;
-            
-            const handleLoad = async () => {
-                try {
-                    await audio.play();
-                    setPlaybackState('playing');
-                    setErrorMessage(null);
-                } catch (e) {
-                    setErrorMessage("Cliquez pour activer la lecture");
-                    setPlaybackState('paused');
-                }
-            };
-
-            const handleError = () => {
-                setErrorMessage("Erreur de lecture, passage à la suivante...");
-                setFailedTracks(prev => new Set(prev).add(track.id));
-                setPlaybackState('error');
-                autoPlayTimeoutRef.current = setTimeout(() => { if (isMountedRef.current) nextTrack(); }, 800);
-            };
-
-            audio.addEventListener('canplay', handleLoad, { once: true });
-            audio.addEventListener('error', handleError, { once: true });
-            
-            if (result.audioUrl.startsWith('data:audio')) {
-                setTtsMessage(`Message de ${track.artist}: ${track.content}`);
-            }
-
-            audio.src = result.audioUrl;
-        } catch (error) {
-            setErrorMessage("Erreur de chargement");
-            setPlaybackState('error');
-            autoPlayTimeoutRef.current = setTimeout(() => { if (isMountedRef.current) nextTrack(); }, 1000);
-        } finally {
+    } catch (error: any) {
+      setErrorMessage(error.message || "Erreur de chargement");
+      setPlaybackState('error');
+      autoPlayTimeoutRef.current = setTimeout(() => nextTrack(), 1000);
+    } finally {
+        if (currentOperationRef.current === trackId) {
             currentOperationRef.current = null;
         }
-    };
-  }, [station, user, stopPlayback, findNextValidTrack, clearAutoPlayTimeout, nextTrack]);
+    }
+  }, [station, user?.uid, stopPlayback, nextTrack]);
 
+  playTrackByIdRef.current = playTrackById;
 
   const previousTrack = useCallback(() => {
     if (playlistHistory.length < 2) return;
     
     const prevTrackId = playlistHistory[playlistHistory.length - 2];
     setPlaylistHistory(prev => prev.slice(0, -2));
-    playTrackByIdRef.current?.(prevTrackId);
-  }, [playlistHistory]);
+    playTrackById(prevTrackId);
+  }, [playlistHistory, playTrackById]);
 
   const togglePlayPause = useCallback(async () => {
     if (playbackState === 'loading') return;
@@ -209,9 +203,9 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       if (audioRef.current) audioRef.current.pause();
       if (window.speechSynthesis?.speaking) window.speechSynthesis.pause();
       setPlaybackState('paused');
-    } else if (playbackState === 'paused') {
+    } else if (playbackState === 'paused' && audioRef.current) {
       try {
-        if (audioRef.current) await audioRef.current.play();
+        await audioRef.current.play();
         if (window.speechSynthesis?.paused) window.speechSynthesis.resume();
         setPlaybackState('playing');
       } catch (e) {
@@ -221,11 +215,14 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       if (!currentTrack && station && station.playlist.length > 0) {
         const firstTrack = findNextValidTrack();
         if (firstTrack) {
-          playTrackByIdRef.current?.(firstTrack.id);
+          playTrackById(firstTrack.id);
         }
+      } else if (currentTrack) {
+        // Retry playing current track if paused or in error state
+         playTrackById(currentTrack.id);
       }
     }
-  }, [playbackState, currentTrack, station, findNextValidTrack]);
+  }, [playbackState, currentTrack, station, findNextValidTrack, playTrackById]);
 
   const enableTTS = useCallback(() => {
     if ('speechSynthesis' in window && !ttsEnabled) {
@@ -262,18 +259,24 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setPlaylistHistory([]);
     setFailedTracks(new Set());
     
+    return () => { isMountedRef.current = false; stopPlayback(); };
+  }, [station?.id, stopPlayback]);
+  
+  // Autoplay logic when station changes
+  useEffect(() => {
     if (station && station.playlist.length > 0) {
-      autoPlayTimeoutRef.current = setTimeout(() => {
+       clearAutoPlayTimeout();
+       autoPlayTimeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) {
           const firstTrack = findNextValidTrack();
           if (firstTrack) {
-            playTrackByIdRef.current?.(firstTrack.id);
+            playTrackById(firstTrack.id);
           }
         }
-      }, 500);
+      }, 500); // Delay to allow UI to settle
     }
-    return () => { isMountedRef.current = false; stopPlayback(); };
-  }, [station?.id]);
+  }, [station?.id, station?.playlist, findNextValidTrack, playTrackById, clearAutoPlayTimeout]);
+
 
   return {
     currentTrack,
@@ -281,7 +284,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     isLoadingTrack,
     failedTracks,
     audioRef,
-    playTrackById: (trackId: string) => playTrackByIdRef.current?.(trackId),
+    playTrackById,
     nextTrack,
     previousTrack,
     togglePlayPause,
