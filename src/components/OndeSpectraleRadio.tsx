@@ -76,8 +76,7 @@ export function OndeSpectraleRadio() {
     fadeOutDuration: 200
   });
 
-  // Utiliser useRef pour stabiliser la fonction fetchStationData
-  const fetchStationDataRef = useRef(useDebouncedCallback(async (freq: number) => {
+  const fetchStationData = useDebouncedCallback(async (freq: number) => {
     setIsLoadingStation(true);
     setError(null);
 
@@ -109,7 +108,7 @@ export function OndeSpectraleRadio() {
     } finally {
       setIsLoadingStation(false);
     }
-  }, 500));
+  }, 500);
 
   // Initialisation et gestion de l'utilisateur
   useEffect(() => {
@@ -142,12 +141,12 @@ export function OndeSpectraleRadio() {
     });
 
     // Chargement initial de la station
-    fetchStationDataRef.current(100.7);
+    fetchStationData(100.7);
 
     return () => {
       unsubscribe();
     };
-  }, []); // Dépendances vides pour ne s'exécuter qu'une fois
+  }, [fetchStationData]); // fetchStationData est maintenant stable
 
   const handleScan = (direction: 'up' | 'down') => {
     if (isScanning) return;
@@ -160,7 +159,7 @@ export function OndeSpectraleRadio() {
     
     setFrequency(clampedFrequency);
     setSliderValue(clampedFrequency);
-    fetchStationDataRef.current(clampedFrequency);
+    fetchStationData(clampedFrequency);
 
     setTimeout(() => setIsScanning(false), 1000);
   }
@@ -175,7 +174,7 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
-    fetchStationDataRef.current(newFreq);
+    fetchStationData(newFreq);
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
@@ -467,3 +466,4 @@ export function OndeSpectraleRadio() {
     </>
   );
 }
+
