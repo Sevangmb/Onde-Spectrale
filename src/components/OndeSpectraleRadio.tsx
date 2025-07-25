@@ -1,10 +1,9 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser, createDefaultStation } from '@/app/actions';
-import { testPlexConnectionAction, searchPlexMusicAction, getRandomPlexTracksAction } from '@/app/actions-plex';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -33,10 +32,7 @@ import {
   Zap, 
   UserCog, 
   Settings,
-  ListMusic,
-  Server,
-  Search,
-  Shuffle
+  ListMusic
 } from 'lucide-react';
 
 interface ParticleStyle {
@@ -57,17 +53,11 @@ export function OndeSpectraleRadio() {
   const [isScanning, setIsScanning] = useState(false);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
   
-  // Fonctionnalités Plex
-  const [plexConnected, setPlexConnected] = useState(false);
-  const [plexLibraries, setPlexLibraries] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  
   // Interface
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const [isClient, setIsClient] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   
   const router = useRouter();
 
@@ -86,20 +76,44 @@ export function OndeSpectraleRadio() {
     fadeOutDuration: 200
   });
 
-  // Initialisation
+  // Utiliser useRef pour stabiliser la fonction fetchStationData
+  const fetchStationDataRef = useRef(useDebouncedCallback(async (freq: number) => {
+    setIsLoadingStation(true);
+    setError(null);
+
+    try {
+      let station = await getStationForFrequency(freq);
+      
+      if (!station && [100.7, 94.5, 102.1, 98.2].includes(freq)) {
+        station = await createDefaultStation();
+      }
+      
+      const newSignalStrength = station 
+        ? Math.floor(Math.random() * 20) + 80 
+        : Math.floor(Math.random() * 30) + 10;
+      
+      setSignalStrength(newSignalStrength);
+      
+      if (!station) {
+        radioSounds.playContextualEffect('signal_loss', true);
+      } else if (newSignalStrength < 50) {
+        radioSounds.playInterference(true);
+      } else {
+        radioSounds.stopEffect();
+      }
+      
+      setCurrentStation(station);
+      
+    } catch (err: any) {
+      setError(`Erreur de données: ${err.message}`);
+    } finally {
+      setIsLoadingStation(false);
+    }
+  }, 500));
+
+  // Initialisation et gestion de l'utilisateur
   useEffect(() => {
     setIsClient(true);
-    
-    let handleResize: (() => void) | null = null;
-    if (typeof window !== 'undefined') {
-      setIsMobile(window.innerWidth < 640);
-      
-      handleResize = () => {
-        setIsMobile(window.innerWidth < 640);
-      };
-      
-      window.addEventListener('resize', handleResize);
-    }
     
     setTimeout(() => {
       radioSounds.playRadioStartup();
@@ -127,52 +141,13 @@ export function OndeSpectraleRadio() {
       }
     });
 
+    // Chargement initial de la station
+    fetchStationDataRef.current(100.7);
+
     return () => {
       unsubscribe();
-      if (typeof window !== 'undefined' && handleResize) {
-        window.removeEventListener('resize', handleResize);
-      }
     };
-  }, []);
-
-  const fetchStationData = useDebouncedCallback(async (freq: number) => {
-      setIsLoadingStation(true);
-      setError(null);
-
-      try {
-        let station = await getStationForFrequency(freq);
-        
-        if (!station && [100.7, 94.5, 102.1, 98.2].includes(freq)) {
-          station = await createDefaultStation();
-        }
-        
-        const newSignalStrength = station 
-          ? Math.floor(Math.random() * 20) + 80 
-          : Math.floor(Math.random() * 30) + 10;
-        
-        setSignalStrength(newSignalStrength);
-        
-        if (!station) {
-          radioSounds.playContextualEffect('signal_loss', true);
-        } else if (newSignalStrength < 50) {
-          radioSounds.playInterference(true);
-        } else {
-          radioSounds.stopEffect();
-        }
-        
-        setCurrentStation(station);
-        
-      } catch (err: any) {
-        setError(`Erreur de données: ${err.message}`);
-      } finally {
-        setIsLoadingStation(false);
-      }
-  }, 500);
-
-  useEffect(() => {
-    fetchStationData(100.7);
-  }, []);
-
+  }, []); // Dépendances vides pour ne s'exécuter qu'une fois
 
   const handleScan = (direction: 'up' | 'down') => {
     if (isScanning) return;
@@ -185,7 +160,7 @@ export function OndeSpectraleRadio() {
     
     setFrequency(clampedFrequency);
     setSliderValue(clampedFrequency);
-    fetchStationData(clampedFrequency);
+    fetchStationDataRef.current(clampedFrequency);
 
     setTimeout(() => setIsScanning(false), 1000);
   }
@@ -200,7 +175,7 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
-    fetchStationData(newFreq);
+    fetchStationDataRef.current(newFreq);
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
