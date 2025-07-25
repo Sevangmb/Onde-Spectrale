@@ -79,7 +79,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
 
     return null;
-  }, [station?.playlist, failedTracks]);
+  }, [station, failedTracks]);
 
   const nextTrack = useCallback(() => {
     if (!isMountedRef.current) return;
@@ -259,24 +259,20 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     setPlaylistHistory([]);
     setFailedTracks(new Set());
     
-    return () => { isMountedRef.current = false; stopPlayback(); };
-  }, [station?.id, stopPlayback]);
-  
-  // Autoplay logic when station changes
-  useEffect(() => {
     if (station && station.playlist.length > 0) {
-       clearAutoPlayTimeout();
-       autoPlayTimeoutRef.current = setTimeout(() => {
-        if (isMountedRef.current) {
-          const firstTrack = findNextValidTrack();
-          if (firstTrack) {
-            playTrackById(firstTrack.id);
-          }
-        }
-      }, 500); // Delay to allow UI to settle
-    }
-  }, [station?.id, station?.playlist, findNextValidTrack, playTrackById, clearAutoPlayTimeout]);
-
+      clearAutoPlayTimeout();
+      autoPlayTimeoutRef.current = setTimeout(() => {
+       if (isMountedRef.current) {
+         const firstTrack = findNextValidTrack();
+         if (firstTrack) {
+           playTrackById(firstTrack.id);
+         }
+       }
+     }, 500);
+   }
+    
+    return () => { isMountedRef.current = false; stopPlayback(); };
+  }, [station?.id, stopPlayback, clearAutoPlayTimeout, findNextValidTrack, playTrackById]);
 
   return {
     currentTrack,
