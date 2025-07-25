@@ -84,8 +84,6 @@ export function OndeSpectraleRadio() {
       setIsLoadingStation(false);
     }
   }, [setIsLoadingStation, setError, setSignalStrength, setCurrentStation]);
-
-  const debouncedFetchStationData = useDebouncedCallback(fetchStationData, 300);
   
   const playlistManager = usePlaylistManager({
     station: currentStation,
@@ -113,9 +111,13 @@ export function OndeSpectraleRadio() {
       }))
     );
     
-    createDefaultStations().then(() => {
-       fetchStationData(frequency);
-    });
+    const init = async () => {
+      await createDefaultStations();
+      // Fetch initial station data based on persisted frequency
+      const initialFrequency = useRadioStore.getState().frequency;
+      fetchStationData(initialFrequency);
+    };
+    init();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -182,7 +184,7 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
-    debouncedFetchStationData(newFreq);
+    fetchStationData(newFreq);
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
