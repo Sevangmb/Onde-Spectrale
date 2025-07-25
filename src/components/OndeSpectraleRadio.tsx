@@ -1,7 +1,8 @@
-
+// src/components/OndeSpectraleRadio.tsx
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useRadioStore } from '@/shared/stores/useRadioStore';
 import { useDebouncedCallback } from 'use-debounce';
 import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
@@ -24,13 +25,13 @@ import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-import { 
-  RadioTower, 
-  Rss, 
-  ChevronLeft, 
-  ChevronRight, 
-  Zap, 
-  UserCog, 
+import {
+  RadioTower,
+  Rss,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  UserCog,
   Settings,
   ListMusic
 } from 'lucide-react';
@@ -43,60 +44,42 @@ interface ParticleStyle {
 }
 
 export function OndeSpectraleRadio() {
-  // État de base
-  const [frequency, setFrequency] = useState(100.7);
-  const [sliderValue, setSliderValue] = useState(100.7);
-  const [currentStation, setCurrentStation] = useState<Station | null>(null);
-  const [isLoadingStation, setIsLoadingStation] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
-  
-  // Interface
   const [showPlaylist, setShowPlaylist] = useState(false);
-  const [signalStrength, setSignalStrength] = useState(0);
   const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const [isClient, setIsClient] = useState(false);
-  
-  const router = useRouter();
+  const [audioContextEnabled, setAudioContextEnabled] = useState(false);
 
-  // Hook de gestion de playlist
-  const playlistManager = usePlaylistManager({
-    station: currentStation,
-    user,
-    allDjs
-  });
-
-  // Hook pour les effets sonores radio
-  const radioSounds = useRadioSoundEffects({
-    volume: 0.2,
-    enableEffects: false,
-    fadeInDuration: 300,
-    fadeOutDuration: 200
-  });
+  const {
+    frequency,
+    sliderValue,
+    currentStation,
+    isLoadingStation,
+    isScanning,
+    signalStrength,
+    setFrequency,
+    setSliderValue,
+    setCurrentStation,
+    setIsLoadingStation,
+    setIsScanning,
+    setSignalStrength,
+    setError
+  } = useRadioStore();
 
   const fetchStationData = useDebouncedCallback(async (freq: number) => {
     setIsLoadingStation(true);
     setError(null);
 
     try {
-      let station = await getStationForFrequency(freq);
+      const station = await getStationForFrequency(freq);
       
       const newSignalStrength = station 
         ? Math.floor(Math.random() * 20) + 80 
         : Math.floor(Math.random() * 30) + 10;
       
       setSignalStrength(newSignalStrength);
-      
-      if (!station) {
-        radioSounds.playContextualEffect('signal_loss', true);
-      } else if (newSignalStrength < 50) {
-        radioSounds.playInterference(true);
-      } else {
-        radioSounds.stopEffect();
-      }
-      
       setCurrentStation(station);
       
     } catch (err: any) {
@@ -106,13 +89,21 @@ export function OndeSpectraleRadio() {
     }
   }, 500);
 
-  // Initialisation et gestion de l'utilisateur
+  const playlistManager = usePlaylistManager({
+    station: currentStation,
+    user,
+    allDjs
+  });
+
+  const radioSounds = useRadioSoundEffects({
+    volume: 0.2,
+    enableEffects: false,
+    fadeInDuration: 300,
+    fadeOutDuration: 200
+  });
+
   useEffect(() => {
     setIsClient(true);
-    
-    setTimeout(() => {
-      radioSounds.playRadioStartup();
-    }, 500);
     
     setParticleStyles(
       Array.from({ length: 15 }, () => ({
@@ -123,14 +114,12 @@ export function OndeSpectraleRadio() {
       }))
     );
     
-    // Créer les stations par défaut au démarrage si elles n'existent pas
     createDefaultStations().then(() => {
-       fetchStationData(100.7);
+       fetchStationData(frequency);
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      
       if (currentUser) {
         try {
           const customDjs = await getCustomCharactersForUser(currentUser.uid);
@@ -141,12 +130,29 @@ export function OndeSpectraleRadio() {
       }
     });
 
-    return () => {
-      unsubscribe();
-    };
-  }, []); // Dépendances vides pour n'exécuter qu'au montage
+    return () => unsubscribe();
+  }, [fetchStationData, frequency]);
 
-  const handleScan = (direction: 'up' | 'down') => {
+  const handleUserInteraction = useCallback(() => {
+    if (!audioContextEnabled) {
+      setAudioContextEnabled(true);
+      if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
+        playlistManager.togglePlayPause();
+      }
+    }
+  }, [audioContextEnabled, playlistManager]);
+
+  useEffect(() => {
+    if (!audioContextEnabled) {
+      const events = ['click', 'touchstart', 'keydown'];
+      events.forEach(event => document.addEventListener(event, handleUserInteraction, { once: true }));
+      return () => {
+        events.forEach(event => document.removeEventListener(event, handleUserInteraction));
+      };
+    }
+  }, [audioContextEnabled, handleUserInteraction]);
+
+  const handleScan = useCallback((direction: 'up' | 'down') => {
     if (isScanning) return;
     
     setIsScanning(true);
@@ -155,24 +161,19 @@ export function OndeSpectraleRadio() {
     let newFrequency = sliderValue;
     const intervalId = setInterval(() => {
       newFrequency += direction === 'up' ? 0.1 : -0.1;
-      const clampedFrequency = Math.max(87.0, Math.min(108.0, newFrequency));
-      setSliderValue(clampedFrequency);
+      setSliderValue(Math.max(87.0, Math.min(108.0, newFrequency)));
     }, 50);
 
     setTimeout(() => {
       clearInterval(intervalId);
-      const finalFrequency = Math.round(newFrequency * 2)/2; // Arrondi au .5 le plus proche
+      const finalFrequency = Math.round(newFrequency * 2)/2;
       const clampedFrequency = Math.max(87.0, Math.min(108.0, finalFrequency));
-
       setFrequency(clampedFrequency);
       setSliderValue(clampedFrequency);
       fetchStationData(clampedFrequency);
       setIsScanning(false);
     }, 1000);
-  };
-
-  const handleScanUp = () => handleScan('up');
-  const handleScanDown = () => handleScan('down');
+  }, [isScanning, sliderValue, radioSounds, setIsScanning, setSliderValue, setFrequency, fetchStationData]);
 
   const handleFrequencyChange = (value: number[]) => {
     setSliderValue(value[0]);
@@ -187,45 +188,17 @@ export function OndeSpectraleRadio() {
     }
   };
 
-  const [audioContextEnabled, setAudioContextEnabled] = useState(false);
-  
-  const handleUserInteraction = useCallback(() => {
-    if (!audioContextEnabled) {
-      setAudioContextEnabled(true);
-      if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
-        playlistManager.togglePlayPause();
-      }
-    }
-  }, [audioContextEnabled, playlistManager]);
-  
-  useEffect(() => {
-    if (!audioContextEnabled) {
-      const events = ['click', 'touchstart', 'keydown'];
-      events.forEach(event => {
-        document.addEventListener(event, handleUserInteraction, { once: true });
-      });
-      
-      return () => {
-        events.forEach(event => {
-          document.removeEventListener(event, handleUserInteraction);
-        });
-      };
-    }
-  }, [audioContextEnabled, handleUserInteraction]);
-  
-  const isRadioActive = useMemo(() => {
-    return isClient && !isLoadingStation && currentStation !== null;
-  }, [isClient, isLoadingStation, currentStation]);
+  const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
 
   return (
     <>
-      <audio 
-        ref={playlistManager.audioRef} 
-        crossOrigin="anonymous" 
+      <audio
+        ref={playlistManager.audioRef}
+        crossOrigin="anonymous"
         preload="metadata"
         onEnded={playlistManager.nextTrack}
         onError={(e) => {
-          if(playlistManager.currentTrack) {
+          if (playlistManager.currentTrack) {
             playlistManager.addFailedTrack(playlistManager.currentTrack.id);
           }
           playlistManager.nextTrack();
@@ -233,7 +206,6 @@ export function OndeSpectraleRadio() {
       />
       
       <div className="relative w-full min-h-[90vh] overflow-hidden bg-background">
-        
         {isClient && particleStyles.map((style, i) => (
           <div
             key={i}
@@ -248,7 +220,6 @@ export function OndeSpectraleRadio() {
               
               <div className="lg:col-span-2">
                 <Card className="w-full pip-boy-terminal shadow-2xl relative overflow-hidden fade-in">
-                  
                   <CardHeader className="relative border-b-2 border-primary/40 pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -261,19 +232,19 @@ export function OndeSpectraleRadio() {
                       </div>
                       
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          className="retro-button" 
+                          className="retro-button"
                           onClick={() => router.push('/admin')}
                         >
                           <UserCog className="mr-1 h-4 w-4" /> Admin
                         </Button>
                         
                         {isRadioActive && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => setShowPlaylist(!showPlaylist)}
                             className="retro-button"
                           >
@@ -285,10 +256,10 @@ export function OndeSpectraleRadio() {
                         {user ? (
                           <>
                             {currentStation && currentStation.ownerId === user.uid && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="retro-button" 
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="retro-button"
                                 onClick={() => router.push(`/admin/stations/${currentStation.id}`)}
                               >
                                 <Settings className="mr-2 h-4 w-4" /> Gérer
@@ -296,10 +267,10 @@ export function OndeSpectraleRadio() {
                             )}
                           </>
                         ) : (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="retro-button" 
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="retro-button"
                             onClick={() => router.push('/login')}
                           >
                             <Rss className="mr-2 h-4 w-4" /> Connexion
@@ -311,9 +282,7 @@ export function OndeSpectraleRadio() {
                   
                   <CardContent className="p-6 relative">
                     <div className="flex flex-col gap-6">
-                      
                       <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl relative overflow-hidden slide-up">
-                        
                         <div className="relative z-10 space-y-4">
                           <div className="flex items-center justify-between">
                             <label htmlFor="frequency" className="text-sm font-mono font-bold text-primary/80 tracking-wider uppercase">
@@ -326,8 +295,8 @@ export function OndeSpectraleRadio() {
                                   <div
                                     key={i}
                                     className={`w-2 h-5 rounded-sm transition-all duration-300 ${
-                                      i < Math.floor(signalStrength / 20) 
-                                        ? 'bg-primary shadow-lg' 
+                                      i < Math.floor(signalStrength / 20)
+                                        ? 'bg-primary shadow-lg'
                                         : 'bg-muted'
                                     }`}
                                   />
@@ -359,11 +328,11 @@ export function OndeSpectraleRadio() {
                           </div>
 
                           <div className="flex items-center justify-center gap-4">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={handleScanDown} 
-                              disabled={frequency <= 87.0 || isScanning} 
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleScan('down')}
+                              disabled={frequency <= 87.0 || isScanning}
                               className="retro-button disabled:opacity-50"
                             >
                               <ChevronLeft className="h-4 w-4 mr-1" /> SCAN-
@@ -371,11 +340,11 @@ export function OndeSpectraleRadio() {
                             <div className="text-muted-foreground px-4 py-2 text-xs font-mono">
                               87.0 - 108.0 MHz
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={handleScanUp} 
-                              disabled={frequency >= 108.0 || isScanning} 
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleScan('up')}
+                              disabled={frequency >= 108.0 || isScanning}
                               className="retro-button disabled:opacity-50"
                             >
                               SCAN+ <ChevronRight className="h-4 w-4 ml-1" />
@@ -392,7 +361,7 @@ export function OndeSpectraleRadio() {
                               onValueChange={handleFrequencyChange}
                               onValueCommit={handleFrequencyCommit}
                               className="w-full"
-                              disabled={!!error || isScanning}
+                              disabled={isScanning}
                             />
                             <div className="flex justify-between text-xs text-muted-foreground font-mono">
                               <span>87.0</span><span>95.0</span><span>108.0</span>
@@ -429,9 +398,9 @@ export function OndeSpectraleRadio() {
                       
                       <SpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
                       
-                      <AudioPlayer 
-                        track={playlistManager.currentTrack} 
-                        isPlaying={playlistManager.isPlaying} 
+                      <AudioPlayer
+                        track={playlistManager.currentTrack}
+                        isPlaying={playlistManager.isPlaying}
                         isLoading={playlistManager.isLoadingTrack}
                         audioRef={playlistManager.audioRef}
                         ttsMessage={playlistManager.ttsMessage}

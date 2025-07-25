@@ -1,9 +1,15 @@
 import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
-import type { RadioState, Station } from '@/shared/types';
+import type { Station } from '@/lib/types';
 
-interface RadioStore extends RadioState {
-  // Actions
+interface RadioState {
+  frequency: number;
+  sliderValue: number;
+  currentStation: Station | null;
+  isLoadingStation: boolean;
+  isScanning: boolean;
+  signalStrength: number;
+  error: string | null;
   setFrequency: (frequency: number) => void;
   setSliderValue: (value: number) => void;
   setCurrentStation: (station: Station | null) => void;
@@ -14,7 +20,7 @@ interface RadioStore extends RadioState {
   reset: () => void;
 }
 
-const initialState: RadioState = {
+const initialState: Omit<RadioState, 'setFrequency' | 'setSliderValue' | 'setCurrentStation' | 'setIsLoadingStation' | 'setIsScanning' | 'setSignalStrength' | 'setError' | 'reset'> = {
   frequency: 100.7,
   sliderValue: 100.7,
   currentStation: null,
@@ -24,57 +30,29 @@ const initialState: RadioState = {
   error: null,
 };
 
-export const useRadioStore = create<RadioStore>()(
+export const useRadioStore = create<RadioState>()(
   devtools(
     persist(
-      (set, get) => ({
+      (set) => ({
         ...initialState,
-
-        // Actions
-        setFrequency: (frequency) => 
-          set({ frequency }, false, 'setFrequency'),
-
-        setSliderValue: (sliderValue) => 
-          set({ sliderValue }, false, 'setSliderValue'),
-
-        setCurrentStation: (currentStation) => 
-          set({ currentStation }, false, 'setCurrentStation'),
-
-        setIsLoadingStation: (isLoadingStation) => 
-          set({ isLoadingStation }, false, 'setIsLoadingStation'),
-
-        setIsScanning: (isScanning) => 
-          set({ isScanning }, false, 'setIsScanning'),
-
-        setSignalStrength: (signalStrength) => 
-          set({ signalStrength }, false, 'setSignalStrength'),
-
-        setError: (error) => 
-          set({ error }, false, 'setError'),
-
-        reset: () => 
-          set(initialState, false, 'reset'),
+        setFrequency: (frequency) => set({ frequency }, false, 'setFrequency'),
+        setSliderValue: (sliderValue) => set({ sliderValue }, false, 'setSliderValue'),
+        setCurrentStation: (currentStation) => set({ currentStation }, false, 'setCurrentStation'),
+        setIsLoadingStation: (isLoadingStation) => set({ isLoadingStation }, false, 'setIsLoadingStation'),
+        setIsScanning: (isScanning) => set({ isScanning }, false, 'setIsScanning'),
+        setSignalStrength: (signalStrength) => set({ signalStrength }, false, 'setSignalStrength'),
+        setError: (error) => set({ error }, false, 'setError'),
+        reset: () => set(initialState, false, 'reset'),
       }),
       {
-        name: 'onde-spectrale-radio',
-        storage: createJSONStorage(() => {
-          if (typeof window !== 'undefined') {
-            return localStorage;
-          }
-          return {
-            getItem: () => null,
-            setItem: () => {},
-            removeItem: () => {},
-          };
-        }),
+        name: 'onde-spectrale-radio-store',
+        storage: createJSONStorage(() => localStorage),
         partialize: (state) => ({
           frequency: state.frequency,
           sliderValue: state.sliderValue,
         }),
       }
     ),
-    {
-      name: 'radio-store',
-    }
+    { name: 'radio-store' }
   )
 );
