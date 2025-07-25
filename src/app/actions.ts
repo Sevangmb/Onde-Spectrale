@@ -338,39 +338,17 @@ export async function createStation(ownerId: string, formData: FormData) {
       theme: theme,
   };
 
-  // TEMPORAIRE: Créer une playlist statique pour éviter les problèmes d'IA
-  const playlistWithIds: PlaylistItem[] = [
-    {
-      id: `${Date.now()}-0`,
-      type: 'message',
-      title: 'Message de bienvenue',
-      content: `Bonjour et bienvenue sur ${name}. Je suis ${dj.name}, votre DJ post-apocalyptique. Nous diffusons de la musique sur le thème ${theme} pour tous les survivants des terres désolées.`,
-      artist: dj.name,
-      duration: 10,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-1`,
-      type: 'message',
-      title: 'Ouverture de Station',
-      content: `Salut les survivants ! Ici ${dj.name} sur ${name}. Bienvenue dans les terres désolées radioactives ! On va vous faire passer un bon moment avec de la musique d'avant-guerre et les dernières nouvelles de l'apocalypse.`,
-      artist: dj.name,
-      duration: 12,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-2`,
-      type: 'music',
-      title: 'Cantina Band',
-      content: 'jazz',
-      artist: 'Pre-War Classics',
-      duration: 30,
-      url: '',
-      addedAt: new Date().toISOString()
-    }
-  ];
+  const { items } = await generatePlaylist(playlistInput);
+  
+  const playlistWithIds: PlaylistItem[] = items.map((item, index) => ({
+    id: `${Date.now()}-${index}`,
+    ...item,
+    title: item.type === 'message' ? `Message de ${dj.name}` : 'Musique d\'ambiance',
+    artist: item.type === 'message' ? dj.name : 'Artistes variés',
+    duration: item.type === 'message' ? 10 : 180, // Durées par défaut
+    url: '', // L'URL sera déterminée à la lecture
+    addedAt: new Date().toISOString(),
+  }));
 
 
   const newStationData = {
@@ -504,7 +482,7 @@ export async function addMusicToStation(stationId: string, musicTrack: PlaylistI
     return { success: true, playlistItem: newTrack };
 }
 
-export async function regenerateStationPlaylist(stationId: string): Promise<{ success: true } | { error: string }> {
+export async function regenerateStationPlaylist(stationId: string): Promise<{ success: true, newPlaylist: PlaylistItem[] } | { error: string }> {
     const station = await getStationById(stationId);
     if (!station) {
         return { error: "Station non trouvée." };
@@ -517,58 +495,38 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
     if (!dj) {
         return { error: "DJ non trouvé." };
     }
-
-    // Créer une nouvelle playlist avec contenu
-    const newPlaylist: PlaylistItem[] = [
-        {
-            id: `${Date.now()}-0`,
-            type: 'message',
-            title: 'Message de bienvenue',
-            content: `Bonjour et bienvenue sur ${station.name}. Je suis ${dj.name}, votre DJ. Nous diffusons de la musique sur le thème ${station.theme}.`,
-            artist: dj.name,
-            duration: 8,
-            url: '',
-            addedAt: new Date().toISOString()
-        },
-        {
-            id: `${Date.now()}-1`,
-            type: 'music',
-            title: 'Première chanson',
-            content: 'jazz',
-            artist: 'Artiste Inconnu',
-            duration: 180,
-            url: '',
-            addedAt: new Date().toISOString()
-        },
-        {
-            id: `${Date.now()}-2`,
-            type: 'message',
-            title: 'Transition musicale',
-            content: `Voici une belle chanson pour accompagner votre écoute sur ${station.name}. Restez à l'écoute !`,
-            artist: dj.name,
-            duration: 5,
-            url: '',
-            addedAt: new Date().toISOString()
-        },
-        {
-            id: `${Date.now()}-3`,
-            type: 'music',
-            title: 'Deuxième chanson',
-            content: 'classical',
-            artist: 'Artiste Inconnu',
-            duration: 200,
-            url: '',
-            addedAt: new Date().toISOString()
-        }
-    ];
-
-    const stationRef = doc(db, 'stations', stationId);
-    await updateDoc(stationRef, { playlist: newPlaylist });
-
-    revalidatePath(`/admin/stations/${stationId}`);
-    revalidatePath('/admin/stations');
     
-    return { success: true };
+    const playlistInput: GeneratePlaylistInput = {
+      stationName: station.name,
+      djName: dj.name,
+      djDescription: 'isCustom' in dj && dj.isCustom ? dj.description : (dj as DJCharacter).description,
+      theme: station.theme || 'musique post-apocalyptique',
+    };
+
+    try {
+        const { items } = await generatePlaylist(playlistInput);
+      
+        const newPlaylist: PlaylistItem[] = items.map((item, index) => ({
+            id: `regen-${Date.now()}-${index}`,
+            type: item.type,
+            content: item.content,
+            title: item.type === 'message' ? `Message de ${dj.name}` : `Ambiance ${station.name}`,
+            artist: item.type === 'message' ? dj.name : 'Artistes des terres désolées',
+            duration: item.type === 'message' ? 12 : 180,
+            url: '',
+            addedAt: new Date().toISOString(),
+        }));
+
+        const stationRef = doc(db, 'stations', stationId);
+        await updateDoc(stationRef, { playlist: newPlaylist });
+
+        revalidatePath(`/admin/stations/${stationId}`);
+        revalidatePath('/admin/stations');
+        
+        return { success: true, newPlaylist };
+    } catch (error: any) {
+        return { error: `Erreur de l'IA lors de la régénération: ${error.message}` };
+    }
 }
 
 
@@ -592,9 +550,11 @@ export async function updateUserOnLogin(userId: string, email: string | null) {
 }
 
 export async function updateUserFrequency(userId: string, frequency: number) {
-  const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, { lastFrequency: frequency });
+    if (!userId) return;
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, { lastFrequency: frequency });
 }
+
 
 export async function getUserData(userId: string) {
     if (!userId) return null;
@@ -732,8 +692,8 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: 'Terme de recherche musical vide.' };
         }
 
-        if (track.url) {
-            try {
+        if (track.url && !track.url.startsWith('http')) {
+             try {
                 const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
                 if (response.ok && response.headers.get('content-type')?.includes('audio')) {
                     return { audioUrl: track.url };
@@ -742,7 +702,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
                 console.warn(`URL existante invalide pour ${track.title}:`, err);
             }
         }
-
+       
         try {
             console.log(`🎵 Recherche Plex pour "${track.content}"`);
             
@@ -762,14 +722,14 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
                 }
             }
 
-            console.log(`🎲 Aucune correspondance exacte, piste aléatoire du thème "${stationTheme}"`);
+            console.log(`🎲 Aucune correspondance exacte, piste aléatoire.`);
             const randomTracks = await getRandomPlexTracks(undefined, 1);
             if (randomTracks.length > 0) {
                 const randomTrack = randomTracks[0];
                 console.log(`✅ Piste Plex aléatoire: ${randomTrack.title} par ${randomTrack.artist}`);
                 return { audioUrl: randomTrack.url };
             }
-
+            
             return { error: `Plex n'a trouvé aucune piste pour "${track.content}".` };
             
         } catch (plexError: any) {
@@ -778,3 +738,5 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         }
     }
 }
+
+    

@@ -146,7 +146,7 @@ export function OndeSpectraleRadio() {
     return () => {
       unsubscribe();
     };
-  }, [fetchStationData]); // fetchStationData est maintenant stable
+  }, []); // Dépendances vides pour n'exécuter qu'au montage
 
   const handleScan = (direction: 'up' | 'down') => {
     if (isScanning) return;

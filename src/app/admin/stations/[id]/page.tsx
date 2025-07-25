@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
-import { getStationById, addMessageToStation, addMusicToStation, searchMusic } from '@/app/actions';
+import { getStationById, addMessageToStation, addMusicToStation, searchMusic, regenerateStationPlaylist } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import type { Station, PlaylistItem, CustomDJCharacter, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -34,6 +34,7 @@ import {
   Clock,
   ExternalLink,
   Sparkles,
+  RefreshCcw
 } from 'lucide-react';
 
 export default function StationDetailPage() {
@@ -55,6 +56,7 @@ export default function StationDetailPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   
   const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
 
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
@@ -117,6 +119,19 @@ export default function StationDetailPage() {
     }
     setAddingTrackId(null);
   }
+
+  const handleRegeneratePlaylist = async () => {
+    if (!station) return;
+    setIsRegenerating(true);
+    const result = await regenerateStationPlaylist(station.id);
+    if ('error' in result) {
+      toast({ variant: 'destructive', title: "Erreur IA", description: result.error });
+    } else {
+      toast({ title: "Playlist régénérée !", description: `La playlist de ${station.name} a été mise à jour.` });
+      setStation(prev => prev ? { ...prev, playlist: result.newPlaylist } : null);
+    }
+    setIsRegenerating(false);
+  };
 
   const sortedPlaylist = useMemo(() => {
     if (!station?.playlist) return [];
@@ -201,24 +216,25 @@ export default function StationDetailPage() {
 
          <Card className="lg:col-span-2">
             <CardHeader>
-                <CardTitle>Générateur de Playlist IA</CardTitle>
-                 <CardDescription>La playlist de cette station est générée automatiquement par l'IA. Pour ajouter manuellement du contenu, utilisez les options ci-dessous.</CardDescription>
+                <CardTitle>Gestion de la Playlist</CardTitle>
+                 <CardDescription>La playlist de cette station est un mix de pistes générées par IA et d'ajouts manuels. Vous pouvez la régénérer à tout moment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="space-y-2">
-                    <Label htmlFor="message-theme">Thème de la station</Label>
+                    <Label htmlFor="message-theme">Thème de la station pour l'IA</Label>
                     <Input
                         id="message-theme"
                         value={station.theme}
                         disabled
+                        className="font-mono"
                     />
                      <p className="text-xs text-muted-foreground">
-                        Ce thème est utilisé par l'IA pour générer les messages et choisir les musiques.
+                        Ce thème est utilisé par l'IA lors de la régénération de la playlist.
                      </p>
                 </div>
-                <Button disabled className="w-full">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Playlist gérée par l'IA
+                <Button onClick={handleRegeneratePlaylist} disabled={isRegenerating} className="w-full">
+                    {isRegenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                    {isRegenerating ? 'Régénération en cours...' : 'Regénérer la playlist avec l\'IA'}
                 </Button>
             </CardContent>
          </Card>
@@ -341,3 +357,5 @@ export default function StationDetailPage() {
     </div>
   );
 }
+
+    
