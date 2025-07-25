@@ -12,7 +12,7 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, 
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
-import { searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
+import { testPlexConnection, getPlexMusicLibraries, searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -37,46 +37,62 @@ export async function createDefaultStations(): Promise<void> {
     {
       frequency: 100.7,
       name: 'Radio Wasteland',
-      djId: 'three-dog',
-      theme: 'post-apocalyptic'
+      djId: 'marcus', // Utilisons Marcus pour la radio principale
+      theme: 'Histoires et musiques des terres désolées'
     },
     {
       frequency: 94.5,
       name: 'Diamond City Radio',
-      djId: 'travis',
-      theme: 'pre-war-music'
+      djId: 'tommy', // Tommy pour une ambiance plus légère
+      theme: 'Les classiques d\'avant-guerre et les nouvelles de la ville'
     },
     {
       frequency: 102.1,
       name: 'Enclave Radio',
-      djId: 'john-henry-eden',
-      theme: 'propaganda'
+      djId: 'marcus', // Marcus pour une voix autoritaire
+      theme: 'Propagande et marches patriotiques de l\'Enclave'
     },
     {
       frequency: 98.2,
-      name: 'Classical Radio',
-      djId: 'classical-dj',
-      theme: 'classical'
+      name: 'Radio de la Savante',
+      djId: 'sarah', // Sarah pour une touche de savoir
+      theme: 'Musique classique et réflexions sur le vieux monde'
     }
   ];
 
   for (const stationConfig of stations) {
     try {
-      // Vérifier si existe déjà
       const existing = await getStationForFrequency(stationConfig.frequency);
       if (existing) continue;
 
       const dj = DJ_CHARACTERS.find(d => d.id === stationConfig.djId) || DJ_CHARACTERS[0];
       
-      const playlist = createPlaylistForTheme(stationConfig.theme, stationConfig.name, dj);
+      const playlistInput: GeneratePlaylistInput = {
+        stationName: stationConfig.name,
+        djName: dj.name,
+        djDescription: dj.description,
+        theme: stationConfig.theme,
+      };
+
+      const { items } = await generatePlaylist(playlistInput);
       
+      const playlistWithIds: PlaylistItem[] = items.map((item, index) => ({
+        id: `${Date.now()}-${index}`,
+        ...item,
+        title: item.type === 'message' ? `Message de ${dj.name}` : 'Musique d\'ambiance',
+        artist: item.type === 'message' ? dj.name : 'Artistes variés',
+        duration: item.type === 'message' ? 10 : 180,
+        url: '',
+        addedAt: new Date().toISOString(),
+      }));
+
       const stationData = {
         name: stationConfig.name,
         frequency: stationConfig.frequency,
         djCharacterId: dj.id,
         theme: stationConfig.theme,
         ownerId: 'system',
-        playlist: playlist,
+        playlist: playlistWithIds,
         createdAt: serverTimestamp(),
       };
       
@@ -86,154 +102,6 @@ export async function createDefaultStations(): Promise<void> {
     } catch (error) {
       console.error(`Erreur création station ${stationConfig.name}:`, error);
     }
-  }
-}
-
-function createPlaylistForTheme(theme: string, stationName: string, dj: any): PlaylistItem[] {
-  const baseId = Date.now();
-  
-  if (theme === 'classical') {
-    return [
-      {
-        id: `${baseId}-1`,
-        type: 'message',
-        title: 'Ouverture Classique',
-        content: `Bonsoir, ici ${dj.name} sur ${stationName}. Voici les plus belles œuvres d'avant-guerre.`,
-        artist: dj.name,
-        duration: 8,
-        url: '',
-        addedAt: new Date().toISOString()
-      },
-      {
-        id: `${baseId}-2`,
-        type: 'music',
-        title: 'Musique Classique',
-        content: 'classical piano symphony',
-        artist: 'À découvrir',
-        duration: 180,
-        url: '',
-        addedAt: new Date().toISOString()
-      },
-      {
-        id: `${baseId}-3`,
-        type: 'music',
-        title: 'Orchestre Symphonique',
-        content: 'orchestra symphony classical',
-        artist: 'À découvrir',
-        duration: 200,
-        url: '',
-        addedAt: new Date().toISOString()
-      }
-    ];
-  }
-
-  if (theme === 'propaganda') {
-    return [
-      {
-        id: `${baseId}-1`,
-        type: 'message',
-        title: 'Message Enclave',
-        content: `Citoyens américains, ici votre président ${dj.name}. L'Enclave veille sur vous.`,
-        artist: dj.name,
-        duration: 8,
-        url: '',
-        addedAt: new Date().toISOString()
-      },
-      {
-        id: `${baseId}-2`,
-        type: 'music',
-        title: 'Marche Patriotique',
-        content: 'patriotic',
-        artist: 'Enclave Band',
-        duration: 30,
-        url: '',
-        addedAt: new Date().toISOString()
-      }
-    ];
-  }
-
-  // Station par défaut (Wasteland/Diamond City)
-  const vintageJazzTracks = [
-    { title: "Moonlight Serenade", artist: "Glenn Miller Orchestra" },
-    { title: "Take Five", artist: "Dave Brubeck" },
-    { title: "Summertime", artist: "Ella Fitzgerald" },
-    { title: "In the Mood", artist: "Glenn Miller" },
-    { title: "Sing Sing Sing", artist: "Benny Goodman" }
-  ];
-  
-  const randomTrack = vintageJazzTracks[Math.floor(Math.random() * vintageJazzTracks.length)];
-  
-  return [
-    {
-      id: `${baseId}-1`,
-      type: 'message',
-      title: 'Ouverture Radio',
-      content: `Salut les survivants ! Ici ${dj.name} sur ${stationName}. Bienvenue dans les terres désolées ! On commence avec du jazz d'avant-guerre.`,
-      artist: dj.name,
-      duration: 8,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${baseId}-2`,
-      type: 'music',
-      title: randomTrack.title,
-      content: 'jazz',
-      artist: randomTrack.artist,
-      duration: 45,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${baseId}-3`,
-      type: 'message',
-      title: 'Info du jour',
-      content: `Flash info ! Des raiders ont été aperçus près du Vault 101. Ils semblent chercher de vieux disques de jazz. Coïncidence ? Je ne pense pas...`,
-      artist: dj.name,
-      duration: 8,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${baseId}-4`,
-      type: 'music',
-      title: 'Blue Suede Shoes',
-      content: 'rockabilly',
-      artist: 'Carl Perkins',
-      duration: 40,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${baseId}-5`,
-      type: 'message',
-      title: 'Message de fin',
-      content: `C'était ${dj.name} sur ${stationName}. On se retrouve bientôt avec plus de classiques d'avant-guerre. Restez à l'écoute !`,
-      artist: dj.name,
-      duration: 6,
-      url: '',
-      addedAt: new Date().toISOString()
-    }
-  ];
-}
-
-export async function createDefaultStation(): Promise<Station | null> {
-  try {
-    const frequency = 100.7;
-    
-    // Vérifier si la station par défaut existe déjà
-    const existing = await getStationForFrequency(frequency);
-    if (existing) return existing;
-    
-    // Créer toutes les stations par défaut
-    await createDefaultStations();
-    
-    // Retourner la station principale
-    return await getStationForFrequency(frequency);
-    
-  } catch (error) {
-    console.error('Erreur création station par défaut:', error);
-    return null;
   }
 }
 
@@ -424,33 +292,19 @@ export async function addMessageToStation(stationId: string, message: string): P
     return { success: true, playlistItem: newPlaylistItem };
 }
 
-
 export async function searchMusic(searchTerm: string): Promise<{ data?: PlaylistItem[]; error?: string }> {
     if (!searchTerm || !searchTerm.trim()) {
       return { error: "Search term is empty" };
     }
 
     try {
-        // Use Plex search only
         const results = await searchPlexMusic(searchTerm, 8);
         
         if (results.length === 0) {
             return { error: "Aucune musique trouvée dans votre bibliothèque Plex" };
         }
 
-        // Convert Plex results to PlaylistItem format
-        const playlistItems: PlaylistItem[] = results.map(track => ({
-            id: `plex-${Date.now()}-${Math.random()}`,
-            type: 'music',
-            title: track.title,
-            content: searchTerm,
-            artist: track.artist,
-            duration: track.duration || 180,
-            url: track.url,
-            addedAt: new Date().toISOString()
-        }));
-
-        return { data: playlistItems };
+        return { data: results };
     } catch (error: any) {
         console.error("La recherche musicale Plex a échoué:", error);
         return { error: "Erreur de connexion à Plex. Vérifiez votre configuration." };
@@ -538,7 +392,7 @@ export async function updateUserOnLogin(userId: string, email: string | null) {
     await setDoc(userRef, {
       email: email,
       stationsCreated: 0,
-      lastFrequency: 92.1,
+      lastFrequency: 100.7, // Fréquence par défaut
       createdAt: serverTimestamp(),
       lastLogin: serverTimestamp(),
     });
@@ -554,7 +408,6 @@ export async function updateUserFrequency(userId: string, frequency: number) {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, { lastFrequency: frequency });
 }
-
 
 export async function getUserData(userId: string) {
     if (!userId) return null;
@@ -691,17 +544,6 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         if (!track.content) {
             return { error: 'Terme de recherche musical vide.' };
         }
-
-        if (track.url && !track.url.startsWith('http')) {
-             try {
-                const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
-                if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                    return { audioUrl: track.url };
-                }
-            } catch (err) {
-                console.warn(`URL existante invalide pour ${track.title}:`, err);
-            }
-        }
        
         try {
             console.log(`🎵 Recherche Plex pour "${track.content}"`);
@@ -733,10 +575,8 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: `Plex n'a trouvé aucune piste pour "${track.content}".` };
             
         } catch (plexError: any) {
-            console.error('❌ Plex non disponible:', plexError);
+            console.error('❌ Erreur de connexion à Plex:', plexError);
             return { error: `Erreur de connexion à Plex: ${plexError.message}` };
         }
     }
 }
-
-    

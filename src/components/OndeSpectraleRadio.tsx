@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
-import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser, createDefaultStation } from '@/app/actions';
+import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -83,10 +83,6 @@ export function OndeSpectraleRadio() {
     try {
       let station = await getStationForFrequency(freq);
       
-      if (!station && [100.7, 94.5, 102.1, 98.2].includes(freq)) {
-        station = await createDefaultStation();
-      }
-      
       const newSignalStrength = station 
         ? Math.floor(Math.random() * 20) + 80 
         : Math.floor(Math.random() * 30) + 10;
@@ -126,6 +122,11 @@ export function OndeSpectraleRadio() {
         animationDuration: `${3 + Math.random() * 4}s`,
       }))
     );
+    
+    // Créer les stations par défaut au démarrage si elles n'existent pas
+    createDefaultStations().then(() => {
+       fetchStationData(100.7);
+    });
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -139,9 +140,6 @@ export function OndeSpectraleRadio() {
         }
       }
     });
-
-    // Chargement initial de la station
-    fetchStationData(100.7);
 
     return () => {
       unsubscribe();
@@ -466,4 +464,3 @@ export function OndeSpectraleRadio() {
     </>
   );
 }
-
