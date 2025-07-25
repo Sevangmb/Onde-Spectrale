@@ -88,7 +88,7 @@ export function OndeSpectraleRadio() {
       setIsLoadingStation(false);
     }
   }, 500);
-
+  
   const playlistManager = usePlaylistManager({
     station: currentStation,
     user,
@@ -131,7 +131,8 @@ export function OndeSpectraleRadio() {
     });
 
     return () => unsubscribe();
-  }, [fetchStationData, frequency]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUserInteraction = useCallback(() => {
     if (!audioContextEnabled) {
