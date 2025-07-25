@@ -68,26 +68,24 @@ export function OndeSpectraleRadio() {
     setError
   } = useRadioStore();
 
-  const fetchStationData = useDebouncedCallback(async (freq: number) => {
+  const fetchStationData = useCallback(async (freq: number) => {
     setIsLoadingStation(true);
     setError(null);
-
     try {
       const station = await getStationForFrequency(freq);
-      
       const newSignalStrength = station 
         ? Math.floor(Math.random() * 20) + 80 
         : Math.floor(Math.random() * 30) + 10;
-      
       setSignalStrength(newSignalStrength);
       setCurrentStation(station);
-      
     } catch (err: any) {
       setError(`Erreur de données: ${err.message}`);
     } finally {
       setIsLoadingStation(false);
     }
-  }, 500);
+  }, [setIsLoadingStation, setError, setSignalStrength, setCurrentStation]);
+
+  const debouncedFetchStationData = useDebouncedCallback(fetchStationData, 300);
   
   const playlistManager = usePlaylistManager({
     station: currentStation,
@@ -101,7 +99,8 @@ export function OndeSpectraleRadio() {
     fadeInDuration: 300,
     fadeOutDuration: 200
   });
-
+  
+  // Initial setup effect, runs only once
   useEffect(() => {
     setIsClient(true);
     
@@ -183,7 +182,7 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
-    fetchStationData(newFreq);
+    debouncedFetchStationData(newFreq);
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
