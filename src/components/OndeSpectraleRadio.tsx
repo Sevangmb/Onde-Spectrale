@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRadioStore } from '@/shared/stores/useRadioStore';
-import { useDebouncedCallback } from 'use-debounce';
 import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -113,7 +112,6 @@ export function OndeSpectraleRadio() {
     
     const init = async () => {
       await createDefaultStations();
-      // Fetch initial station data based on persisted frequency
       const initialFrequency = useRadioStore.getState().frequency;
       fetchStationData(initialFrequency);
     };
@@ -181,14 +179,14 @@ export function OndeSpectraleRadio() {
     setSliderValue(value[0]);
   };
 
-  const handleFrequencyCommit = async (value: number[]) => {
+  const handleFrequencyCommit = useCallback(async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
     fetchStationData(newFreq);
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
-  };
+  }, [fetchStationData, setFrequency, user]);
 
   const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
 
@@ -198,13 +196,6 @@ export function OndeSpectraleRadio() {
         ref={playlistManager.audioRef}
         crossOrigin="anonymous"
         preload="metadata"
-        onEnded={playlistManager.nextTrack}
-        onError={(e) => {
-          if (playlistManager.currentTrack) {
-            playlistManager.addFailedTrack(playlistManager.currentTrack.id);
-          }
-          playlistManager.nextTrack();
-        }}
       />
       
       <div className="relative w-full min-h-[90vh] overflow-hidden bg-background">

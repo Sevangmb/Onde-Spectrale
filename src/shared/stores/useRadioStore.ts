@@ -20,7 +20,7 @@ interface RadioState {
   reset: () => void;
 }
 
-const initialState: Omit<RadioState, 'setFrequency' | 'setSliderValue' | 'setCurrentStation' | 'setIsLoadingStation' | 'setIsScanning' | 'setSignalStrength' | 'setError' | 'reset'> = {
+const initialState = {
   frequency: 100.7,
   sliderValue: 100.7,
   currentStation: null,
@@ -35,14 +35,14 @@ export const useRadioStore = create<RadioState>()(
     persist(
       (set) => ({
         ...initialState,
-        setFrequency: (frequency) => set({ frequency }, false, 'setFrequency'),
-        setSliderValue: (sliderValue) => set({ sliderValue }, false, 'setSliderValue'),
-        setCurrentStation: (currentStation) => set({ currentStation }, false, 'setCurrentStation'),
-        setIsLoadingStation: (isLoadingStation) => set({ isLoadingStation }, false, 'setIsLoadingStation'),
-        setIsScanning: (isScanning) => set({ isScanning }, false, 'setIsScanning'),
-        setSignalStrength: (signalStrength) => set({ signalStrength }, false, 'setSignalStrength'),
-        setError: (error) => set({ error }, false, 'setError'),
-        reset: () => set(initialState, false, 'reset'),
+        setFrequency: (frequency) => set({ frequency }),
+        setSliderValue: (sliderValue) => set({ sliderValue }),
+        setCurrentStation: (currentStation) => set({ currentStation }),
+        setIsLoadingStation: (isLoadingStation) => set({ isLoadingStation }),
+        setIsScanning: (isScanning) => set({ isScanning }),
+        setSignalStrength: (signalStrength) => set({ signalStrength }),
+        setError: (error) => set({ error }),
+        reset: () => set(initialState),
       }),
       {
         name: 'onde-spectrale-radio-store',

@@ -12,7 +12,7 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, 
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
-import { testPlexConnection, getPlexMusicLibraries, searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
+import { searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
