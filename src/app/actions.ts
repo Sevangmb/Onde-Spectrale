@@ -1,3 +1,4 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -695,38 +696,34 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
 
 export async function getAudioForTrack(track: PlaylistItem, djCharacterId: string, ownerId: string, stationTheme?: string): Promise<{ audioUrl?: string; error?: string }> {
     if (!track) {
-      return { error: "Piste non fournie." };
+        return { error: "Piste non fournie." };
     }
 
-    // Gérer l'utilisateur anonyme
     const allDjs = ownerId && ownerId !== 'anonymous' ? await getCustomCharactersForUser(ownerId) : [];
     const fullDjList: (DJCharacter | CustomDJCharacter)[] = [...DJ_CHARACTERS, ...allDjs];
     const dj = fullDjList.find(d => d.id === djCharacterId);
-    
+
     if (!dj) {
         return { error: "Personnage DJ non trouvé." };
     }
 
     if (track.type === 'message') {
-        // Fallback pour les anciens messages sans content
         let messageContent = track.content;
-        if (!messageContent || messageContent.trim() === '') {
-            messageContent = track.title || 'Message du DJ';
+        if (!messageContent || !messageContent.trim()) {
+            return { error: 'Le contenu du message est vide.' };
         }
         
-        if (!messageContent || messageContent.trim() === '') {
-             return { error: 'Aucun contenu de message disponible.' };
-        }
-        
-        // TEMPORAIRE: Désactiver la génération IA pour diagnostiquer
-        console.log(`Message DJ: "${track.content}" par ${dj.name}`);
-        
-        // Créer un audio silencieux temporaire ou utiliser TTS du navigateur
         try {
-            // Fallback: utiliser TTS du navigateur côté client
-            return { audioUrl: `tts:${encodeURIComponent(messageContent)}` };
-            
-        } catch(err: any) {
+            const { audioBase64 } = ('isCustom' in dj && dj.isCustom)
+                ? await generateCustomDjAudio({ message: messageContent, voice: dj.voice })
+                : await generateDjAudio({ message: messageContent, characterId: dj.id });
+
+            if (!audioBase64) {
+                throw new Error("La génération audio n'a retourné aucune donnée.");
+            }
+
+            return { audioUrl: `data:audio/wav;base64,${audioBase64}` };
+        } catch (err: any) {
             console.error("Erreur de génération vocale IA:", err);
             return { error: `La génération de la voix IA a échoué: ${err.message}` };
         }
@@ -734,8 +731,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         if (!track.content) {
             return { error: 'Terme de recherche musical vide.' };
         }
-        
-        // Essayer l'URL existante d'abord si elle existe
+
         if (track.url) {
             try {
                 const response = await fetch(track.url, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
@@ -746,21 +742,17 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
                 console.warn(`URL existante invalide pour ${track.title}:`, err);
             }
         }
-        
-        // PLEX - Recherche dans le répertoire musique
+
         try {
             console.log(`🎵 Recherche Plex pour "${track.content}"`);
             
-            // D'abord essayer de chercher spécifiquement
             const searchResults = await searchPlexMusic(track.content, 3);
-            
             if (searchResults.length > 0) {
                 const plexTrack = searchResults[0];
                 console.log(`✅ Piste Plex trouvée: ${plexTrack.title} par ${plexTrack.artist}`);
                 return { audioUrl: plexTrack.url };
             }
-            
-            // Fallback: essayer avec le titre de la piste
+
             if (track.title && track.title !== track.content) {
                 const titleResults = await searchPlexMusic(track.title, 1);
                 if (titleResults.length > 0) {
@@ -769,27 +761,20 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
                     return { audioUrl: plexTrack.url };
                 }
             }
-            
-            // Dernier recours: une piste aléatoire du même genre
+
             console.log(`🎲 Aucune correspondance exacte, piste aléatoire du thème "${stationTheme}"`);
             const randomTracks = await getRandomPlexTracks(undefined, 1);
-            
             if (randomTracks.length > 0) {
                 const randomTrack = randomTracks[0];
                 console.log(`✅ Piste Plex aléatoire: ${randomTrack.title} par ${randomTrack.artist}`);
                 return { audioUrl: randomTrack.url };
             }
+
+            return { error: `Plex n'a trouvé aucune piste pour "${track.content}".` };
             
-        } catch (plexError) {
+        } catch (plexError: any) {
             console.error('❌ Plex non disponible:', plexError);
+            return { error: `Erreur de connexion à Plex: ${plexError.message}` };
         }
-        
-        // FALLBACK TEMPORAIRE: Mode démo sans audio réel
-        console.log('🔄 Mode démo - Interface fonctionnelle sans audio Plex');
-        
-        // Retourner une indication que c'est en mode démo
-        return { 
-            error: `Mode démo - Plex non configuré. Interface fonctionnelle pour tester les thèmes.`
-        };
     }
 }
