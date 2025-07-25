@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RadioSoundControls } from '@/components/RadioSoundControls';
 import { testPlexConnectionAction, searchPlexMusicAction, getRandomPlexTracksAction } from '@/app/actions-plex';
 import { PlaylistItem } from '@/lib/types';
 import { Music, Search, Shuffle, Server, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -93,6 +94,13 @@ export default function PlexAdminPage() {
             </CardTitle>
           </CardHeader>
         </Card>
+
+        {/* Contrôles des effets sonores radio */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <RadioSoundControls className="vintage-radio-frame" />
+          </div>
+        </div>
 
         {/* Test de connexion */}
         <Card className="vintage-radio-frame">

@@ -33,6 +33,13 @@ interface PlexResponse {
 const PLEX_SERVER_URL = process.env.PLEX_SERVER_URL || 'http://192.168.1.100:32400';
 const PLEX_TOKEN = process.env.PLEX_TOKEN || '';
 
+// Debug de la configuration Plex
+console.log('🔧 Configuration Plex:', {
+  serverUrl: PLEX_SERVER_URL,
+  hasToken: !!PLEX_TOKEN,
+  tokenLength: PLEX_TOKEN.length
+});
+
 /**
  * Recherche de musique dans la bibliothèque Plex
  */
@@ -70,9 +77,13 @@ export async function searchPlexMusic(query: string, limit: number = 10): Promis
       try {
         // Construire l'URL de streaming
         const mediaKey = track.Media?.[0]?.Part?.[0]?.key;
-        if (!mediaKey) continue;
+        if (!mediaKey) {
+          console.warn(`⚠️ Pas de clé média pour la piste: ${track.title}`);
+          continue;
+        }
 
         const streamUrl = `${PLEX_SERVER_URL}${mediaKey}?X-Plex-Token=${PLEX_TOKEN}`;
+        console.log(`🎵 URL Plex générée: ${streamUrl}`);
 
         const playlistItem: PlaylistItem = {
           id: `plex-${track.key.replace(/\D/g, '')}-${Date.now()}`,
@@ -178,9 +189,13 @@ export async function getRandomPlexTracks(libraryKey?: string, limit: number = 2
     for (const track of tracks) {
       try {
         const mediaKey = track.Media?.[0]?.Part?.[0]?.key;
-        if (!mediaKey) continue;
+        if (!mediaKey) {
+          console.warn(`⚠️ Pas de clé média pour la piste: ${track.title}`);
+          continue;
+        }
 
         const streamUrl = `${PLEX_SERVER_URL}${mediaKey}?X-Plex-Token=${PLEX_TOKEN}`;
+        console.log(`🎵 URL Plex générée: ${streamUrl}`);
 
         const playlistItem: PlaylistItem = {
           id: `plex-random-${track.key.replace(/\D/g, '')}-${Date.now()}`,

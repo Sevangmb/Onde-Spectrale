@@ -257,7 +257,7 @@ export default function StationDetailPage() {
                         <div className="flex w-full items-center space-x-2">
                           <Input 
                             type="text" 
-                            placeholder="Chercher une musique vintage..." 
+                            placeholder="Chercher dans votre bibliothèque Plex..." 
                             value={musicQuery}
                             onChange={(e) => setMusicQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearchMusic()}
@@ -266,7 +266,7 @@ export default function StationDetailPage() {
                             {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">Recherche sur <a href="https://archive.org" target="_blank" rel="noopener noreferrer" className="underline">Archive.org</a>. Privilégiez les titres en anglais.</p>
+                        <p className="text-xs text-muted-foreground">Recherche dans votre bibliothèque Plex. Assurez-vous que Plex est configuré et accessible.</p>
                         
                         <ScrollArea className="h-64 border rounded-md">
                             {searchError && (
@@ -325,13 +325,6 @@ export default function StationDetailPage() {
                                     <Clock className="h-4 w-4"/>
                                     <span>{formatDuration(item.duration)}</span>
                                 </div>
-                                 {item.type === 'music' && item.archiveId && (
-                                     <Button asChild variant="ghost" size="icon">
-                                        <a href={`https://archive.org/details/${item.archiveId}`} target="_blank" rel="noopener noreferrer" title="Voir sur Archive.org">
-                                           <ExternalLink className="h-4 w-4"/>
-                                        </a>
-                                     </Button>
-                                 )}
                             </div>
                         ))}
                     </div>

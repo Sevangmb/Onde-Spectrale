@@ -70,21 +70,49 @@ function AdminLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const data = await getUserData(currentUser.uid);
-        const userStations = await getStationsForUser(currentUser.uid);
-        const userCharacters = await getCustomCharactersForUser(currentUser.uid);
-        setUserData(data);
-        setStations(userStations);
-        setCustomCharacters(userCharacters);
-      } else {
+      try {
+        if (currentUser) {
+          setUser(currentUser);
+          
+          // Gestion d'erreur pour chaque appel Firebase
+          try {
+            const data = await getUserData(currentUser.uid);
+            setUserData(data);
+          } catch (error) {
+            console.error('Erreur getUserData:', error);
+            setUserData(null);
+          }
+          
+          try {
+            const userStations = await getStationsForUser(currentUser.uid);
+            setStations(userStations);
+          } catch (error) {
+            console.error('Erreur getStationsForUser:', error);
+            setStations([]);
+          }
+          
+          try {
+            const userCharacters = await getCustomCharactersForUser(currentUser.uid);
+            setCustomCharacters(userCharacters);
+          } catch (error) {
+            console.error('Erreur getCustomCharactersForUser:', error);
+            setCustomCharacters([]);
+          }
+        } else {
+          setUser(null);
+          setUserData(null);
+          setStations([]);
+          setCustomCharacters([]);
+        }
+      } catch (error) {
+        console.error('Erreur globale dans le layout admin:', error);
         setUser(null);
         setUserData(null);
         setStations([]);
         setCustomCharacters([]);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => unsubscribe();

@@ -107,8 +107,6 @@ export default function AdminDashboard() {
   const renderOverview = () => (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Stations Actives</CardTitle>
@@ -159,7 +157,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Actions Rapides</CardTitle>
@@ -226,7 +224,7 @@ export default function AdminDashboard() {
                 )}
             </CardContent>
         </Card>
-       </div>
-    </div>
+      </div>
+    </>
   );
 }

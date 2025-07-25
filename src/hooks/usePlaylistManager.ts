@@ -1,4 +1,3 @@
-// src/hooks/usePlaylistManager.ts
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -11,315 +10,453 @@ interface PlaylistManagerProps {
   allDjs: (DJCharacter | CustomDJCharacter)[];
 }
 
+type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+
 export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
+  // États principaux
   const [currentTrack, setCurrentTrack] = useState<PlaylistItem | undefined>();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoadingTrack, setIsLoadingTrack] = useState(false);
+  const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
   const [playlistHistory, setPlaylistHistory] = useState<string[]>([]);
   const [failedTracks, setFailedTracks] = useState<Set<string>>(new Set());
   const [ttsMessage, setTtsMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled] = useState(false);
 
+  // Refs
   const audioRef = useRef<HTMLAudioElement>(null);
   const isMountedRef = useRef(true);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const nextTrackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentTrackRef = useRef<PlaylistItem | undefined>();
-  const playTrackByIdRef = useRef<(trackId: string) => Promise<void>>();
+  const currentOperationRef = useRef<string | null>(null);
+  const autoPlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    currentTrackRef.current = currentTrack;
-  }, [currentTrack]);
+  // États dérivés
+  const isPlaying = playbackState === 'playing';
+  const isLoadingTrack = playbackState === 'loading';
 
-  // Mettre à jour la référence de playTrackById
-  useEffect(() => {
-    playTrackByIdRef.current = playTrackById;
-  });
+  // Fonction utilitaire pour nettoyer les timeouts
+  const clearAutoPlayTimeout = useCallback(() => {
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+  }, []);
 
+  // Fonction pour arrêter complètement la lecture
   const stopPlayback = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current.src = '';
+      audioRef.current.currentTime = 0;
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
     }
+    
     if (typeof window !== 'undefined' && window.speechSynthesis?.speaking) {
       window.speechSynthesis.cancel();
     }
-    setIsPlaying(false);
-    if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-  }, []);
-  
-  const playTrackById = useCallback(async (trackId: string): Promise<void> => {
-    if (isLoadingTrack || !isMountedRef.current) return;
     
-    stopPlayback();
-    
-    if (!station) {
-      console.error("playTrackById a été appelée sans station définie.");
-      return;
-    }
-    
-    const track = station.playlist.find(t => t.id === trackId);
-    if (!track) {
-      console.warn(`Piste ${trackId} non trouvée. Passage à la suivante.`);
-      if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-      nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 100);
-      return;
-    }
-
-    if (track.type === 'message' && !track.content?.trim()) {
-      setFailedTracks(prev => new Set(prev).add(track.id));
-      if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-      nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 100);
-      return;
-    }
-
-    setCurrentTrack(track);
-    setIsLoadingTrack(true);
+    clearAutoPlayTimeout();
+    setPlaybackState('idle');
     setErrorMessage(null);
     setTtsMessage(null);
+  }, [clearAutoPlayTimeout]);
+
+  // Fonction pour trouver la prochaine piste valide
+  const findNextValidTrack = useCallback((currentId?: string): PlaylistItem | null => {
+    if (!station || station.playlist.length === 0) return null;
+
+    const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
+    const startIndex = (currentIndex + 1) % station.playlist.length;
     
-    const result = await getAudioForTrack(track, station.djCharacterId, user?.uid || 'anonymous', station.theme);
-
-    if (!isMountedRef.current) return;
-
-    if (result.error || !result.audioUrl) {
-      setErrorMessage(result.error || `Impossible d'obtenir l'audio pour "${track.title}".`);
-      setFailedTracks(prev => new Set(prev).add(track.id));
-      setIsLoadingTrack(false);
-      if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-      nextTrackTimeoutRef.current = setTimeout(() => nextTrack(), 2000);
-      return;
+    // Parcourir la playlist à partir de la position suivante
+    for (let i = 0; i < station.playlist.length; i++) {
+      const index = (startIndex + i) % station.playlist.length;
+      const track = station.playlist[index];
+      
+      // Ignorer les pistes échouées et les messages vides
+      if (!failedTracks.has(track.id) && 
+          !(track.type === 'message' && !track.content?.trim())) {
+        return track;
+      }
     }
 
-    setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
-    setIsLoadingTrack(false);
+    return null;
+  }, [station?.playlist, failedTracks]);
 
-    if (result.audioUrl.startsWith('data:audio')) {
-      if (!audioRef.current) return;
-      setTtsMessage(`Message de ${track.artist}: ${track.content}`);
-      if (result.audioUrl && audioRef.current) {
-        audioRef.current.src = result.audioUrl;
-        try {
-          await audioRef.current.play();
-          setIsPlaying(true);
-        } catch (e) {
-          setErrorMessage("La lecture automatique a été bloquée.");
-          setIsPlaying(false);
-        }
-      } else {
-        setErrorMessage("URL audio non disponible pour cette piste.");
-      }
-    } else {
-      if (!audioRef.current || !result.audioUrl) {
-        setErrorMessage("Erreur de lecture - piste non disponible.");
+  // Fonction principale de lecture d'une piste
+  const playTrackById = useCallback(async (trackId: string): Promise<void> => {
+    if (!isMountedRef.current || !station) return;
+
+    // Empêcher les opérations concurrentes
+    if (currentOperationRef.current === trackId) return;
+    currentOperationRef.current = trackId;
+
+    try {
+      // Arrêter la lecture précédente
+      stopPlayback();
+
+      const track = station.playlist.find(t => t.id === trackId);
+      if (!track) {
+        console.warn(`Piste ${trackId} non trouvée dans la playlist`);
         return;
       }
-      audioRef.current.src = result.audioUrl;
-      try {
-        await audioRef.current.play();
-        setIsPlaying(true);
-      } catch (e) {
-        setErrorMessage("La lecture automatique a été bloquée.");
-        setIsPlaying(false);
-      }
-    }
-  }, [station?.id, user?.uid]);
 
-  const playNextTrackInQueue = useCallback(() => {
-      if (!station || station.playlist.length === 0) return;
-  
-      const currentId = currentTrackRef.current?.id;
-      const currentIndex = currentId ? station.playlist.findIndex(t => t.id === currentId) : -1;
-      
-      let nextIndex = (currentIndex + 1) % station.playlist.length;
-      for (let i = 0; i < station.playlist.length; i++) {
-          const nextTrackToPlay = station.playlist[nextIndex];
-  
-          if (!failedTracks.has(nextTrackToPlay.id)) {
-              if(nextTrackToPlay.type === 'message' && !nextTrackToPlay.content?.trim()) {
-                  setFailedTracks(prev => new Set(prev).add(nextTrackToPlay.id));
-              } else {
-                  if (playTrackByIdRef.current) {
-                    playTrackByIdRef.current(nextTrackToPlay.id);
-                  }
-                  return;
-              }
+      // Vérifier si la piste est valide
+      if (track.type === 'message' && !track.content?.trim()) {
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        // Passer automatiquement à la suivante
+        const nextTrack = findNextValidTrack(track.id);
+        if (nextTrack) {
+          setTimeout(() => playTrackById(nextTrack.id), 100);
+        }
+        return;
+      }
+
+      // Mettre à jour l'état
+      setCurrentTrack(track);
+      setPlaybackState('loading');
+      setErrorMessage(null);
+      setTtsMessage(null);
+
+      console.log('🎵 Chargement de la piste:', track.title);
+
+      // Obtenir l'audio pour la piste
+      const result = await getAudioForTrack(track, station.djCharacterId, user?.uid || 'anonymous', station.theme);
+
+      if (!isMountedRef.current) return;
+
+      // Gérer les erreurs de récupération audio
+      if (result.error || !result.audioUrl) {
+        const errorMsg = result.error || 'URL audio manquante';
+        
+        // Mode démo spécial
+        if (errorMsg.includes('Mode démo')) {
+          console.log('🎨 Mode démo actif');
+          setPlaybackState('playing');
+          setErrorMessage('🎨 Mode démo - Interface fonctionnelle');
+          
+          // Simuler la fin de piste après 30 secondes
+          autoPlayTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setPlaybackState('idle');
+              nextTrack();
+            }
+          }, 30000);
+          return;
+        }
+        
+        // Erreur réelle
+        console.error(`❌ Erreur pour "${track.title}": ${errorMsg}`);
+        setErrorMessage(`Piste non disponible: ${track.title}`);
+        setFailedTracks(prev => new Set(prev).add(track.id));
+        setPlaybackState('error');
+        
+        // Passer à la suivante après 1.5s
+        autoPlayTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            nextTrack();
           }
-          nextIndex = (nextIndex + 1) % station.playlist.length;
+        }, 1500);
+        return;
       }
-  
-      setErrorMessage("Toutes les pistes de la playlist ont échoué.");
-      stopPlayback();
-  }, [station?.id, station?.playlist, failedTracks]);
-  
-  const nextTrack = useCallback(() => {
-    playNextTrackInQueue();
-  }, [playNextTrackInQueue]);
 
+      // Ajouter à l'historique
+      setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
+
+      // Configurer l'élément audio
+      if (!audioRef.current) {
+        setErrorMessage("Lecteur audio non disponible");
+        setPlaybackState('error');
+        return;
+      }
+
+      const audio = audioRef.current;
+
+      // Gérer les messages TTS (data:audio)
+      if (result.audioUrl.startsWith('data:audio')) {
+        setTtsMessage(`Message de ${track.artist}: ${track.content}`);
+        
+        const handleTTSLoad = () => {
+          setPlaybackState('playing');
+          console.log('✅ Message TTS démarré');
+        };
+
+        const handleTTSError = () => {
+          console.error('❌ Erreur TTS');
+          setErrorMessage("Erreur de synthèse vocale");
+          setPlaybackState('error');
+          nextTrack();
+        };
+
+        audio.addEventListener('canplay', handleTTSLoad, { once: true });
+        audio.addEventListener('error', handleTTSError, { once: true });
+        
+        audio.src = result.audioUrl;
+        
+        try {
+          await audio.play();
+        } catch (e) {
+          console.error('❌ Erreur de lecture TTS:', e);
+          setErrorMessage("Cliquez pour activer l'audio");
+          setPlaybackState('paused');
+        }
+      } else {
+        // Gérer les pistes musicales normales
+        const handleAudioLoad = async () => {
+          try {
+            await audio.play();
+            setPlaybackState('playing');
+            setErrorMessage(null);
+            console.log('✅ Lecture démarrée:', track.title);
+          } catch (e) {
+            console.error('❌ Lecture automatique bloquée:', e);
+            setErrorMessage("Cliquez pour activer la lecture");
+            setPlaybackState('paused');
+          }
+        };
+
+        const handleAudioError = () => {
+          console.warn('⚠️ Échantillon non disponible:', track.title);
+          setErrorMessage("Recherche d'un autre échantillon...");
+          setFailedTracks(prev => new Set(prev).add(track.id));
+          setPlaybackState('error');
+          
+          // Passer à la suivante
+          autoPlayTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              nextTrack();
+            }
+          }, 800);
+        };
+
+        audio.addEventListener('canplay', handleAudioLoad, { once: true });
+        audio.addEventListener('error', handleAudioError, { once: true });
+        
+        audio.src = result.audioUrl;
+      }
+
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement de la piste:', error);
+      setErrorMessage("Erreur de chargement");
+      setPlaybackState('error');
+      
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          nextTrack();
+        }
+      }, 1000);
+    } finally {
+      currentOperationRef.current = null;
+    }
+  }, [station, user, stopPlayback, findNextValidTrack, clearAutoPlayTimeout]);
+
+  // Fonction pour passer à la piste suivante
+  const nextTrack = useCallback(() => {
+    if (!isMountedRef.current) return;
+    
+    const nextTrack = findNextValidTrack(currentTrack?.id);
+    if (nextTrack) {
+      playTrackById(nextTrack.id);
+    } else {
+      setErrorMessage("Aucune piste disponible dans la playlist");
+      stopPlayback();
+    }
+  }, [currentTrack?.id, findNextValidTrack, playTrackById, stopPlayback]);
+
+  // Fonction pour revenir à la piste précédente
   const previousTrack = useCallback(() => {
     if (playlistHistory.length < 2) return;
+    
     const prevTrackId = playlistHistory[playlistHistory.length - 2];
     setPlaylistHistory(prev => prev.slice(0, -2));
-    if (playTrackByIdRef.current) {
-      playTrackByIdRef.current(prevTrackId);
-    }
-  }, [playlistHistory]);
+    playTrackById(prevTrackId);
+  }, [playlistHistory, playTrackById]);
 
+  // Fonction pour basculer lecture/pause
+  const togglePlayPause = useCallback(async () => {
+    if (playbackState === 'loading') return;
+
+    if (playbackState === 'playing') {
+      // Mettre en pause
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (window.speechSynthesis?.speaking) {
+        window.speechSynthesis.pause();
+      }
+      setPlaybackState('paused');
+    } else if (playbackState === 'paused') {
+      // Reprendre la lecture
+      try {
+        if (audioRef.current) {
+          await audioRef.current.play();
+        }
+        if (window.speechSynthesis?.paused) {
+          window.speechSynthesis.resume();
+        }
+        setPlaybackState('playing');
+      } catch (e) {
+        console.error('❌ Erreur de reprise:', e);
+        setErrorMessage("Impossible de reprendre la lecture");
+      }
+    } else {
+      // Démarrer la lecture si aucune piste n'est sélectionnée
+      if (!currentTrack && station && station.playlist.length > 0) {
+        const firstTrack = findNextValidTrack();
+        if (firstTrack) {
+          playTrackById(firstTrack.id);
+        }
+      }
+    }
+  }, [playbackState, currentTrack, station, findNextValidTrack, playTrackById]);
+
+  // Fonction pour activer le TTS
   const enableTTS = useCallback(() => {
     if ('speechSynthesis' in window && !ttsEnabled) {
       try {
-        // Créer un utterance de test pour déclencher l'autorisation
         const testUtterance = new SpeechSynthesisUtterance('');
         testUtterance.volume = 0;
         
-        // Gestionnaire pour confirmer le succès
-        const onTestStart = () => {
+        testUtterance.onstart = () => {
           setTtsEnabled(true);
           setErrorMessage(null);
-          console.log('✅ TTS activé avec succès');
+          console.log('✅ TTS activé');
         };
         
-        const onTestError = (e: any) => {
-          console.warn('TTS toujours non autorisé:', e.error);
+        testUtterance.onerror = (e: any) => {
+          console.warn('TTS non autorisé:', e.error);
           if (e.error === 'not-allowed') {
-            setErrorMessage('Synthèse vocale toujours bloquée - essayez de cliquer à nouveau');
+            setErrorMessage('Synthèse vocale bloquée');
           }
         };
-        
-        testUtterance.onstart = onTestStart;
-        testUtterance.onerror = onTestError;
         
         window.speechSynthesis.speak(testUtterance);
         window.speechSynthesis.cancel();
         
-        // Fallback - considérer comme activé si pas d'erreur immédiate
+        // Fallback
         setTimeout(() => {
           if (!ttsEnabled) {
             setTtsEnabled(true);
             setErrorMessage(null);
-            console.log('✅ TTS activé (fallback)');
           }
         }, 500);
         
       } catch (error) {
         console.warn('Impossible d\'activer TTS:', error);
-        setErrorMessage('Erreur d\'activation de la synthèse vocale');
+        setErrorMessage('Erreur TTS');
       }
     }
   }, [ttsEnabled]);
 
-  const togglePlayPause = useCallback(async () => {
-    if (isLoadingTrack) return;
-    
-    if (isPlaying) {
-      if (utteranceRef.current && window.speechSynthesis.speaking) window.speechSynthesis.pause();
-      if (audioRef.current) audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      if (!currentTrack && station && station.playlist.length > 0) {
-        // Démarrer la première piste directement
-        const firstTrack = station.playlist[0];
-        if (firstTrack && playTrackByIdRef.current) {
-          playTrackByIdRef.current(firstTrack.id);
-        }
-      } else {
-        if (utteranceRef.current && window.speechSynthesis.paused) window.speechSynthesis.resume();
-        if (audioRef.current && audioRef.current.src) {
-           try {
-             await audioRef.current.play();
-             setIsPlaying(true);
-           } catch(e) {
-             console.error("Play error:", e);
-           }
-        }
+  // Fonction pour ajouter des pistes à la playlist (fonction stub pour compatibilité)
+  const addToPlaylist = useCallback((tracks: any[]) => {
+    console.warn('addToPlaylist n\'est pas implémenté dans cette version simplifiée');
+    console.log('Pistes à ajouter:', tracks);
+    // Cette fonctionnalité nécessiterait de modifier la station côté serveur
+    // Pour l'instant, on affiche juste un avertissement
+  }, []);
+
+  // Gestionnaire des événements audio
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleEnded = () => {
+      if (isMountedRef.current && playbackState === 'playing') {
+        console.log('🎵 Piste terminée, passage à la suivante');
+        autoPlayTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            nextTrack();
+          }
+        }, 1000);
       }
-    }
-  }, [isLoadingTrack, isPlaying, currentTrack, station?.playlist]);
-  
+    };
+
+    const handleError = () => {
+      console.warn('❌ Erreur audio globale');
+      setErrorMessage("Erreur de lecture - piste suivante...");
+      setPlaybackState('error');
+      
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          nextTrack();
+        }
+      }, 2000);
+    };
+
+    const handleCanPlay = () => {
+      if (playbackState === 'loading') {
+        setErrorMessage(null);
+      }
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('canplay', handleCanPlay);
+
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('canplay', handleCanPlay);
+    };
+  }, [playbackState, nextTrack]);
+
+  // Effet de changement de station
   useEffect(() => {
     isMountedRef.current = true;
+    
+    // Nettoyer l'état précédent
     stopPlayback();
-
     setCurrentTrack(undefined);
-    setIsLoadingTrack(false);
     setPlaylistHistory([]);
     setFailedTracks(new Set());
     setTtsMessage(null);
     setErrorMessage(null);
-    utteranceRef.current = null;
     
+    // Auto-démarrage pour les nouvelles stations
     if (station && station.playlist.length > 0) {
-        console.log('🎵 Station chargée, auto-démarrage dans 500ms:', station.name);
-        if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-        nextTrackTimeoutRef.current = setTimeout(() => {
-          if (isMountedRef.current) {
-            console.log('🚀 Lancement auto-play');
-            // Utiliser directement la fonction sans dépendance sur le callback
-            const firstTrack = station.playlist[0];
-            if (firstTrack && playTrackByIdRef.current) {
-              playTrackByIdRef.current(firstTrack.id);
-            }
+      console.log('🎵 Nouvelle station chargée:', station.name);
+      
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          const firstTrack = findNextValidTrack();
+          if (firstTrack) {
+            console.log('🚀 Auto-démarrage de la première piste');
+            playTrackById(firstTrack.id);
           }
-        }, 500);
+        }
+      }, 500);
     }
 
     return () => {
       isMountedRef.current = false;
       stopPlayback();
     };
-  }, [station?.id]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    const handleEnd = () => {
-        if (isMountedRef.current && isPlaying) {
-            if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-            nextTrackTimeoutRef.current = setTimeout(nextTrack, 1000);
-        }
-    };
-
-    const handleError = (e: Event) => {
-        console.warn('Audio error:', e);
-        setErrorMessage("Erreur de lecture audio - piste suivante...");
-        setIsPlaying(false);
-        // Passer à la piste suivante après une erreur
-        if(nextTrackTimeoutRef.current) clearTimeout(nextTrackTimeoutRef.current);
-        nextTrackTimeoutRef.current = setTimeout(nextTrack, 2000);
-    };
-
-    const handleCanPlay = () => {
-        setErrorMessage(null);
-    };
-    
-    audio.addEventListener('ended', handleEnd);
-    audio.addEventListener('error', handleError);
-    audio.addEventListener('canplay', handleCanPlay);
-    
-    return () => {
-        audio.removeEventListener('ended', handleEnd);
-        audio.removeEventListener('error', handleError);
-        audio.removeEventListener('canplay', handleCanPlay);
-    };
-  }, [isPlaying, nextTrack]);
+  }, [station?.id, stopPlayback, findNextValidTrack, playTrackById]);
 
   return {
+    // État de la piste actuelle
     currentTrack,
     isPlaying,
     isLoadingTrack,
     failedTracks,
+    
+    // Contrôles de lecture
     audioRef,
     playTrackById,
     nextTrack,
     previousTrack,
     togglePlayPause,
+    
+    // État de navigation
     canGoBack: playlistHistory.length > 1,
     playlistLength: station?.playlist.length || 0,
+    
+    // Messages et erreurs
     ttsMessage,
     errorMessage,
     ttsEnabled,
     enableTTS,
+    
+    // Fonctionnalité d'ajout (stub)
+    addToPlaylist,
   };
 }

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -13,120 +12,6 @@ import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 import { searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
-
-/**
- * Obtient les URLs thématiques pour la musique selon le thème de la station
- */
-function getThemedMusicUrls(stationTheme: string, searchTerm: string): string[] {
-  const themedUrls = {
-    'post-apocalyptic': {
-      'jazz': [
-        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3', // Vintage jazz
-        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Atmospheric
-      ],
-      'classical': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Orchestral
-        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Classical
-      ],
-      'ambient': [
-        'https://freesound.org/data/previews/235/235777_4062622-lq.mp3', // Dark ambient
-        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Atmospheric
-      ]
-    },
-    'pre-war-music': {
-      'jazz': [
-        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3', // Jazz standards
-        'https://freesound.org/data/previews/341/341695_5858296-lq.mp3'  // Swing
-      ],
-      'classical': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Classical piano
-        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Orchestra
-      ]
-    },
-    'propaganda': {
-      'march': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Military march
-        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Patriotic
-      ],
-      'orchestral': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Full orchestra
-        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3'  // Brass band
-      ]
-    },
-    'classical': {
-      'classical': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Symphony
-        'https://freesound.org/data/previews/317/317828_5123451-lq.mp3'  // Chamber music
-      ],
-      'piano': [
-        'https://freesound.org/data/previews/376/376968_7037445-lq.mp3', // Piano solo
-        'https://freesound.org/data/previews/316/316847_5123451-lq.mp3'  // Piano classical
-      ]
-    }
-  };
-
-  const theme = themedUrls[stationTheme as keyof typeof themedUrls];
-  if (theme) {
-    for (const [genre, urls] of Object.entries(theme)) {
-      if (searchTerm.toLowerCase().includes(genre)) {
-        return urls;
-      }
-    }
-  }
-
-  // Fallback vers l'ancienne fonction si pas de thème spécifique
-  return getFallbackMusicUrls(searchTerm);
-}
-
-/**
- * URLs de fallback pour les pistes musicales de test (ancienne version)
- */
-function getFallbackMusicUrls(searchTerm: string): string[] {
-  // URLs plus fiables de sources audio libres
-  const fallbackMusic = {
-    'jazz': [
-      'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
-      'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
-    ],
-    'classical': [
-      'https://freesound.org/data/previews/376/376968_7037445-lq.mp3',
-      'https://freesound.org/data/previews/317/317828_5123451-lq.mp3',
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
-    ],
-    'rock': [
-      'https://freesound.org/data/previews/317/317828_5123451-lq.mp3',
-      'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
-    ],
-    'ambient': [
-      'https://freesound.org/data/previews/235/235777_4062622-lq.mp3',
-      'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
-    ],
-    'electronic': [
-      'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
-      'https://freesound.org/data/previews/235/235777_4062622-lq.mp3',
-      'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW=='
-    ]
-  };
-
-  // Correspondance basique par mot-clé
-  for (const [genre, urls] of Object.entries(fallbackMusic)) {
-    if (searchTerm.toLowerCase().includes(genre)) {
-      return urls;
-    }
-  }
-
-  // Fallback général - URLs d'échantillons audio génériques mais fonctionnels
-  return [
-    'https://archive.org/download/test_202405/Generic_Audio_Sample.mp3',
-    'https://freesound.org/data/previews/316/316738_5123451-lq.mp3',
-    'https://archive.org/download/royalty-free-music-samples/Neutral_Background.mp3',
-    'https://freesound.org/data/previews/268/268763_4062622-lq.mp3'
-  ];
-}
-
 
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
@@ -260,7 +145,7 @@ function createPlaylistForTheme(theme: string, stationName: string, dj: any): Pl
         content: 'patriotic',
         artist: 'Enclave Band',
         duration: 30,
-        url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+        url: '',
         addedAt: new Date().toISOString()
       }
     ];
@@ -295,7 +180,7 @@ function createPlaylistForTheme(theme: string, stationName: string, dj: any): Pl
       content: 'jazz',
       artist: randomTrack.artist,
       duration: 45,
-      url: 'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
+      url: '',
       addedAt: new Date().toISOString()
     },
     {
@@ -315,7 +200,7 @@ function createPlaylistForTheme(theme: string, stationName: string, dj: any): Pl
       content: 'rockabilly',
       artist: 'Carl Perkins',
       duration: 40,
-      url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
+      url: '',
       addedAt: new Date().toISOString()
     },
     {
@@ -481,66 +366,6 @@ export async function createStation(ownerId: string, formData: FormData) {
       content: 'jazz',
       artist: 'Pre-War Classics',
       duration: 30,
-      url: 'https://freesound.org/data/previews/316/316847_5123451-lq.mp3',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-3`,
-      type: 'message',
-      title: 'Bulletin Info',
-      content: `Flash info ! Une caravane de marchands a été aperçue près du Vault 101. Ils échangent des capsules contre de l'eau purifiée et des stimpaks. Méfiez-vous tout de même des raiders dans le secteur.`,
-      artist: dj.name,
-      duration: 10,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-4`,
-      type: 'music',
-      title: 'Star Wars Theme',
-      content: 'classical',
-      artist: 'Orchestre Pré-Guerre',
-      duration: 30,
-      url: 'https://freesound.org/data/previews/376/376968_7037445-lq.mp3',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-5`,
-      type: 'message',
-      title: 'Météo des Terres Désolées',
-      content: `Prévisions météo : tempête de sable radioactive prévue ce soir. Niveau de radiation : modéré à élevé. Portez vos masques à gaz et évitez les sorties non essentielles. La température chutera à moins 10 degrés.`,
-      artist: dj.name,
-      duration: 15,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-6`,
-      type: 'music',
-      title: 'Test Audio MP3',
-      content: 'electronic',
-      artist: 'Archive.org Test',
-      duration: 30,
-      url: 'https://freesound.org/data/previews/341/341695_5858296-lq.mp3',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-7`,
-      type: 'message',
-      title: 'Conseil de Survie',
-      content: `Conseil de survie du jour : Les goules ferales sont plus actives la nuit. Si vous entendez des grognements, ne courez pas ! Marchez lentement et évitez le contact visuel. Gardez vos armes à portée de main.`,
-      artist: dj.name,
-      duration: 18,
-      url: '',
-      addedAt: new Date().toISOString()
-    },
-    {
-      id: `${Date.now()}-8`,
-      type: 'message',
-      title: 'Merci d\'écoute',
-      content: `Merci d'écouter ${name} ! C'était ${dj.name}. À bientôt !`,
-      artist: dj.name,
-      duration: 5,
       url: '',
       addedAt: new Date().toISOString()
     }
@@ -627,11 +452,29 @@ export async function searchMusic(searchTerm: string): Promise<{ data?: Playlist
     }
 
     try {
-        const results = await searchMusicAdvanced(searchTerm, 8);
-        return { data: results };
+        // Use Plex search only
+        const results = await searchPlexMusic(searchTerm, 8);
+        
+        if (results.length === 0) {
+            return { error: "Aucune musique trouvée dans votre bibliothèque Plex" };
+        }
+
+        // Convert Plex results to PlaylistItem format
+        const playlistItems: PlaylistItem[] = results.map(track => ({
+            id: `plex-${Date.now()}-${Math.random()}`,
+            type: 'music',
+            title: track.title,
+            content: searchTerm,
+            artist: track.artist,
+            duration: track.duration || 180,
+            url: track.url,
+            addedAt: new Date().toISOString()
+        }));
+
+        return { data: playlistItems };
     } catch (error: any) {
-        console.error("La recherche musicale a échoué:", error);
-        return { error: error.message || "Unknown search error" };
+        console.error("La recherche musicale Plex a échoué:", error);
+        return { error: "Erreur de connexion à Plex. Vérifiez votre configuration." };
     }
 }
 
@@ -881,8 +724,6 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         // Créer un audio silencieux temporaire ou utiliser TTS du navigateur
         try {
             // Fallback: utiliser TTS du navigateur côté client
-            const silentAudio = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvmMaBDbQ2e3FdTgFK3nW9c2FQAUUWeHlvmsgCjGC1vHPgCwFJHfH8N2QQAoUXrTp66hVFApGn+PyvW==';
-            
             return { audioUrl: `tts:${encodeURIComponent(messageContent)}` };
             
         } catch(err: any) {
@@ -941,27 +782,14 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             
         } catch (plexError) {
             console.error('❌ Plex non disponible:', plexError);
-            // Continuer vers le fallback Archive.org au lieu de retourner une erreur
         }
         
-        // Fallback vers Archive.org si Plex échoue
-        try {
-            console.log(`🌐 Fallback vers Archive.org pour "${track.content}"`);
-            const searchResults = await searchMusicAdvanced(track.content, 3);
-            
-            for (const result of searchResults) {
-                if (result.url) {
-                    const isValid = await validateAudioUrl(result.url);
-                    if (isValid) {
-                        console.log(`✅ Piste Archive.org: ${result.title} par ${result.artist}`);
-                        return { audioUrl: result.url };
-                    }
-                }
-            }
-        } catch (archiveError) {
-            console.error('❌ Archive.org non disponible:', archiveError);
-        }
+        // FALLBACK TEMPORAIRE: Mode démo sans audio réel
+        console.log('🔄 Mode démo - Interface fonctionnelle sans audio Plex');
         
-        return { error: `Aucune musique trouvée pour "${track.content}"` };
+        // Retourner une indication que c'est en mode démo
+        return { 
+            error: `Mode démo - Plex non configuré. Interface fonctionnelle pour tester les thèmes.`
+        };
     }
 }
