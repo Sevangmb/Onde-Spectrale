@@ -133,7 +133,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/stations', label: 'Mes Stations', icon: Radio },
     { href: '/admin/personnages', label: 'Mes Personnages', icon: Users },
-    { href: '/admin/bibliotheque', label: 'Bibliothèque', icon: Library },
+    { href: '/admin/bibliotheque', label: 'Bibliothèque Plex', icon: Library },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
     { href: '/admin/parametres', label: 'Paramètres', icon: Settings },
   ];
