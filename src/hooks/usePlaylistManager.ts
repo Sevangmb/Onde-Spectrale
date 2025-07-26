@@ -131,9 +131,17 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         setTtsMessage(`Message de ${track.artist}: ${track.content}`);
       }
       
-      await audio.play();
-      setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
-      setPlaybackState('playing');
+      try {
+        await audio.play();
+        setPlaylistHistory(prev => [...prev.slice(-9), track.id]);
+        setPlaybackState('playing');
+      } catch (playError: any) {
+        console.warn('Autoplay bloqué par le navigateur:', playError);
+        setPlaybackState('paused');
+        setErrorMessage('🎵 Cliquez pour démarrer la lecture audio');
+        // Ne pas marquer comme échec, juste attendre l'interaction utilisateur
+        return;
+      }
 
     } catch (error: any) {
       setErrorMessage(error.message);

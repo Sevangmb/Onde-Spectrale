@@ -136,9 +136,11 @@ export function OndeSpectraleRadio() {
   const handleUserInteraction = useCallback(() => {
     if (!audioContextEnabled) {
       setAudioContextEnabled(true);
-      if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
-        playlistManager.togglePlayPause();
-      }
+    }
+    
+    // Relancer la lecture si elle était bloquée ou si il y a une piste en attente
+    if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
+      playlistManager.togglePlayPause();
     }
   }, [audioContextEnabled, playlistManager]);
 
@@ -370,12 +372,12 @@ export function OndeSpectraleRadio() {
                                    playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
                                 </div>
                                 
-                                {!audioContextEnabled && playlistManager.currentTrack && (
+                                {(!audioContextEnabled || playlistManager.errorMessage?.includes('Cliquez')) && playlistManager.currentTrack && (
                                   <button
                                     onClick={handleUserInteraction}
-                                    className="retro-button text-xs px-4 py-2 animate-pulse"
+                                    className="retro-button text-xs px-4 py-2 animate-pulse bg-primary/20 hover:bg-primary/30 border-primary/40"
                                   >
-                                    🎵 ACTIVER L'AUDIO
+                                    🎵 {!audioContextEnabled ? 'ACTIVER L\'AUDIO' : 'DÉMARRER LA LECTURE'}
                                   </button>
                                 )}
                               </div>
