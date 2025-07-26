@@ -1,7 +1,24 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  addDoc, 
+  getDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  serverTimestamp, 
+  Timestamp, 
+  arrayUnion, 
+  increment 
+} from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL, uploadBytes, listAll, deleteObject } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -55,4 +72,30 @@ export const listAudioFiles = async (path: string) => {
   }));
 };
 
-export { app, auth, db, storage, ref, uploadString, getDownloadURL, uploadBytes, listAll, deleteObject };
+export { 
+  app, 
+  auth, 
+  db, 
+  storage, 
+  ref, 
+  uploadString, 
+  getDownloadURL, 
+  uploadBytes, 
+  listAll, 
+  deleteObject,
+  collection, 
+  doc, 
+  addDoc, 
+  getDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  serverTimestamp, 
+  Timestamp, 
+  arrayUnion, 
+  increment 
+};
