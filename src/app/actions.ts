@@ -37,10 +37,10 @@ function serializeStation(doc: any): Station {
 export async function createDefaultStations(): Promise<void> {
   const stations = [
     {
-      frequency: 100.7,
-      name: 'Radio Wasteland',
-      djId: 'marcus', // Utilisons Marcus pour la radio principale
-      theme: 'Histoires et musiques des terres désolées'
+      frequency: 87.6,
+      name: 'Radio Liberty',
+      djId: 'sarah', // Sarah pour une voix douce
+      theme: 'Nouvelles de l\'aube et musiques de liberté'
     },
     {
       frequency: 94.5,
@@ -49,16 +49,22 @@ export async function createDefaultStations(): Promise<void> {
       theme: 'Les classiques d\'avant-guerre et les nouvelles de la ville'
     },
     {
-      frequency: 102.1,
-      name: 'Enclave Radio',
-      djId: 'marcus', // Marcus pour une voix autoritaire
-      theme: 'Propagande et marches patriotiques de l\'Enclave'
-    },
-    {
       frequency: 98.2,
       name: 'Radio de la Savante',
       djId: 'sarah', // Sarah pour une touche de savoir
       theme: 'Musique classique et réflexions sur le vieux monde'
+    },
+    {
+      frequency: 100.7,
+      name: 'Radio Wasteland',
+      djId: 'marcus', // Utilisons Marcus pour la radio principale
+      theme: 'Histoires et musiques des terres désolées'
+    },
+    {
+      frequency: 102.1,
+      name: 'Enclave Radio',
+      djId: 'marcus', // Marcus pour une voix autoritaire
+      theme: 'Propagande et marches patriotiques de l\'Enclave'
     }
   ];
 
@@ -323,6 +329,7 @@ export async function createStation(ownerId: string, formData: FormData) {
   
   revalidatePath('/admin/stations');
   revalidatePath('/admin');
+  revalidatePath('/'); // Invalider aussi la page principale pour le scanner
   return { success: true, stationId: docRef.id };
 }
 
@@ -371,6 +378,7 @@ export async function addMessageToStation(stationId: string, message: string): P
     }
 
     revalidatePath(`/admin/stations/${stationId}`);
+    revalidatePath('/'); // Invalider la page principale pour le scanner
     return { success: true, playlistItem: newPlaylistItem };
 }
 
@@ -415,6 +423,7 @@ export async function addMusicToStation(stationId: string, musicTrack: PlaylistI
     });
     
     revalidatePath(`/admin/stations/${stationId}`);
+    revalidatePath('/'); // Invalider la page principale pour le scanner
     return { success: true, playlistItem: newTrack };
 }
 
@@ -492,6 +501,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
 
         revalidatePath(`/admin/stations/${stationId}`);
         revalidatePath('/admin/stations');
+        revalidatePath('/'); // Invalider la page principale pour le scanner
         
         return { success: true, newPlaylist };
     } catch (error: any) {

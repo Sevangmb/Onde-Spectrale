@@ -5,8 +5,10 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { createStation } from '@/app/actions';
+import { resetAndCreateDefaultStations, verifyDefaultStations } from '@/app/actions-improved';
 import type { CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
+import { useStationSync } from '@/hooks/useStationSync';
 
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +30,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
+  RefreshCw,
+  Bug
 } from 'lucide-react';
 
 
@@ -38,6 +42,8 @@ export default function StationsManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { notifyStationsUpdated } = useStationSync();
+  const [isResetting, setIsResetting] = useState(false);
 
   const allDjs = useMemo(() => [...DJ_CHARACTERS, ...customCharacters], [customCharacters]);
 
@@ -75,6 +81,10 @@ export default function StationsManagement() {
           title: 'Station créée !',
           description: `La station ${formData.name} est maintenant en ligne sur ${formData.frequency} MHz.`,
         });
+        
+        // Notifier la synchronisation cross-tab
+        notifyStationsUpdated();
+        
         setIsCreateModalOpen(false);
         setFormData({ name: '', frequency: 92.1, djCharacterId: '', theme: 'Histoires d\'espoir et de survie dans les terres désolées' });
         router.push(`/admin/stations/${result.stationId}`);
@@ -99,6 +109,66 @@ export default function StationsManagement() {
     const freq = Math.random() * (108.0 - 87.0) + 87.0;
     return parseFloat(freq.toFixed(1));
   };
+
+  const handleResetDefaultStations = async () => {
+    if (!confirm('Voulez-vous vraiment réinitialiser toutes les stations par défaut ? Cette action est irréversible.')) {
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const result = await resetAndCreateDefaultStations();
+      
+      if (result.success) {
+        toast({
+          title: 'Stations réinitialisées !',
+          description: result.message,
+        });
+        notifyStationsUpdated();
+      } else {
+        toast({
+          title: 'Erreur de réinitialisation',
+          description: result.message,
+          variant: 'destructive'
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleVerifyStations = async () => {
+    try {
+      const result = await verifyDefaultStations();
+      console.log('Vérification des stations:', result);
+      
+      const missingStations = result.frequencies.filter(f => !f.exists);
+      if (missingStations.length > 0) {
+        toast({
+          title: 'Stations manquantes détectées',
+          description: `${missingStations.length} stations manquantes: ${missingStations.map(s => s.frequency).join(', ')} MHz`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Toutes les stations sont présentes',
+          description: 'Vérification terminée avec succès'
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erreur de vérification',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
   
   if (isLoading) {
       return (
@@ -122,14 +192,38 @@ export default function StationsManagement() {
             <h1 className="text-2xl font-bold tracking-tight">Mes Stations</h1>
             <p className="text-muted-foreground">Créez et gérez vos propres stations radio.</p>
           </div>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nouvelle Station
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+          <div className="flex gap-2">
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleVerifyStations}
+                  className="gap-2"
+                >
+                  <Bug className="h-4 w-4" />
+                  Vérifier
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetDefaultStations}
+                  disabled={isResetting}
+                  className="gap-2"
+                >
+                  {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Reset
+                </Button>
+              </>
+            )}
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nouvelle Station
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Créer une nouvelle station</DialogTitle>
               </DialogHeader>
@@ -212,8 +306,9 @@ export default function StationsManagement() {
                   </Button>
                 </div>
               </form>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
       </div>
       
       {stations.length === 0 ? (

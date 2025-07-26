@@ -13,6 +13,8 @@ import { useRouter } from 'next/navigation';
 // Hooks personnalisés
 import { usePlaylistManager } from '@/hooks/usePlaylistManager';
 import { useRadioSoundEffects } from '@/hooks/useRadioSoundEffects';
+import { useStationSync, useStationForFrequency } from '@/hooks/useStationSync';
+import { radioDebug } from '@/lib/debug';
 
 // Composants UI
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +41,8 @@ import {
   Zap,
   UserCog,
   Settings,
-  ListMusic
+  ListMusic,
+  RefreshCw
 } from 'lucide-react';
 
 interface ParticleStyle {
@@ -70,35 +73,37 @@ export function OndeSpectraleRadio() {
   const {
     frequency,
     sliderValue,
-    currentStation,
-    isLoadingStation,
     isScanning,
     signalStrength,
     setFrequency,
     setSliderValue,
-    setCurrentStation,
-    setIsLoadingStation,
     setIsScanning,
     setSignalStrength,
     setError
   } = useRadioStore();
 
-  const fetchStationData = useCallback(async (freq: number) => {
-    setIsLoadingStation(true);
-    setError(null);
-    try {
-      const station = await getStationForFrequency(freq);
-      const newSignalStrength = station 
-        ? Math.floor(Math.random() * 20) + 80 
-        : Math.floor(Math.random() * 30) + 10;
-      setSignalStrength(newSignalStrength);
-      setCurrentStation(station);
-    } catch (err: any) {
-      setError(`Erreur de données: ${err.message}`);
-    } finally {
-      setIsLoadingStation(false);
+  // Nouveau système de synchronisation des stations
+  const { notifyStationsUpdated } = useStationSync();
+  const { 
+    station: currentStation, 
+    isLoading: isLoadingStation, 
+    error: stationError,
+    refresh: refreshStation 
+  } = useStationForFrequency(frequency);
+
+  // Effet pour mettre à jour la force du signal selon la station
+  useEffect(() => {
+    const newSignalStrength = currentStation 
+      ? Math.floor(Math.random() * 20) + 80 
+      : Math.floor(Math.random() * 30) + 10;
+    setSignalStrength(newSignalStrength);
+    
+    if (stationError) {
+      setError(`Erreur de données: ${stationError}`);
+    } else {
+      setError(null);
     }
-  }, [setIsLoadingStation, setError, setSignalStrength, setCurrentStation]);
+  }, [currentStation, stationError, setSignalStrength, setError]);
   
   const playlistManager = usePlaylistManager({
     station: currentStation,
@@ -119,8 +124,7 @@ export function OndeSpectraleRadio() {
     
     const init = async () => {
       await createDefaultStations();
-      const initialFrequency = useRadioStore.getState().frequency;
-      fetchStationData(initialFrequency);
+      // La station sera automatiquement chargée par useStationForFrequency
     };
     init();
 
@@ -188,10 +192,10 @@ export function OndeSpectraleRadio() {
       const clampedFrequency = Math.max(87.0, Math.min(108.0, finalFrequency));
       setFrequency(clampedFrequency);
       setSliderValue(clampedFrequency);
-      fetchStationData(clampedFrequency);
+      // La station sera automatiquement chargée par useStationForFrequency
       setIsScanning(false);
     }, 1000);
-  }, [isScanning, sliderValue, radioSounds, setIsScanning, setSliderValue, setFrequency, fetchStationData]);
+  }, [isScanning, sliderValue, radioSounds, setIsScanning, setSliderValue, setFrequency]);
 
   const handleFrequencyChange = (value: number[]) => {
     setSliderValue(value[0]);
@@ -200,11 +204,11 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = useCallback(async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
-    fetchStationData(newFreq);
+    // La station sera automatiquement chargée par useStationForFrequency
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
-  }, [fetchStationData, setFrequency, user]);
+  }, [setFrequency, user]);
 
   const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
 
@@ -316,6 +320,28 @@ export function OndeSpectraleRadio() {
                               <span className="text-xs text-muted-foreground font-mono w-12">
                                 SIG:{signalStrength}%
                               </span>
+                              {process.env.NODE_ENV === 'development' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={refreshStation}
+                                  className="h-6 w-6 p-0 ml-2"
+                                  title="Rafraîchir la station"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {process.env.NODE_ENV === 'development' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => radioDebug.testFrequency(frequency)}
+                                  className="h-6 w-6 p-0 ml-2"
+                                  title="Debug fréquence"
+                                >
+                                  🐛
+                                </Button>
+                              )}
                             </div>
                           </div>
 
