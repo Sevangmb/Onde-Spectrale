@@ -14,6 +14,8 @@ import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 import { searchPlexMusic, getRandomPlexTracks } from '@/lib/plex';
 
+const PLEX_SERVER_URL = process.env.PLEX_SERVER_URL || '';
+
 const CreateStationSchema = z.object({
   name: z.string().min(3, 'Le nom doit contenir au moins 3 caractères.'),
   frequency: z.number(),
@@ -74,17 +76,51 @@ export async function createDefaultStations(): Promise<void> {
         theme: stationConfig.theme,
       };
 
+      // Generate playlist with mixed content: messages + Plex music
       const { items } = await generatePlaylist(playlistInput);
       
-      const playlistWithIds: PlaylistItem[] = items.map((item, index) => ({
-        id: `${Date.now()}-${index}`,
-        ...item,
-        title: item.type === 'message' ? `Message de ${dj.name}` : 'Musique d\'ambiance',
-        artist: item.type === 'message' ? dj.name : 'Artistes variés',
-        duration: item.type === 'message' ? 10 : 180,
-        url: '',
-        addedAt: new Date().toISOString(),
-      }));
+      // Get random Plex tracks for music items
+      const plexTracks = await getRandomPlexTracks(undefined, 10);
+      let plexIndex = 0;
+      
+      const playlistWithIds: PlaylistItem[] = [];
+      
+      for (const [index, item] of items.entries()) {
+        if (item.type === 'message') {
+          playlistWithIds.push({
+            id: `${Date.now()}-msg-${index}`,
+            ...item,
+            title: `Message de ${dj.name}`,
+            artist: dj.name,
+            duration: 10,
+            url: '',
+            addedAt: new Date().toISOString(),
+          });
+        } else {
+          // Use real Plex track instead of placeholder
+          if (plexTracks[plexIndex]) {
+            const plexTrack = plexTracks[plexIndex];
+            playlistWithIds.push({
+              ...plexTrack,
+              id: `${Date.now()}-plex-${index}`,
+              content: item.content || plexTrack.title, // Keep AI-generated context
+              addedAt: new Date().toISOString(),
+            });
+            plexIndex++;
+          } else {
+            // Fallback if no more Plex tracks
+            playlistWithIds.push({
+              id: `${Date.now()}-fallback-${index}`,
+              ...item,
+              title: 'Musique d\'ambiance',
+              artist: 'Station Radio',
+              duration: 180,
+              url: '',
+              addedAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
 
       const stationData = {
         name: stationConfig.name,
@@ -145,9 +181,21 @@ export async function getStationById(stationId: string): Promise<Station | null>
 export async function getStationsForUser(userId: string): Promise<Station[]> {
     if (!userId) return [];
     const stationsCol = collection(db, 'stations');
-    const q = query(stationsCol, where('ownerId', '==', userId));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(serializeStation);
+    
+    // Récupérer les stations de l'utilisateur ET les stations système
+    const userQuery = query(stationsCol, where('ownerId', '==', userId));
+    const systemQuery = query(stationsCol, where('ownerId', '==', 'system'));
+    
+    const [userSnapshot, systemSnapshot] = await Promise.all([
+        getDocs(userQuery),
+        getDocs(systemQuery)
+    ]);
+    
+    const userStations = userSnapshot.docs.map(serializeStation);
+    const systemStations = systemSnapshot.docs.map(serializeStation);
+    
+    // Combiner et trier par fréquence
+    return [...systemStations, ...userStations].sort((a, b) => a.frequency - b.frequency);
 }
 
 
@@ -206,17 +254,51 @@ export async function createStation(ownerId: string, formData: FormData) {
       theme: theme,
   };
 
+  // Generate playlist with mixed content: messages + Plex music
   const { items } = await generatePlaylist(playlistInput);
   
-  const playlistWithIds: PlaylistItem[] = items.map((item, index) => ({
-    id: `${Date.now()}-${index}`,
-    ...item,
-    title: item.type === 'message' ? `Message de ${dj.name}` : 'Musique d\'ambiance',
-    artist: item.type === 'message' ? dj.name : 'Artistes variés',
-    duration: item.type === 'message' ? 10 : 180, // Durées par défaut
-    url: '', // L'URL sera déterminée à la lecture
-    addedAt: new Date().toISOString(),
-  }));
+  // Get random Plex tracks for music items
+  const plexTracks = await getRandomPlexTracks(undefined, 15);
+  let plexIndex = 0;
+  
+  const playlistWithIds: PlaylistItem[] = [];
+  
+  for (const [index, item] of items.entries()) {
+    if (item.type === 'message') {
+      playlistWithIds.push({
+        id: `${Date.now()}-msg-${index}`,
+        ...item,
+        title: `Message de ${dj.name}`,
+        artist: dj.name,
+        duration: 10,
+        url: '',
+        addedAt: new Date().toISOString(),
+      });
+    } else {
+      // Use real Plex track instead of placeholder
+      if (plexTracks[plexIndex]) {
+        const plexTrack = plexTracks[plexIndex];
+        playlistWithIds.push({
+          ...plexTrack,
+          id: `${Date.now()}-plex-${index}`,
+          content: item.content || plexTrack.title, // Keep AI-generated context
+          addedAt: new Date().toISOString(),
+        });
+        plexIndex++;
+      } else {
+        // Fallback if no more Plex tracks
+        playlistWithIds.push({
+          id: `${Date.now()}-fallback-${index}`,
+          ...item,
+          title: 'Musique d\'ambiance',
+          artist: 'Station Radio',
+          duration: 180,
+          url: '',
+          addedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }
 
 
   const newStationData = {
@@ -360,16 +442,50 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
     try {
         const { items } = await generatePlaylist(playlistInput);
       
-        const newPlaylist: PlaylistItem[] = items.map((item, index) => ({
-            id: `regen-${Date.now()}-${index}`,
-            type: item.type,
-            content: item.content,
-            title: item.type === 'message' ? `Message de ${dj.name}` : `Ambiance ${station.name}`,
-            artist: item.type === 'message' ? dj.name : 'Artistes des terres désolées',
-            duration: item.type === 'message' ? 12 : 180,
-            url: '',
-            addedAt: new Date().toISOString(),
-        }));
+        // Get fresh Plex tracks for regeneration
+        const plexTracks = await getRandomPlexTracks(undefined, 12);
+        let plexIndex = 0;
+        
+        const newPlaylist: PlaylistItem[] = [];
+        
+        for (const [index, item] of items.entries()) {
+          if (item.type === 'message') {
+            newPlaylist.push({
+              id: `regen-${Date.now()}-msg-${index}`,
+              type: item.type,
+              content: item.content,
+              title: `Message de ${dj.name}`,
+              artist: dj.name,
+              duration: 12,
+              url: '',
+              addedAt: new Date().toISOString(),
+            });
+          } else {
+            // Use real Plex track
+            if (plexTracks[plexIndex]) {
+              const plexTrack = plexTracks[plexIndex];
+              newPlaylist.push({
+                ...plexTrack,
+                id: `regen-${Date.now()}-plex-${index}`,
+                content: item.content || plexTrack.title,
+                addedAt: new Date().toISOString(),
+              });
+              plexIndex++;
+            } else {
+              // Fallback
+              newPlaylist.push({
+                id: `regen-${Date.now()}-fallback-${index}`,
+                type: item.type,
+                content: item.content,
+                title: `Ambiance ${station.name}`,
+                artist: 'Station Radio',
+                duration: 180,
+                url: '',
+                addedAt: new Date().toISOString(),
+              });
+            }
+          }
+        }
 
         const stationRef = doc(db, 'stations', stationId);
         await updateDoc(stationRef, { playlist: newPlaylist });
@@ -541,30 +657,26 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
             return { error: `La génération de la voix IA a échoué: ${err.message}` };
         }
     } else { // music
-        if (!track.content) {
-            return { error: 'Terme de recherche musical vide.' };
-        }
-       
         try {
-            console.log(`🎵 Recherche Plex pour "${track.content}"`);
+            // If track already has a Plex URL (from playlist generation), use it directly
+            if (track.url && track.url.includes(PLEX_SERVER_URL || 'plex')) {
+                console.log(`🎵 Utilisation URL Plex existante: ${track.title} par ${track.artist}`);
+                return { audioUrl: track.url };
+            }
             
-            const searchResults = await searchPlexMusic(track.content, 3);
+            // Otherwise search Plex by content or title
+            const searchTerm = track.content || track.title || 'random music';
+            console.log(`🎵 Recherche Plex pour "${searchTerm}"`);
+            
+            const searchResults = await searchPlexMusic(searchTerm, 3);
             if (searchResults.length > 0) {
                 const plexTrack = searchResults[0];
                 console.log(`✅ Piste Plex trouvée: ${plexTrack.title} par ${plexTrack.artist}`);
                 return { audioUrl: plexTrack.url };
             }
 
-            if (track.title && track.title !== track.content) {
-                const titleResults = await searchPlexMusic(track.title, 1);
-                if (titleResults.length > 0) {
-                    const plexTrack = titleResults[0];
-                    console.log(`✅ Piste Plex trouvée par titre: ${plexTrack.title} par ${plexTrack.artist}`);
-                    return { audioUrl: plexTrack.url };
-                }
-            }
-
-            console.log(`🎲 Aucune correspondance exacte, piste aléatoire.`);
+            // Fallback: get random track from Plex music library
+            console.log(`🎲 Aucune correspondance exacte, piste aléatoire du répertoire musique.`);
             const randomTracks = await getRandomPlexTracks(undefined, 1);
             if (randomTracks.length > 0) {
                 const randomTrack = randomTracks[0];
@@ -572,7 +684,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
                 return { audioUrl: randomTrack.url };
             }
             
-            return { error: `Plex n'a trouvé aucune piste pour "${track.content}".` };
+            return { error: `Aucune musique disponible dans le répertoire Plex.` };
             
         } catch (plexError: any) {
             console.error('❌ Erreur de connexion à Plex:', plexError);

@@ -6,6 +6,7 @@ import type { PlaylistItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { PlaylistSkeleton } from '@/components/LoadingSkeleton';
 import { 
   Music, 
   MessageSquare, 
@@ -46,6 +47,11 @@ export function EnhancedPlaylist({
   canGoBack,
   className = ''
 }: EnhancedPlaylistProps) {
+  
+  // Show skeleton when playlist is empty or loading
+  if (!playlist || playlist.length === 0) {
+    return <PlaylistSkeleton className={className} />;
+  }
 
   const formatDuration = (seconds: number) => {
     if (isNaN(seconds)) return '--:--';

@@ -1,7 +1,7 @@
 // src/components/OndeSpectraleRadio.tsx
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRadioStore } from '@/shared/stores/useRadioStore';
 import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
@@ -21,8 +21,15 @@ import { Button } from '@/components/ui/button';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
+import { StationSkeleton, SpectrumSkeleton } from '@/components/LoadingSkeleton';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
+
+// Memoized components for performance
+const MemoizedAudioPlayer = React.memo(AudioPlayer);
+const MemoizedSpectrumAnalyzer = React.memo(SpectrumAnalyzer);
+const MemoizedEnhancedPlaylist = React.memo(EnhancedPlaylist);
+const MemoizedEmergencyAlertSystem = React.memo(EmergencyAlertSystem);
 
 import {
   RadioTower,
@@ -47,9 +54,18 @@ export function OndeSpectraleRadio() {
   const [user, setUser] = useState<User | null>(null);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
   const [showPlaylist, setShowPlaylist] = useState(false);
-  const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [audioContextEnabled, setAudioContextEnabled] = useState(false);
+
+  // Optimized particle generation with useMemo
+  const particleStyles = useMemo<ParticleStyle[]>(() => 
+    Array.from({ length: 15 }, (_, i) => ({
+      left: `${(i * 7 + Math.sin(i) * 20) % 100}%`,
+      top: `${(i * 13 + Math.cos(i) * 20) % 100}%`,
+      animationDelay: `${(i * 0.3) % 5}s`,
+      animationDuration: `${3 + (i % 4)}s`,
+    })), []
+  );
 
   const {
     frequency,
@@ -101,15 +117,6 @@ export function OndeSpectraleRadio() {
   useEffect(() => {
     setIsClient(true);
     
-    setParticleStyles(
-      Array.from({ length: 15 }, () => ({
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-        animationDelay: `${Math.random() * 5}s`,
-        animationDuration: `${3 + Math.random() * 4}s`,
-      }))
-    );
-    
     const init = async () => {
       await createDefaultStations();
       const initialFrequency = useRadioStore.getState().frequency;
@@ -138,11 +145,20 @@ export function OndeSpectraleRadio() {
       setAudioContextEnabled(true);
     }
     
+    // Activer l'autoplay dès la première interaction
+    if (!playlistManager.autoPlayEnabled && playlistManager.enableAutoPlay) {
+      playlistManager.enableAutoPlay();
+      console.log('🎵 Autoplay activé par interaction utilisateur');
+    }
+    
     // Relancer la lecture si elle était bloquée ou si il y a une piste en attente
     if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
       playlistManager.togglePlayPause();
+    } else if (!playlistManager.currentTrack && currentStation && currentStation.playlist.length > 0) {
+      // Si aucune piste n'est sélectionnée, démarrer la première
+      playlistManager.togglePlayPause();
     }
-  }, [audioContextEnabled, playlistManager]);
+  }, [audioContextEnabled, playlistManager, currentStation]);
 
   useEffect(() => {
     if (!audioContextEnabled) {
@@ -369,7 +385,8 @@ export function OndeSpectraleRadio() {
                                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/30 rounded-full text-primary text-sm">
                                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse mr-1"></div>
                                   {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
-                                   playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
+                                   playlistManager.isPlaying ? (playlistManager.autoPlayEnabled ? 'PLAYLIST AUTO ♪' : 'TRANSMISSION EN COURS') : 
+                                   (playlistManager.autoPlayEnabled ? 'PLAYLIST ACTIVÉE' : 'CONNEXION ÉTABLIE')}
                                 </div>
                                 
                                 {(!audioContextEnabled || playlistManager.errorMessage?.includes('Cliquez')) && playlistManager.currentTrack && (
@@ -391,9 +408,13 @@ export function OndeSpectraleRadio() {
                         </div>
                       </div>
                       
-                      <SpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
+                      {isLoadingStation ? (
+                        <SpectrumSkeleton className="h-24" />
+                      ) : (
+                        <MemoizedSpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
+                      )}
                       
-                      <AudioPlayer
+                      <MemoizedAudioPlayer
                         track={playlistManager.currentTrack}
                         isPlaying={playlistManager.isPlaying}
                         isLoading={playlistManager.isLoadingTrack}
@@ -412,7 +433,7 @@ export function OndeSpectraleRadio() {
 
               {(isRadioActive && currentStation && showPlaylist) && (
                 <div className="lg:col-span-1 transition-opacity duration-500">
-                     <EnhancedPlaylist
+                     <MemoizedEnhancedPlaylist
                         playlist={currentStation.playlist}
                         currentTrackId={playlistManager.currentTrack?.id}
                         isPlaying={playlistManager.isPlaying}
@@ -431,7 +452,7 @@ export function OndeSpectraleRadio() {
           </div>
         </div>
         
-        <EmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
+        <MemoizedEmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
       </div>
     </>
   );

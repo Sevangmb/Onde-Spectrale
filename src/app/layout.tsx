@@ -2,11 +2,20 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AlertTriangle } from 'lucide-react';
+import RadioErrorBoundary from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Onde Spectrale',
   description:
     'Une application radio post-apocalyptique où les utilisateurs peuvent scanner des fréquences et créer leurs propres stations avec des DJs IA.',
+  manifest: '/manifest.json',
+  themeColor: '#00ff41',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Onde Spectrale'
+  }
 };
 
 export default function RootLayout({
@@ -23,6 +32,23 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                      console.log('📻 SW registered:', registration);
+                    })
+                    .catch(error => {
+                      console.log('🚨 SW registration failed:', error);
+                    });
+                });
+              }
+            `
+          }}
+        />
       </head>
       <body className="font-mono antialiased bg-background text-foreground">
         <noscript>
@@ -34,7 +60,9 @@ export default function RootLayout({
                 </div>
             </div>
         </noscript>
-        {children}
+        <RadioErrorBoundary>
+          {children}
+        </RadioErrorBoundary>
         <Toaster />
       </body>
     </html>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { PlaylistItem } from '@/lib/types';
 import { useEffect, useState, useCallback } from 'react';
+import { AudioPlayerSkeleton } from '@/components/LoadingSkeleton';
 
 interface AudioPlayerProps {
   track: PlaylistItem | undefined;
@@ -128,6 +129,11 @@ export function AudioPlayer({
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
   
   const displayTitle = isLoading ? 'Chargement...' : (track ? track.title : "Silence radio");
+
+  // Show skeleton while loading and no track info
+  if (isLoading && !track) {
+    return <AudioPlayerSkeleton className="vintage-radio-frame shadow-2xl" />;
+  }
 
   return (
     <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
