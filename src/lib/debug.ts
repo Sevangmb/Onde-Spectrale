@@ -2,16 +2,34 @@
 'use client';
 
 import { getStationForFrequency } from '@/app/actions';
+import { fixSpecificStation } from '@/app/actions-improved';
 import { clientCache, CACHE_KEYS } from './cache';
 
 export const radioDebug = {
   async testFrequency(frequency: number) {
-    console.log(`🔍 Test de la fréquence ${frequency} MHz`);
+    console.log(`🔍 Test détaillé de la fréquence ${frequency} MHz`);
     
     try {
       // Test sans cache
       const station = await getStationForFrequency(frequency);
       console.log(`Station trouvée:`, station);
+      
+      if (station) {
+        console.log(`📊 Détails de la station ${frequency} MHz:`);
+        console.log(`  - Nom: ${station.name}`);
+        console.log(`  - DJ ID: ${station.djCharacterId}`);
+        console.log(`  - Thème: ${station.theme}`);
+        console.log(`  - Propriétaire: ${station.ownerId}`);
+        console.log(`  - Playlist: ${station.playlist?.length || 0} pistes`);
+        
+        // Vérifier les pistes de la playlist
+        if (station.playlist && station.playlist.length > 0) {
+          console.log(`  - Exemples de pistes:`);
+          station.playlist.slice(0, 3).forEach((track, i) => {
+            console.log(`    ${i+1}. ${track.type === 'message' ? '💬' : '🎵'} ${track.title} (${track.artist})`);
+          });
+        }
+      }
       
       // Vérifier le cache
       const cacheKey = CACHE_KEYS.STATION_BY_FREQUENCY(frequency);
@@ -53,6 +71,26 @@ export const radioDebug = {
     console.log('📦 Contenu du cache:');
     for (const [key, value] of cache.entries()) {
       console.log(`${key}:`, value);
+    }
+  },
+
+  async fix876() {
+    console.log('🔧 Correction de la station 87.6 MHz...');
+    try {
+      const result = await fixSpecificStation(87.6);
+      console.log('Résultat:', result);
+      if (result.success) {
+        console.log('✅ Station 87.6 MHz corrigée avec succès !');
+        this.clearCache();
+        // Re-tester la fréquence
+        await this.testFrequency(87.6);
+      } else {
+        console.error('❌ Échec de la correction:', result.message);
+      }
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur lors de la correction:', error);
+      return { success: false, error };
     }
   }
 };

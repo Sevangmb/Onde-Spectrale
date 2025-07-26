@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { createStation } from '@/app/actions';
-import { resetAndCreateDefaultStations, verifyDefaultStations } from '@/app/actions-improved';
+import { resetAndCreateDefaultStations, verifyDefaultStations, fixSpecificStation } from '@/app/actions-improved';
 import type { CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { useStationSync } from '@/hooks/useStationSync';
@@ -31,7 +31,8 @@ import {
   CheckCircle,
   Loader2,
   RefreshCw,
-  Bug
+  Bug,
+  Wrench
 } from 'lucide-react';
 
 
@@ -169,6 +170,36 @@ export default function StationsManagement() {
       });
     }
   };
+
+  const handleFix876Station = async () => {
+    if (!confirm('Corriger la station 87.6 MHz ? Cela va supprimer l\'ancienne et créer Radio Liberty avec Sarah.')) {
+      return;
+    }
+
+    try {
+      const result = await fixSpecificStation(87.6);
+      
+      if (result.success) {
+        toast({
+          title: 'Station 87.6 MHz corrigée !',
+          description: result.message,
+        });
+        notifyStationsUpdated();
+      } else {
+        toast({
+          title: 'Erreur de correction',
+          description: result.message,
+          variant: 'destructive'
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
   
   if (isLoading) {
       return (
@@ -203,6 +234,16 @@ export default function StationsManagement() {
                 >
                   <Bug className="h-4 w-4" />
                   Vérifier
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFix876Station}
+                  className="gap-2"
+                  title="Corriger spécifiquement 87.6 MHz"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Fix 87.6
                 </Button>
                 <Button
                   variant="outline"

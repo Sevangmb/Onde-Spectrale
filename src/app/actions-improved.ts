@@ -5,6 +5,59 @@ import { revalidatePath } from 'next/cache';
 import { db, collection, query, where, getDocs, deleteDoc, doc } from '@/lib/firebase';
 import { createDefaultStations, getStationForFrequency } from './actions';
 
+export async function fixSpecificStation(frequency: number): Promise<{ success: boolean; message: string; station: any }> {
+  try {
+    console.log(`🔧 Correction de la station ${frequency} MHz`);
+    
+    // 1. Supprimer la station existante sur cette fréquence
+    const existing = await getStationForFrequency(frequency);
+    if (existing) {
+      console.log(`🗑️ Suppression de l'ancienne station: ${existing.name} (DJ: ${existing.djCharacterId})`);
+      await deleteDoc(doc(db, 'stations', existing.id));
+    }
+    
+    // 2. Re-créer les stations par défaut (qui inclut maintenant 87.6 MHz)
+    await createDefaultStations();
+    
+    // 3. Vérifier la nouvelle station
+    const newStation = await getStationForFrequency(frequency);
+    
+    if (newStation) {
+      console.log(`✅ Nouvelle station créée: ${newStation.name} (DJ: ${newStation.djCharacterId})`);
+      
+      // 4. Revalider les caches
+      revalidatePath('/');
+      revalidatePath('/admin');
+      revalidatePath('/admin/stations');
+      
+      return {
+        success: true,
+        message: `Station ${frequency} MHz mise à jour: ${newStation.name} avec DJ ${newStation.djCharacterId}`,
+        station: {
+          frequency: newStation.frequency,
+          name: newStation.name,
+          djCharacterId: newStation.djCharacterId,
+          theme: newStation.theme
+        }
+      };
+    } else {
+      return {
+        success: false,
+        message: `Échec de la création de la station ${frequency} MHz`,
+        station: null
+      };
+    }
+    
+  } catch (error: any) {
+    console.error(`❌ Erreur lors de la correction de ${frequency} MHz:`, error);
+    return {
+      success: false,
+      message: `Erreur: ${error.message}`,
+      station: null
+    };
+  }
+}
+
 export async function resetAndCreateDefaultStations(): Promise<{ success: boolean; message: string; stations: any[] }> {
   try {
     console.log('🔄 Début de la réinitialisation des stations par défaut');
