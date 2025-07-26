@@ -2,12 +2,24 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { db, collection, query, where, getDocs, deleteDoc, doc } from '@/lib/firebase';
-import { createDefaultStations, getStationForFrequency } from './actions';
+import { getStationForFrequency, createDefaultStations } from './actions';
+
+// Import direct des fonctions Firebase pour éviter les erreurs
+import { 
+  getFirestore, 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  deleteDoc, 
+  doc 
+} from 'firebase/firestore';
+import { app } from '@/lib/firebase';
 
 export async function fixSpecificStation(frequency: number): Promise<{ success: boolean; message: string; station: any }> {
   try {
     console.log(`🔧 Correction de la station ${frequency} MHz`);
+    const db = getFirestore(app);
     
     // 1. Supprimer la station existante sur cette fréquence
     const existing = await getStationForFrequency(frequency);
@@ -61,6 +73,7 @@ export async function fixSpecificStation(frequency: number): Promise<{ success: 
 export async function resetAndCreateDefaultStations(): Promise<{ success: boolean; message: string; stations: any[] }> {
   try {
     console.log('🔄 Début de la réinitialisation des stations par défaut');
+    const db = getFirestore(app);
     
     // 1. Supprimer toutes les stations système existantes
     const stationsCol = collection(db, 'stations');

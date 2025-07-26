@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { createStation } from '@/app/actions';
 import { resetAndCreateDefaultStations, verifyDefaultStations, fixSpecificStation } from '@/app/actions-improved';
+import { simpleFixStation876 } from '@/app/actions-simple-fix';
 import type { CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { useStationSync } from '@/hooks/useStationSync';
@@ -172,12 +173,12 @@ export default function StationsManagement() {
   };
 
   const handleFix876Station = async () => {
-    if (!confirm('Corriger la station 87.6 MHz ? Cela va supprimer l\'ancienne et créer Radio Liberty avec Sarah.')) {
+    if (!confirm('Corriger la station 87.6 MHz ? Cela va supprimer l\'ancienne station Marcus et créer Radio Liberty avec Sarah.')) {
       return;
     }
 
     try {
-      const result = await fixSpecificStation(87.6);
+      const result = await simpleFixStation876();
       
       if (result.success) {
         toast({
@@ -185,6 +186,7 @@ export default function StationsManagement() {
           description: result.message,
         });
         notifyStationsUpdated();
+        console.log('✅ Correction réussie:', result.details);
       } else {
         toast({
           title: 'Erreur de correction',
@@ -193,6 +195,7 @@ export default function StationsManagement() {
         });
       }
     } catch (error: any) {
+      console.error('❌ Erreur dans handleFix876Station:', error);
       toast({
         title: 'Erreur',
         description: error.message,
