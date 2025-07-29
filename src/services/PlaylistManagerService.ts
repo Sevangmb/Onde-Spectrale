@@ -53,12 +53,13 @@ export class PlaylistManagerService {
   // ========================================
 
   /**
-   * Réorganise une playlist avec nouvel ordre
+   * Réorganise une playlist avec nouvel ordre et validation optimisée
    */
   async reorderPlaylist(
     stationId: string, 
-    newOrder: PlaylistItem[]
-  ): Promise<{ success: boolean; error?: string }> {
+    newOrder: PlaylistItem[],
+    options: { validateTracks?: boolean; optimizeOrder?: boolean } = {}
+  ): Promise<{ success: boolean; error?: string; optimizations?: string[] }> {
     try {
       console.log('🔄 Reordering playlist for station:', stationId);
       
@@ -86,8 +87,19 @@ export class PlaylistManagerService {
         lastModified: Timestamp.now()
       });
 
+      const optimizations: string[] = [];
+      
+      // Auto-optimize if requested
+      if (options.optimizeOrder) {
+        const optimized = this.optimizeTrackOrder(newOrder);
+        if (optimized.changed) {
+          newOrder = optimized.playlist;
+          optimizations.push('Ordre optimisé pour meilleure expérience');
+        }
+      }
+      
       console.log('✅ Playlist reordered successfully');
-      return { success: true };
+      return { success: true, optimizations };
 
     } catch (error) {
       console.error('❌ Error reordering playlist:', error);
@@ -810,6 +822,378 @@ export class PlaylistManagerService {
       id,
       ...template
     }));
+  }
+
+  // ========================================
+  // PLAYLIST INTELLIGENCE & OPTIMIZATION
+  // ========================================
+
+  /**
+   * Optimise l'ordre des pistes pour une meilleure expérience
+   */
+  private optimizeTrackOrder(playlist: PlaylistItem[]): { playlist: PlaylistItem[]; changed: boolean } {
+    const originalOrder = playlist.map(t => t.id).join(',');
+    const optimized = [...playlist];
+    
+    // Éviter trop de messages consécutifs
+    for (let i = 1; i < optimized.length - 1; i++) {
+      if (optimized[i].type === 'message' && 
+          optimized[i - 1].type === 'message' && 
+          optimized[i + 1].type === 'message') {
+        
+        // Chercher une piste musicale proche à échanger
+        const nearbyMusicIndex = this.findNearbyMusic(optimized, i);
+        if (nearbyMusicIndex !== -1) {
+          [optimized[i], optimized[nearbyMusicIndex]] = [optimized[nearbyMusicIndex], optimized[i]];
+        }
+      }
+    }
+    
+    // Équilibrer les durées (éviter trop de pistes courtes/longues consécutives)
+    this.balanceTrackDurations(optimized);
+    
+    const newOrder = optimized.map(t => t.id).join(',');
+    return {
+      playlist: optimized,
+      changed: originalOrder !== newOrder
+    };
+  }
+
+  /**
+   * Trouve une piste musicale proche pour échanger
+   */
+  private findNearbyMusic(playlist: PlaylistItem[], startIndex: number): number {
+    const searchRadius = 3;
+    
+    for (let distance = 1; distance <= searchRadius; distance++) {
+      // Chercher avant
+      const beforeIndex = startIndex - distance;
+      if (beforeIndex >= 0 && playlist[beforeIndex].type === 'music') {
+        return beforeIndex;
+      }
+      
+      // Chercher après
+      const afterIndex = startIndex + distance;
+      if (afterIndex < playlist.length && playlist[afterIndex].type === 'music') {
+        return afterIndex;
+      }
+    }
+    
+    return -1;
+  }
+
+  /**
+   * Équilibre les durées des pistes
+   */
+  private balanceTrackDurations(playlist: PlaylistItem[]): void {
+    // Identifier les séquences de pistes très courtes ou très longues
+    for (let i = 0; i < playlist.length - 2; i++) {
+      const current = playlist[i];
+      const next = playlist[i + 1];
+      const afterNext = playlist[i + 2];
+      
+      // Si 3 pistes très courtes consécutives (< 60s)
+      if (current.duration < 60 && next.duration < 60 && afterNext.duration < 60) {
+        // Chercher une piste plus longue à proximité
+        const longerTrackIndex = this.findTrackByDuration(playlist, i, 120, 5);
+        if (longerTrackIndex !== -1) {
+          [playlist[i + 1], playlist[longerTrackIndex]] = [playlist[longerTrackIndex], playlist[i + 1]];
+        }
+      }
+      
+      // Si 3 pistes très longues consécutives (> 300s)
+      if (current.duration > 300 && next.duration > 300 && afterNext.duration > 300) {
+        // Chercher une piste plus courte à proximité
+        const shorterTrackIndex = this.findTrackByDuration(playlist, i, 180, 5, true);
+        if (shorterTrackIndex !== -1) {
+          [playlist[i + 1], playlist[shorterTrackIndex]] = [playlist[shorterTrackIndex], playlist[i + 1]];
+        }
+      }
+    }
+  }
+
+  /**
+   * Trouve une piste avec une durée spécifique dans un rayon donné
+   */
+  private findTrackByDuration(
+    playlist: PlaylistItem[], 
+    startIndex: number, 
+    targetDuration: number, 
+    radius: number,
+    shorter = false
+  ): number {
+    for (let distance = 1; distance <= radius; distance++) {
+      // Chercher avant
+      const beforeIndex = startIndex - distance;
+      if (beforeIndex >= 0) {
+        const track = playlist[beforeIndex];
+        if (shorter ? track.duration < targetDuration : track.duration > targetDuration) {
+          return beforeIndex;
+        }
+      }
+      
+      // Chercher après
+      const afterIndex = startIndex + distance + 3; // Éviter la zone des 3 pistes problématiques
+      if (afterIndex < playlist.length) {
+        const track = playlist[afterIndex];
+        if (shorter ? track.duration < targetDuration : track.duration > targetDuration) {
+          return afterIndex;
+        }
+      }
+    }
+    
+    return -1;
+  }
+
+  /**
+   * Génère une playlist intelligente basée sur l'historique et les préférences
+   */
+  async generateSmartPlaylist(
+    stationId: string,
+    options: {
+      targetDuration?: number; // en secondes
+      messageRatio?: number; // 0.0 - 1.0
+      theme?: string;
+      djStyle?: 'energetic' | 'calm' | 'mysterious' | 'professional';
+      timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'night';
+    } = {}
+  ): Promise<{ success: boolean; playlist?: PlaylistItem[]; insights?: string[]; error?: string }> {
+    try {
+      console.log('🧠 Generating smart playlist with options:', options);
+      
+      const insights: string[] = [];
+      const defaultDuration = options.targetDuration || 3600; // 1 heure par défaut
+      const messageRatio = options.messageRatio || 0.25; // 25% messages par défaut
+      
+      // Calculer le nombre de pistes basé sur la durée cible
+      const avgTrackDuration = 180; // 3 minutes moyenne
+      const totalTracks = Math.round(defaultDuration / avgTrackDuration);
+      const messageCount = Math.round(totalTracks * messageRatio);
+      const musicCount = totalTracks - messageCount;
+      
+      insights.push(`Génération de ${totalTracks} pistes (${musicCount} musiques, ${messageCount} messages)`);
+      
+      // Adapter le style selon l'heure
+      let adjustedTheme = options.theme || 'radio post-apocalyptique';
+      if (options.timeOfDay) {
+        switch (options.timeOfDay) {
+          case 'morning':
+            adjustedTheme += ' - Ambiance matinale énergique';
+            insights.push('Style adapté pour le matin : plus énergique');
+            break;
+          case 'evening':
+            adjustedTheme += ' - Ambiance relaxante du soir';
+            insights.push('Style adapté pour le soir : plus calme');
+            break;
+          case 'night':
+            adjustedTheme += ' - Ambiance nocturne mystérieuse';
+            insights.push('Style adapté pour la nuit : plus mystérieux');
+            break;
+        }
+      }
+      
+      // Générer la playlist de base
+      const templateResult = await this.generateFromTemplate(
+        stationId,
+        'balanced-mix', // Template par défaut
+        { 
+          id: 'smart-dj', 
+          name: 'DJ Intelligent', 
+          description: adjustedTheme,
+          voice: 'alloy'
+        } as any,
+        adjustedTheme
+      );
+      
+      if (!templateResult.success || !templateResult.playlist) {
+        return { success: false, error: templateResult.error };
+      }
+      
+      // Optimiser l'ordre des pistes
+      const optimizedResult = this.optimizeTrackOrder(templateResult.playlist);
+      let finalPlaylist = optimizedResult.playlist;
+      
+      if (optimizedResult.changed) {
+        insights.push('Ordre des pistes optimisé pour une meilleure expérience');
+      }
+      
+      // Ajuster les durées si nécessaire
+      const totalGeneratedDuration = finalPlaylist.reduce((sum, track) => sum + track.duration, 0);
+      if (Math.abs(totalGeneratedDuration - defaultDuration) > defaultDuration * 0.2) {
+        // Si l'écart est > 20%, ajuster
+        if (totalGeneratedDuration > defaultDuration) {
+          // Supprimer des pistes en commençant par les plus longues
+          finalPlaylist = this.trimPlaylistToDuration(finalPlaylist, defaultDuration);
+          insights.push(`Playlist raccourcie à ${Math.round(defaultDuration / 60)} minutes`);
+        } else {
+          // Ajouter des pistes courtes
+          const additionalTracks = await this.generateAdditionalTracks(
+            defaultDuration - totalGeneratedDuration,
+            messageRatio
+          );
+          finalPlaylist = [...finalPlaylist, ...additionalTracks];
+          insights.push(`${additionalTracks.length} pistes supplémentaires ajoutées`);
+        }
+      }
+      
+      console.log(`✅ Smart playlist generated: ${finalPlaylist.length} tracks, ${Math.round(finalPlaylist.reduce((s, t) => s + t.duration, 0) / 60)} minutes`);
+      
+      return {
+        success: true,
+        playlist: finalPlaylist,
+        insights
+      };
+      
+    } catch (error) {
+      console.error('❌ Error generating smart playlist:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur génération intelligente'
+      };
+    }
+  }
+
+  /**
+   * Raccourcit une playlist à une durée cible
+   */
+  private trimPlaylistToDuration(playlist: PlaylistItem[], targetDuration: number): PlaylistItem[] {
+    // Trier par durée décroissante pour supprimer les plus longues d'abord
+    const sorted = [...playlist].sort((a, b) => b.duration - a.duration);
+    let currentDuration = playlist.reduce((sum, track) => sum + track.duration, 0);
+    const result = [...playlist];
+    
+    for (const track of sorted) {
+      if (currentDuration <= targetDuration) break;
+      
+      const index = result.findIndex(t => t.id === track.id);
+      if (index !== -1) {
+        result.splice(index, 1);
+        currentDuration -= track.duration;
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Génère des pistes supplémentaires pour atteindre la durée cible
+   */
+  private async generateAdditionalTracks(
+    neededDuration: number,
+    messageRatio: number
+  ): Promise<PlaylistItem[]> {
+    const avgTrackDuration = 120; // 2 minutes pour les pistes supplémentaires
+    const additionalCount = Math.ceil(neededDuration / avgTrackDuration);
+    const messageCount = Math.round(additionalCount * messageRatio);
+    const musicCount = additionalCount - messageCount;
+    
+    const tracks: PlaylistItem[] = [];
+    
+    // Générer des messages courts
+    for (let i = 0; i < messageCount; i++) {
+      tracks.push({
+        id: `additional-msg-${Date.now()}-${i}`,
+        type: 'message',
+        title: `Message Radio ${i + 1}`,
+        content: 'Message généré automatiquement pour compléter la playlist',
+        artist: 'DJ Intelligent',
+        duration: Math.floor(Math.random() * 30) + 15, // 15-45 secondes
+        url: '',
+        addedAt: new Date().toISOString()
+      });
+    }
+    
+    // Générer des pistes musicales courtes
+    for (let i = 0; i < musicCount; i++) {
+      tracks.push({
+        id: `additional-music-${Date.now()}-${i}`,
+        type: 'music',
+        title: `Piste Supplémentaire ${i + 1}`,
+        content: 'Piste générée pour compléter la durée cible',
+        artist: 'Artiste Radio',
+        duration: avgTrackDuration + (Math.random() * 60 - 30), // ±30s variation
+        url: '',
+        addedAt: new Date().toISOString()
+      });
+    }
+    
+    return tracks;
+  }
+
+  /**
+   * Analyse et suggère des améliorations personnalisées
+   */
+  async getPersonalizedRecommendations(
+    stationId: string,
+    userListeningHistory?: any[]
+  ): Promise<{ success: boolean; recommendations?: string[]; error?: string }> {
+    try {
+      const analyticsResult = await this.analyzePlaylistPerformance(stationId);
+      
+      if (!analyticsResult.success || !analyticsResult.analytics) {
+        return { success: false, error: analyticsResult.error };
+      }
+      
+      const analytics = analyticsResult.analytics;
+      const recommendations: string[] = [];
+      
+      // Recommandations basées sur les analytics
+      if (analytics.composition.ratios.message > 0.4) {
+        recommendations.push('🎵 Ajoutez plus de musique pour équilibrer votre playlist');
+      }
+      
+      if (analytics.overview.totalTracks < 15) {
+        recommendations.push('📊 Votre playlist est courte - ajoutez plus de contenu pour éviter la répétition');
+      }
+      
+      if (analytics.distribution.shortTracks.percentage > 60) {
+        recommendations.push('⏱️ Beaucoup de pistes courtes - variez avec des morceaux plus longs');
+      }
+      
+      // Recommandations basées sur l'historique (si disponible)
+      if (userListeningHistory && userListeningHistory.length > 0) {
+        const skipRate = userListeningHistory.filter(h => h.action === 'skip').length / userListeningHistory.length;
+        
+        if (skipRate > 0.3) {
+          recommendations.push('⏭️ Taux de skip élevé - variez le contenu ou ajustez le style DJ');
+        }
+        
+        const favoriteTypes = this.analyzeFavoriteTypes(userListeningHistory);
+        if (favoriteTypes.music > favoriteTypes.message) {
+          recommendations.push('🎶 Vous préférez la musique - réduisez les messages DJ');
+        }
+      }
+      
+      // Recommandations pour l'optimisation
+      recommendations.push('⚡ Utilisez la génération intelligente pour optimiser automatiquement');
+      recommendations.push('📈 Consultez régulièrement les analytics pour améliorer l\'engagement');
+      
+      return {
+        success: true,
+        recommendations
+      };
+      
+    } catch (error) {
+      console.error('❌ Error getting personalized recommendations:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur recommandations'
+      };
+    }
+  }
+
+  /**
+   * Analyse les types de contenu préférés par l'utilisateur
+   */
+  private analyzeFavoriteTypes(history: any[]): { music: number; message: number } {
+    const completedListens = history.filter(h => h.action === 'completed');
+    const musicCompleted = completedListens.filter(h => h.trackType === 'music').length;
+    const messageCompleted = completedListens.filter(h => h.trackType === 'message').length;
+    
+    return {
+      music: musicCompleted,
+      message: messageCompleted
+    };
   }
 }
 

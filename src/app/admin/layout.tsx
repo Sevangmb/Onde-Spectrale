@@ -130,8 +130,8 @@ function AdminLayout({ children }: { children: ReactNode }) {
   };
 
   const menuItems = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/stations', label: 'Mes Stations', icon: Radio },
+    { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin/stations', label: 'Gestion Radio', icon: Radio },
     { href: '/admin/personnages', label: 'Mes Personnages', icon: Users },
     { href: '/admin/bibliotheque', label: 'Bibliothèque Plex', icon: Library },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
