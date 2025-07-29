@@ -14,7 +14,11 @@ import { useRouter } from 'next/navigation';
 import { usePlaylistManager } from '@/hooks/usePlaylistManager';
 import { useRadioSoundEffects } from '@/hooks/useRadioSoundEffects';
 import { useStationSync, useStationForFrequency } from '@/hooks/useStationSync';
+import { useAutoPlay } from '@/hooks/useAutoPlay';
 import { radioDebug } from '@/lib/debug';
+
+// Services
+import { interferenceAudioService } from '@/services/InterferenceAudioService';
 
 // Composants UI
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,7 +62,6 @@ export function OndeSpectraleRadio() {
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [audioContextEnabled, setAudioContextEnabled] = useState(false);
 
   // Optimized particle generation with useMemo
   const particleStyles = useMemo<ParticleStyle[]>(() => 
@@ -104,6 +107,7 @@ export function OndeSpectraleRadio() {
       setError(null);
     }
   }, [currentStation, stationError, setSignalStrength, setError]);
+
   
   const playlistManager = usePlaylistManager({
     station: currentStation,
@@ -116,6 +120,18 @@ export function OndeSpectraleRadio() {
     enableEffects: false,
     fadeInDuration: 300,
     fadeOutDuration: 200
+  });
+
+  // Hook pour gérer l'autoplay automatique et les interférences
+  const { 
+    isAudioInitialized, 
+    autoPlayReady, 
+    handleUserInteraction, 
+    needsUserInteraction 
+  } = useAutoPlay({
+    frequency,
+    currentStation,
+    playlistManager
   });
   
   // Initial setup effect, runs only once
@@ -144,46 +160,35 @@ export function OndeSpectraleRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleUserInteraction = useCallback(() => {
-    if (!audioContextEnabled) {
-      setAudioContextEnabled(true);
-    }
-    
-    // Activer l'autoplay dès la première interaction
-    if (!playlistManager.autoPlayEnabled && playlistManager.enableAutoPlay) {
-      playlistManager.enableAutoPlay();
-      console.log('🎵 Autoplay activé par interaction utilisateur');
-    }
-    
-    // Relancer la lecture si elle était bloquée ou si il y a une piste en attente
-    if (playlistManager.currentTrack && !playlistManager.isPlaying && !playlistManager.isLoadingTrack) {
-      playlistManager.togglePlayPause();
-    } else if (!playlistManager.currentTrack && currentStation && currentStation.playlist.length > 0) {
-      // Si aucune piste n'est sélectionnée, démarrer la première
-      playlistManager.togglePlayPause();
-    }
-  }, [audioContextEnabled, playlistManager, currentStation]);
-
-  useEffect(() => {
-    if (!audioContextEnabled) {
-      const events = ['click', 'touchstart', 'keydown'];
-      events.forEach(event => document.addEventListener(event, handleUserInteraction, { once: true }));
-      return () => {
-        events.forEach(event => document.removeEventListener(event, handleUserInteraction));
-      };
-    }
-  }, [audioContextEnabled, handleUserInteraction]);
-
-  const handleScan = useCallback((direction: 'up' | 'down') => {
+  const handleScan = useCallback(async (direction: 'up' | 'down') => {
     if (isScanning) return;
     
     setIsScanning(true);
     radioSounds.playTuning();
     
+    // Jouer le son de scan radio pendant le balayage si l'audio est initialisé
+    if (isAudioInitialized) {
+      try {
+        await interferenceAudioService.playInterference(frequency, 'medium');
+      } catch (error) {
+        console.warn('Erreur scan interférence:', error);
+      }
+    }
+    
     let newFrequency = sliderValue;
-    const intervalId = setInterval(() => {
+    const intervalId = setInterval(async () => {
       newFrequency += direction === 'up' ? 0.1 : -0.1;
-      setSliderValue(Math.max(87.0, Math.min(108.0, newFrequency)));
+      const clampedFreq = Math.max(87.0, Math.min(108.0, newFrequency));
+      setSliderValue(clampedFreq);
+      
+      // Jouer différents types d'interférence pendant le scan
+      if (isAudioInitialized) {
+        try {
+          await interferenceAudioService.playInterference(clampedFreq, 'low');
+        } catch (error) {
+          // Ignore les erreurs pendant le scan rapide
+        }
+      }
     }, 50);
 
     setTimeout(() => {
@@ -193,9 +198,10 @@ export function OndeSpectraleRadio() {
       setFrequency(clampedFrequency);
       setSliderValue(clampedFrequency);
       // La station sera automatiquement chargée par useStationForFrequency
+      // L'interférence sera gérée par l'effet useEffect
       setIsScanning(false);
     }, 1000);
-  }, [isScanning, sliderValue, radioSounds, setIsScanning, setSliderValue, setFrequency]);
+  }, [isScanning, sliderValue, frequency, isAudioInitialized, radioSounds, setIsScanning, setSliderValue, setFrequency]);
 
   const handleFrequencyChange = (value: number[]) => {
     setSliderValue(value[0]);
@@ -204,11 +210,18 @@ export function OndeSpectraleRadio() {
   const handleFrequencyCommit = useCallback(async (value: number[]) => {
     const newFreq = value[0];
     setFrequency(newFreq);
+    
+    // Arrêter toute interférence existante puis vérifier la nouvelle fréquence
+    if (isAudioInitialized) {
+      interferenceAudioService.stopInterference();
+      // L'interférence sera automatiquement gérée par le hook useAutoPlay
+    }
+    
     // La station sera automatiquement chargée par useStationForFrequency
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
-  }, [setFrequency, user]);
+  }, [setFrequency, user, isAudioInitialized]);
 
   const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
 
@@ -411,23 +424,24 @@ export function OndeSpectraleRadio() {
                                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/30 rounded-full text-primary text-sm">
                                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse mr-1"></div>
                                   {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
-                                   playlistManager.isPlaying ? (playlistManager.autoPlayEnabled ? 'PLAYLIST AUTO ♪' : 'TRANSMISSION EN COURS') : 
-                                   (playlistManager.autoPlayEnabled ? 'PLAYLIST ACTIVÉE' : 'CONNEXION ÉTABLIE')}
+                                   playlistManager.isPlaying ? (autoPlayReady ? 'TRANSMISSION AUTO ♪' : 'TRANSMISSION EN COURS') : 
+                                   (autoPlayReady ? 'STATION ACTIVE' : 'CONNEXION ÉTABLIE')}
                                 </div>
                                 
-                                {(!audioContextEnabled || playlistManager.errorMessage?.includes('Cliquez')) && playlistManager.currentTrack && (
+                                {needsUserInteraction && playlistManager.currentTrack && (
                                   <button
                                     onClick={handleUserInteraction}
                                     className="retro-button text-xs px-4 py-2 animate-pulse bg-primary/20 hover:bg-primary/30 border-primary/40"
                                   >
-                                    🎵 {!audioContextEnabled ? 'ACTIVER L\'AUDIO' : 'DÉMARRER LA LECTURE'}
+                                    🎵 ACTIVER L'AUDIO AUTO
                                   </button>
                                 )}
                               </div>
                             ) : (
                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-destructive/10 border border-destructive/30 rounded-full text-destructive text-sm">
                                 <div className="w-2 h-2 bg-destructive rounded-full animate-pulse mr-1"></div>
-                                {isLoadingStation ? 'ANALYSE DU SPECTRE...' : 'STATIQUE'}
+                                {isLoadingStation ? 'ANALYSE DU SPECTRE...' : 
+                                 isAudioInitialized ? 'INTERFÉRENCE RADIO' : 'STATIQUE'}
                               </div>
                             )}
                           </div>
