@@ -1,64 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Activity, Wifi, Server, Users, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
-
-interface SystemStatus {
-  server: 'online' | 'offline' | 'degraded';
-  database: 'online' | 'offline' | 'degraded';
-  plex: 'online' | 'offline' | 'degraded';
-  ai: 'online' | 'offline' | 'degraded';
-}
-
-interface RealtimeStats {
-  activeUsers: number;
-  activeStations: number;
-  totalTracks: number;
-  serverUptime: string;
-  lastUpdate: Date;
-}
+import { 
+  useAdminSystemStatus, 
+  useAdminActivePlayers, 
+  useAdminStationHealth,
+  useAdminActions,
+  useAdminState 
+} from '@/stores/extendedRadioStore';
 
 export function RealtimeMonitoring() {
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    server: 'online',
-    database: 'online',
-    plex: 'degraded',
-    ai: 'online'
-  });
+  const systemStatus = useAdminSystemStatus();
+  const activePlayers = useAdminActivePlayers();
+  const stationHealth = useAdminStationHealth();
+  const adminState = useAdminState();
+  const { initializeAdminMonitoring, cleanupAdminMonitoring } = useAdminActions();
 
-  const [stats, setStats] = useState<RealtimeStats>({
-    activeUsers: 3,
-    activeStations: 2,
-    totalTracks: 1247,
-    serverUptime: '2d 14h 32m',
-    lastUpdate: new Date()
-  });
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
+  // Initialize admin monitoring on component mount
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshData();
-    }, 30000); // Refresh every 30 seconds
+    if (!adminState.isMonitoringActive) {
+      initializeAdminMonitoring();
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      // Cleanup on unmount
+      cleanupAdminMonitoring();
+    };
+  }, [adminState.isMonitoringActive, initializeAdminMonitoring, cleanupAdminMonitoring]);
 
   const refreshData = async () => {
-    setIsRefreshing(true);
-    
-    // Simulate API calls
-    setTimeout(() => {
-      setStats(prev => ({
-        ...prev,
-        activeUsers: Math.floor(Math.random() * 10) + 1,
-        lastUpdate: new Date()
-      }));
-      setIsRefreshing(false);
-    }, 1000);
+    // Data is already real-time through the store subscriptions
+    // This could trigger a manual refresh if needed
+    console.log('Manual refresh triggered');
   };
 
   const getStatusIcon = (status: string) => {
@@ -99,12 +76,12 @@ export function RealtimeMonitoring() {
             </CardTitle>
             <Button
               onClick={refreshData}
-              disabled={isRefreshing}
+              disabled={!adminState.isMonitoringActive}
               size="sm"
               variant="outline"
               className="border-orange-500/50 hover:border-orange-500"
             >
-              {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+              {adminState.isMonitoringActive ? 'Actualiser' : 'Initialisation...'}
             </Button>
           </div>
         </CardHeader>
@@ -161,7 +138,7 @@ export function RealtimeMonitoring() {
             <Users className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-300">{stats.activeUsers}</div>
+            <div className="text-2xl font-bold text-orange-300">{adminState.totalActivePlayers}</div>
             <p className="text-xs text-orange-400/70">
               Connectés maintenant
             </p>
@@ -174,7 +151,7 @@ export function RealtimeMonitoring() {
             <Wifi className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-300">{stats.activeStations}</div>
+            <div className="text-2xl font-bold text-orange-300">{Array.from(stationHealth.values()).filter(s => s.status === 'healthy').length}</div>
             <p className="text-xs text-orange-400/70">
               En diffusion
             </p>
@@ -187,9 +164,9 @@ export function RealtimeMonitoring() {
             <Server className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-300">{stats.totalTracks.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-orange-300">{Array.from(stationHealth.values()).reduce((total, station) => total + station.playlistLength, 0).toLocaleString()}</div>
             <p className="text-xs text-orange-400/70">
-              Dans la bibliothèque
+              Dans les playlists
             </p>
           </CardContent>
         </Card>
@@ -200,9 +177,14 @@ export function RealtimeMonitoring() {
             <Clock className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-300">{stats.serverUptime}</div>
+            <div className="text-2xl font-bold text-orange-300">
+              {adminState.monitoringStartTime 
+                ? Math.floor((Date.now() - adminState.monitoringStartTime.getTime()) / 1000 / 60) + 'm'
+                : '0m'
+              }
+            </div>
             <p className="text-xs text-orange-400/70">
-              Sans interruption
+              Monitoring actif
             </p>
           </CardContent>
         </Card>
@@ -210,7 +192,7 @@ export function RealtimeMonitoring() {
 
       {/* Last Update */}
       <div className="text-xs text-orange-400/60 text-center">
-        Dernière mise à jour: {stats.lastUpdate.toLocaleTimeString('fr-FR')}
+        Dernière mise à jour: {adminState.lastUpdateTime?.toLocaleTimeString('fr-FR') || 'Jamais'}
       </div>
     </div>
   );

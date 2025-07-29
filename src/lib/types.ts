@@ -76,3 +76,145 @@ export type PlayerState = {
   }>;
 };
 // --- Fin PlayerState ---
+
+// ========================================
+// ADMIN MONITORING TYPES
+// ========================================
+
+export interface SystemStatus {
+  server: 'online' | 'offline' | 'degraded';
+  database: 'online' | 'offline' | 'degraded';
+  plex: 'online' | 'offline' | 'degraded';
+  ai: 'online' | 'offline' | 'degraded';
+  lastChecked: Date;
+}
+
+export interface AdminPlayerState extends PlayerState {
+  userId: string;
+  sessionId: string;
+  stationFrequency: number;
+  ipAddress?: string;
+  userAgent?: string;
+  connectionTime: Date;
+  lastActivity: Date;
+  bandwidth?: number;
+  audioQuality?: 'low' | 'medium' | 'high';
+}
+
+export interface AdminErrorLog {
+  id: string;
+  timestamp: Date;
+  level: 'critical' | 'error' | 'warning' | 'info';
+  source: 'player' | 'station' | 'api' | 'auth' | 'plex' | 'ai';
+  message: string;
+  userId?: string;
+  stationId?: string;
+  frequency?: number;
+  errorCode?: string;
+  stack?: string;
+  metadata?: Record<string, any>;
+  resolved?: boolean;
+  resolvedAt?: Date;
+  resolvedBy?: string;
+}
+
+export interface StationHealthMetrics {
+  frequency: number;
+  stationId: string;
+  status: 'healthy' | 'degraded' | 'offline' | 'maintenance';
+  uptime: number;
+  currentListeners: number;
+  peakListeners: number;
+  playlistLength: number;
+  playlistHealth: 'good' | 'low' | 'empty';
+  lastTrackPlayed?: PlaylistItem;
+  trackFailureRate: number;
+  djResponseTime?: number;
+  lastActivity: Date;
+  errors: string[];
+  metrics: {
+    avgSessionTime: number;
+    bounceRate: number;
+    trackSkipRate: number;
+  };
+}
+
+export interface AdminAnalytics {
+  period: '1h' | '24h' | '7d' | '30d';
+  totalUsers: number;
+  activeUsers: number;
+  newUsers: number;
+  totalSessions: number;
+  avgSessionDuration: number;
+  totalPlaytime: number;
+  topStations: Array<{
+    frequency: number;
+    name: string;
+    listeners: number;
+    playtime: number;
+  }>;
+  topTracks: Array<{
+    title: string;
+    artist: string;
+    plays: number;
+    station: string;
+  }>;
+  errorStats: {
+    total: number;
+    byLevel: Record<string, number>;
+    bySource: Record<string, number>;
+  };
+  performanceMetrics: {
+    avgResponseTime: number;
+    uptime: number;
+    errorRate: number;
+  };
+}
+
+export interface SystemAlert {
+  id: string;
+  level: 'critical' | 'warning' | 'info';
+  message: string;
+  timestamp: Date;
+  acknowledged?: boolean;
+}
+
+export interface AdminMonitoringState {
+  // Statut général
+  isMonitoringActive: boolean;
+  monitoringStartTime: Date | null;
+  lastUpdateTime: Date | null;
+  
+  // Santé système
+  systemStatus: SystemStatus;
+  systemAlerts: SystemAlert[];
+  
+  // Players en temps réel
+  activePlayers: Map<string, AdminPlayerState>;
+  totalActivePlayers: number;
+  
+  // Logs et erreurs
+  errorLogs: AdminErrorLog[];
+  recentErrors: AdminErrorLog[];
+  errorStats: Record<string, number>;
+  
+  // Santé des stations
+  stationHealth: Map<number, StationHealthMetrics>;
+  offlineStations: number[];
+  degradedStations: number[];
+  
+  // Analytics temps réel
+  realTimeAnalytics: AdminAnalytics;
+  
+  // Configuration monitoring
+  settings: {
+    refreshInterval: number;
+    maxErrorLogs: number;
+    alertThresholds: {
+      maxErrorRate: number;
+      minUptime: number;
+      maxResponseTime: number;
+    };
+    enableNotifications: boolean;
+  };
+}

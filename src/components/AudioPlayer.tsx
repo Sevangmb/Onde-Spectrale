@@ -136,7 +136,7 @@ export function AudioPlayer({
   }
 
   return (
-    <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl radioactive-pulse relative overflow-hidden static-noise">
+    <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl relative overflow-hidden static-noise">
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none"></div>
       
       <div className="absolute inset-0 opacity-30 pointer-events-none">
@@ -145,7 +145,7 @@ export function AudioPlayer({
 
       <div className="relative z-10 flex flex-col gap-4">
         <div className="flex items-center gap-4">
-          <div className="bg-primary/10 border-2 border-primary/40 rounded-lg p-3 shadow-lg radioactive-pulse">
+          <div className="bg-primary/10 border-2 border-primary/40 rounded-lg p-3 shadow-lg">
             { isLoading ? <Loader2 className="h-8 w-8 text-primary phosphor-glow animate-spin"/> :
               !track ? <Radio className="h-8 w-8 text-primary phosphor-glow animate-pulse" /> :
               track.type === 'music' ? 

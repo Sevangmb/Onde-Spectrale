@@ -10,7 +10,20 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-
+  transformIgnorePatterns: [
+    'node_modules/(?!(lucide-react|@testing-library)/)',
+  ],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.(ts|tsx|js)',
+    '<rootDir>/src/**/*.(test|spec).(ts|tsx|js)',
+  ],
+  collectCoverageFrom: [
+    'src/**/*.(ts|tsx)',
+    '!src/**/*.d.ts',
+    '!src/**/*.stories.(ts|tsx)',
+    '!src/**/index.(ts|tsx)',
+  ],
 };
 
 export default createJestConfig(customJestConfig);

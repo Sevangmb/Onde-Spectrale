@@ -150,7 +150,7 @@ export default function LoginPage() {
                 <div className="absolute inset-0 bg-primary/30 blur-sm animate-pulse"></div>
               </div>
               <CardTitle className="font-headline text-2xl text-primary tracking-wider drop-shadow-lg">
-                <span className="inline-block animate-flicker">Onde Spectrale</span>
+                <span className="inline-block">Onde Spectrale</span>
               </CardTitle>
               <p className="text-muted-foreground text-sm">
                 Accès à la console d'administration

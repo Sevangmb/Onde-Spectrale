@@ -1,19 +1,17 @@
 import React, { useRef } from 'react';
 import { AudioPlayer } from './AudioPlayer';
-import type { PlaylistItem } from '@/lib/types';
+import { createMockMusic } from '@/lib/playlistUtils';
 
 export default {
   title: 'Components/AudioPlayer',
   component: AudioPlayer,
 };
 
-const sampleTrack: PlaylistItem = {
+const sampleTrack = createMockMusic({
   title: 'Titre de test',
   artist: 'Artiste',
   url: '/test.mp3',
-  type: 'music',
-  // Ajoutez d'autres champs requis si besoin
-};
+});
 
 export const Default = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
