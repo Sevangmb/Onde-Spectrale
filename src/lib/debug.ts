@@ -2,7 +2,7 @@
 'use client';
 
 import { getStationForFrequency } from '@/app/actions';
-import { fixSpecificStation } from '@/app/actions-improved';
+import { simpleFixStation876 } from '@/app/actions-simple-fix';
 import { clientCache, CACHE_KEYS } from './cache';
 
 export const radioDebug = {
@@ -77,7 +77,7 @@ export const radioDebug = {
   async fix876() {
     console.log('🔧 Correction de la station 87.6 MHz...');
     try {
-      const result = await fixSpecificStation(87.6);
+      const result = await simpleFixStation876();
       console.log('Résultat:', result);
       if (result.success) {
         console.log('✅ Station 87.6 MHz corrigée avec succès !');

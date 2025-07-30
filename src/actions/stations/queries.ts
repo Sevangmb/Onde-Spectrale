@@ -12,7 +12,6 @@ import {
   orderBy
 } from 'firebase/firestore';
 import type { Station } from '@/lib/types';
-import type { StationQueryResult } from './types';
 
 function serializeStation(doc: any): Station {
   const data = doc.data();
@@ -21,7 +20,10 @@ function serializeStation(doc: any): Station {
     ...data,
     createdAt: data.createdAt instanceof Timestamp 
       ? data.createdAt.toDate().toISOString() 
-      : new Date(data.createdAt).toISOString(),
+      : new Date(data.createdAt || Date.now()).toISOString(),
+    lastModified: data.lastModified instanceof Timestamp
+      ? data.lastModified.toDate().toISOString()
+      : new Date(data.lastModified || data.createdAt || Date.now()).toISOString(),
     playlist: data.playlist || [],
   } as Station;
 }
@@ -78,7 +80,6 @@ export async function getStationsForUser(userId: string): Promise<Station[]> {
   try {
     const stationsCol = collection(db, 'stations');
     
-    // Utiliser une requête 'in' pour combiner les stations utilisateur et système
     const q = query(
       stationsCol,
       where('ownerId', 'in', [userId, 'system']),

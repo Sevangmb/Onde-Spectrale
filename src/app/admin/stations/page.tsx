@@ -5,7 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminLayout } from '../layout';
 import { RadioStationManager } from '@/components/radio/RadioStationManager';
-import { resetAndCreateDefaultStations, verifyDefaultStations } from '@/app/actions-improved';
+import { createDefaultStations } from '@/actions/stations/mutations';
+import { getStationsForUser } from '@/actions/stations/queries';
 import { simpleFixStation876 } from '@/app/actions-simple-fix';
 import type { CustomDJCharacter, User } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
@@ -27,7 +28,8 @@ import {
 
 
 export default function StationsManagement() {
-  const { user, stations, customCharacters, isLoading } = useAdminLayout();
+  const { user, customCharacters, isLoading } = useAdminLayout();
+  const { stations, loadStations } = useAdminLayout();
   const { toast } = useToast();
   const { notifyStationsUpdated } = useStationSync();
   const [isResetting, setIsResetting] = useState(false);
@@ -64,21 +66,12 @@ export default function StationsManagement() {
 
     setIsResetting(true);
     try {
-      const result = await resetAndCreateDefaultStations();
-      
-      if (result.success) {
-        toast({
-          title: 'Stations réinitialisées !',
-          description: result.message,
-        });
-        notifyStationsUpdated();
-      } else {
-        toast({
-          title: 'Erreur de réinitialisation',
-          description: result.message,
-          variant: 'destructive'
-        });
-      }
+      await createDefaultStations();
+      await loadStations();
+      toast({
+        title: 'Stations réinitialisées !',
+        description: 'Les stations par défaut ont été recréées.',
+      });
     } catch (error: any) {
       toast({
         title: 'Erreur',
@@ -92,14 +85,14 @@ export default function StationsManagement() {
 
   const handleVerifyStations = async () => {
     try {
-      const result = await verifyDefaultStations();
-      console.log('Vérification des stations:', result);
+      const allStations = user ? await getStationsForUser(user.uid) : [];
+      const defaultFrequencies = [87.6, 94.5, 98.2, 100.7, 102.1];
+      const missingStations = defaultFrequencies.filter(freq => !allStations.some(s => s.frequency === freq));
       
-      const missingStations = result.frequencies.filter(f => !f.exists);
       if (missingStations.length > 0) {
         toast({
           title: 'Stations manquantes détectées',
-          description: `${missingStations.length} stations manquantes: ${missingStations.map(s => s.frequency).join(', ')} MHz`,
+          description: `${missingStations.length} stations manquantes: ${missingStations.join(', ')} MHz`,
           variant: 'destructive'
         });
       } else {
@@ -130,7 +123,7 @@ export default function StationsManagement() {
           title: 'Station 87.6 MHz corrigée !',
           description: result.message,
         });
-        notifyStationsUpdated();
+        await loadStations();
         console.log('✅ Correction réussie:', result.details);
       } else {
         toast({
