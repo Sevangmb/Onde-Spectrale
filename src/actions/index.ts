@@ -11,3 +11,4 @@ export * from './audio/generation';
 
 // User actions
 export * from './users/queries';
+export * from './users/preferences';

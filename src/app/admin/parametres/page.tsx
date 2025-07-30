@@ -1,34 +1,30 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Save, RotateCcw, Volume2, Palette, Radio } from 'lucide-react';
+import { Settings, Save, RotateCcw, Volume2, Palette, Radio, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAdminLayout } from '../layout';
+import { updateUserPreferences, getUserPreferences } from '@/actions/users/preferences';
 
 export interface UserPreferences {
-  // Audio
   defaultVolume: number;
   autoPlay: boolean;
   crossfade: boolean;
-  
-  // Interface
   theme: 'classic' | 'modern' | 'minimal';
   showVisualizer: boolean;
   showLyrics: boolean;
   compactMode: boolean;
-  
-  // Radio
   favoriteGenres: string[];
   skipIntros: boolean;
   autoTune: boolean;
   emergencyAlerts: boolean;
-  
-  // Notifications
   newTrackNotifications: boolean;
   stationChangeNotifications: boolean;
 }
@@ -50,55 +46,70 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 };
 
 export default function ParametresPage() {
+  const { user } = useAdminLayout();
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadPreferences();
-  }, []);
-
-  const loadPreferences = () => {
+  const loadPreferences = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
     try {
-      const saved = localStorage.getItem('onde-spectrale-preferences');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setPreferences({ ...DEFAULT_PREFERENCES, ...parsed });
+      const savedPrefs = await getUserPreferences(user.uid);
+      if (savedPrefs) {
+        setPreferences({ ...DEFAULT_PREFERENCES, ...savedPrefs });
+      } else {
+        setPreferences(DEFAULT_PREFERENCES);
       }
     } catch (error) {
-      console.warn('Erreur chargement préférences:', error);
+      console.error('Erreur chargement préférences:', error);
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Impossible de charger vos préférences.',
+        description: 'Impossible de charger vos préférences depuis la base de données.',
       });
+    } finally {
+      setIsLoading(false);
+      setHasChanges(false);
     }
-  };
+  }, [user, toast]);
+
+  useEffect(() => {
+    loadPreferences();
+  }, [loadPreferences]);
 
   const updatePreference = <K extends keyof UserPreferences>(
     key: K, 
     value: UserPreferences[K]
   ) => {
-    const newPreferences = { ...preferences, [key]: value };
-    setPreferences(newPreferences);
+    setPreferences(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
-  const savePreferences = () => {
+  const savePreferences = async () => {
+    if (!user || !hasChanges) return;
+    setIsLoading(true);
     try {
-      localStorage.setItem('onde-spectrale-preferences', JSON.stringify(preferences));
-      setHasChanges(false);
-      toast({
-        title: 'Préférences sauvegardées',
-        description: 'Vos réglages ont été mis à jour.',
-      });
+      const result = await updateUserPreferences(user.uid, preferences);
+      if (result.success) {
+        setHasChanges(false);
+        toast({
+          title: 'Préférences sauvegardées',
+          description: 'Vos réglages ont été mis à jour dans la base de données.',
+        });
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error('Erreur sauvegarde préférences:', error);
       toast({
         variant: 'destructive',
         title: 'Erreur',
-        description: 'Impossible de sauvegarder vos préférences.',
+        description: `Impossible de sauvegarder vos préférences: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -107,9 +118,17 @@ export default function ParametresPage() {
     setHasChanges(true);
     toast({
       title: 'Préférences réinitialisées',
-      description: 'Les réglages par défaut ont été restaurés.',
+      description: 'Les réglages par défaut ont été restaurés. N\'oubliez pas de sauvegarder.',
     });
   };
+  
+  if (isLoading && !user) {
+     return (
+        <div className="flex items-center justify-center text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin"/>Chargement des informations utilisateur...
+        </div>
+     )
+  }
 
   return (
     <div className="space-y-6">
@@ -123,6 +142,7 @@ export default function ParametresPage() {
               onClick={resetPreferences}
               size="sm"
               variant="outline"
+              disabled={isLoading}
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Réinitialiser
@@ -130,9 +150,9 @@ export default function ParametresPage() {
             <Button
               onClick={savePreferences}
               size="sm"
-              disabled={!hasChanges}
+              disabled={!hasChanges || isLoading}
             >
-              <Save className="h-4 w-4 mr-2" />
+              {isLoading && hasChanges ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Sauvegarder
             </Button>
           </div>
