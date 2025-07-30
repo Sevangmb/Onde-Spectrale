@@ -2,7 +2,6 @@
 'use client';
 
 import { getStationForFrequency } from '@/app/actions';
-import { simpleFixStation876 } from '@/app/actions-simple-fix';
 import { clientCache, CACHE_KEYS } from './cache';
 
 export const radioDebug = {
@@ -73,26 +72,6 @@ export const radioDebug = {
       console.log(`${key}:`, value);
     }
   },
-
-  async fix876() {
-    console.log('🔧 Correction de la station 87.6 MHz...');
-    try {
-      const result = await simpleFixStation876();
-      console.log('Résultat:', result);
-      if (result.success) {
-        console.log('✅ Station 87.6 MHz corrigée avec succès !');
-        this.clearCache();
-        // Re-tester la fréquence
-        await this.testFrequency(87.6);
-      } else {
-        console.error('❌ Échec de la correction:', result.message);
-      }
-      return result;
-    } catch (error) {
-      console.error('❌ Erreur lors de la correction:', error);
-      return { success: false, error };
-    }
-  }
 };
 
 // Exposer globalement en développement

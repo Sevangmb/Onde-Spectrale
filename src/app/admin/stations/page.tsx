@@ -7,7 +7,6 @@ import { useAdminLayout } from '../layout';
 import { RadioStationManager } from '@/components/radio/RadioStationManager';
 import { createDefaultStations } from '@/actions/stations/mutations';
 import { getStationsForUser } from '@/actions/stations/queries';
-import { simpleFixStation876 } from '@/app/actions-simple-fix';
 import type { CustomDJCharacter, User } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { useStationSync } from '@/hooks/useStationSync';
@@ -109,38 +108,6 @@ export default function StationsManagement() {
       });
     }
   };
-
-  const handleFix876Station = async () => {
-    if (!confirm('Corriger la station 87.6 MHz ? Cela va supprimer l\'ancienne station Marcus et créer Radio Liberty avec Sarah.')) {
-      return;
-    }
-
-    try {
-      const result = await simpleFixStation876();
-      
-      if (result.success) {
-        toast({
-          title: 'Station 87.6 MHz corrigée !',
-          description: result.message,
-        });
-        await loadStations();
-        console.log('✅ Correction réussie:', result.details);
-      } else {
-        toast({
-          title: 'Erreur de correction',
-          description: result.message,
-          variant: 'destructive'
-        });
-      }
-    } catch (error: any) {
-      console.error('❌ Erreur dans handleFix876Station:', error);
-      toast({
-        title: 'Erreur',
-        description: error.message,
-        variant: 'destructive'
-      });
-    }
-  };
   
   if (isLoading) {
     return (
@@ -201,16 +168,6 @@ export default function StationsManagement() {
               >
                 <Bug className="h-4 w-4" />
                 Vérifier Stations
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleFix876Station}
-                className="gap-2"
-                title="Corriger spécifiquement 87.6 MHz"
-              >
-                <Wrench className="h-4 w-4" />
-                Fix 87.6 MHz
               </Button>
               <Button
                 variant="outline"
