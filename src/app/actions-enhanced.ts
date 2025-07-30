@@ -31,7 +31,7 @@ import { DJ_CHARACTERS } from '@/lib/data';
 /**
  * Récupérer une station par fréquence avec cache optimisé
  */
-@measurePerformance('get-station-by-frequency')
+// @measurePerformance('get-station-by-frequency') // Decorator disabled for ESLint compatibility
 export async function getStationForFrequencyEnhanced(
   frequency: number
 ): Promise<Station | null> {
@@ -65,7 +65,7 @@ export async function getStationForFrequencyEnhanced(
 /**
  * Créer une station avec validation et sécurité améliorées
  */
-@measurePerformance('create-station')
+// @measurePerformance('create-station') // Decorator disabled for ESLint compatibility
 export async function createStationEnhanced(
   stationData: any,
   userId: string
@@ -141,7 +141,7 @@ export async function createStationEnhanced(
 /**
  * Mettre à jour une station avec validation de propriété
  */
-@measurePerformance('update-station')
+// @measurePerformance('update-station') // Decorator disabled for ESLint compatibility
 export async function updateStationEnhanced(
   stationId: string,
   updates: Partial<Station>,
@@ -213,7 +213,7 @@ export async function updateStationEnhanced(
 /**
  * Supprimer une station avec vérifications de sécurité
  */
-@measurePerformance('delete-station')
+// @measurePerformance('delete-station') // Decorator disabled for ESLint compatibility
 export async function deleteStationEnhanced(
   stationId: string,
   userId: string
@@ -267,7 +267,7 @@ export async function deleteStationEnhanced(
 /**
  * Récupérer une station par ID avec cache
  */
-@measurePerformance('get-station-by-id')
+// @measurePerformance('get-station-by-id') // Decorator disabled for ESLint compatibility
 export async function getStationByIdEnhanced(stationId: string): Promise<Station | null> {
   try {
     // Vérifier le cache d'abord
@@ -327,7 +327,7 @@ export async function getStationByIdEnhanced(stationId: string): Promise<Station
 /**
  * Récupérer les stations d'un utilisateur avec cache
  */
-@measurePerformance('get-user-stations')
+// @measurePerformance('get-user-stations') // Decorator disabled for ESLint compatibility
 export async function getUserStationsEnhanced(userId: string): Promise<Station[]> {
   try {
     // Vérifier le cache
@@ -387,7 +387,7 @@ export async function getUserStationsEnhanced(userId: string): Promise<Station[]
 /**
  * Générer une playlist optimisée avec cache Plex
  */
-@measurePerformance('generate-playlist-enhanced')
+// @measurePerformance('generate-playlist-enhanced') // Decorator disabled for ESLint compatibility
 export async function generatePlaylistEnhanced(
   input: GeneratePlaylistInput
 ): Promise<{ items: PlaylistItem[] }> {
@@ -479,7 +479,7 @@ export async function generatePlaylistEnhanced(
 /**
  * Mettre à jour la fréquence utilisateur avec optimisations
  */
-@measurePerformance('update-user-frequency')
+// @measurePerformance('update-user-frequency') // Decorator disabled for ESLint compatibility
 export async function updateUserFrequencyEnhanced(
   userId: string,
   frequency: number
@@ -520,7 +520,7 @@ export async function updateUserFrequencyEnhanced(
 /**
  * Recherche de stations optimisée
  */
-@measurePerformance('search-stations')
+// @measurePerformance('search-stations') // Decorator disabled for ESLint compatibility
 export async function searchStationsEnhanced(
   query: string,
   filters: {
