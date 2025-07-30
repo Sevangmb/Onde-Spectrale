@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Pre-push validation..."
+
+# Get the remote branch info
+remote="$1"
+url="$2"
+
+# Run full test suite before pushing
+echo "🧪 Running test suite..."
+npm test -- --watchAll=false --coverage=false || {
+  echo "❌ Tests failed. Push aborted."
+  exit 1
+}
+
+# Check for sensitive information
+echo "🔍 Scanning for sensitive data..."
+if git diff --cached --name-only | xargs grep -l "password\|secret\|key\|token" 2>/dev/null; then
+  echo "⚠️  Potential sensitive data detected. Please review:"
+  git diff --cached --name-only | xargs grep -n "password\|secret\|key\|token" 2>/dev/null || true
+  echo "If this is intentional, you can override with --no-verify"
+  exit 1
+fi
+
+# Validate commit messages in push range
+echo "📝 Validating commit messages..."
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
+    if [ "$remote_sha" != "0000000000000000000000000000000000000000" ]; then
+      range="$remote_sha..$local_sha"
+    else
+      range="$local_sha"
+    fi
+    
+    # Check commit messages format
+    git rev-list --no-merges "$range" | while read commit; do
+      msg=$(git log --format=%s -n 1 "$commit")
+      if ! echo "$msg" | grep -qE '^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .{1,50}'; then
+        echo "❌ Invalid commit message format: $msg"
+        echo "   Use: type(scope): description"
+        exit 1
+      fi
+    done
+  fi
+done
+
+echo "✅ Pre-push validation passed!"
