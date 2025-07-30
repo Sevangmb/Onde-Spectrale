@@ -24,7 +24,7 @@ import {
   BarChart3,
   Settings,
   Zap,
-  Template,
+  LayoutTemplate,
   Save,
   RefreshCw,
   FileText,
@@ -509,7 +509,7 @@ export function EnhancedPlaylistInterface({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Template className="h-5 w-5" />
+                <LayoutTemplate className="h-5 w-5" />
                 Templates Prédéfinis
               </CardTitle>
             </CardHeader>
@@ -533,7 +533,7 @@ export function EnhancedPlaylistInterface({
                 variant="outline"
                 className="w-full"
               >
-                <Template className="h-4 w-4 mr-2" />
+                <LayoutTemplate className="h-4 w-4 mr-2" />
                 Appliquer Template
               </Button>
             </CardContent>
