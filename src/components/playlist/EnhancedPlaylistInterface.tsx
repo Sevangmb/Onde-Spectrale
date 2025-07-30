@@ -272,49 +272,49 @@ export function EnhancedPlaylistInterface({
         onDragEnd={() => setDraggedTrack(null)}
       >
         <input
-          type=\"checkbox\"
+          type="checkbox"
           checked={isSelected}
           onChange={() => toggleTrackSelection(track.id)}
-          className=\"rounded\"
+          className="rounded"
         />
         
-        <div className=\"flex-shrink-0\">
+        <div className="flex-shrink-0">
           {track.type === 'music' ? (
-            <Music className=\"h-4 w-4 text-blue-500\" />
+            <Music className="h-4 w-4 text-blue-500" />
           ) : (
-            <MessageSquare className=\"h-4 w-4 text-green-500\" />
+            <MessageSquare className="h-4 w-4 text-green-500" />
           )}
         </div>
         
-        <div className=\"flex-1 min-w-0\">
-          <h4 className=\"font-medium truncate\">{track.title}</h4>
-          <p className=\"text-sm text-muted-foreground truncate\">{track.artist}</p>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium truncate">{track.title}</h4>
+          <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
         </div>
         
-        <div className=\"flex items-center gap-2 text-sm text-muted-foreground\">
-          <Clock className=\"h-3 w-3\" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-3 w-3" />
           {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
         </div>
         
-        <div className=\"flex items-center gap-1\">
+        <div className="flex items-center gap-1">
           <Button
-            size=\"sm\"
-            variant=\"ghost\"
+            size="sm"
+            variant="ghost"
             onClick={() => playlist.duplicateTrack(track.id)}
           >
-            <Copy className=\"h-3 w-3\" />
+            <Copy className="h-3 w-3" />
           </Button>
           <Button
-            size=\"sm\"
-            variant=\"ghost\"
+            size="sm"
+            variant="ghost"
             onClick={() => playlist.removeMultipleTracks([track.id])}
           >
-            <Trash2 className=\"h-3 w-3\" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
         
         {isFailed && (
-          <Badge variant=\"destructive\" className=\"text-xs\">
+          <Badge variant="destructive" className="text-xs">
             Failed
           </Badge>
         )}
@@ -323,20 +323,20 @@ export function EnhancedPlaylistInterface({
   };
   
   return (
-    <div className=\"space-y-6\">
+    <div className="space-y-6">
       {/* Header with stats */}
       <Card>
         <CardHeader>
-          <div className=\"flex items-center justify-between\">
-            <CardTitle className=\"flex items-center gap-2\">
-              <Music className=\"h-5 w-5\" />
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Music className="h-5 w-5" />
               Playlist Manager
             </CardTitle>
             {playlistStats && (
-              <div className=\"flex items-center gap-4 text-sm text-muted-foreground\">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>{playlistStats.total} pistes</span>
                 <span>{playlistStats.totalDuration} min</span>
-                <Badge variant=\"outline\">{Math.round(playlistStats.musicRatio * 100)}% musique</Badge>
+                <Badge variant="outline">{Math.round(playlistStats.musicRatio * 100)}% musique</Badge>
               </div>
             )}
           </div>
@@ -344,49 +344,49 @@ export function EnhancedPlaylistInterface({
       </Card>
       
       {/* Main interface */}
-      <Tabs defaultValue=\"playlist\" className=\"space-y-4\">
-        <TabsList className=\"grid w-full grid-cols-4\">
-          <TabsTrigger value=\"playlist\">Playlist</TabsTrigger>
-          <TabsTrigger value=\"smart\">IA Génération</TabsTrigger>
-          <TabsTrigger value=\"analytics\">Analytics</TabsTrigger>
-          <TabsTrigger value=\"tools\">Outils</TabsTrigger>
+      <Tabs defaultValue="playlist" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="playlist">Playlist</TabsTrigger>
+          <TabsTrigger value="smart">IA Génération</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="tools">Outils</TabsTrigger>
         </TabsList>
         
         {/* Playlist Tab */}
-        <TabsContent value=\"playlist\" className=\"space-y-4\">
+        <TabsContent value="playlist" className="space-y-4">
           {/* Toolbar */}
           <Card>
-            <CardContent className=\"pt-6\">
-              <div className=\"flex items-center gap-2 flex-wrap\">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
-                  size=\"sm\"
+                  size="sm"
                   onClick={() => setSelectedTracks(new Set(station.playlist.map(t => t.id)))}
                 >
                   Tout sélectionner
                 </Button>
                 <Button
-                  size=\"sm\"
-                  variant=\"outline\"
+                  size="sm"
+                  variant="outline"
                   onClick={() => setSelectedTracks(new Set())}
                 >
                   Désélectionner
                 </Button>
                 <Button
-                  size=\"sm\"
-                  variant=\"destructive\"
+                  size="sm"
+                  variant="destructive"
                   onClick={handleRemoveSelected}
                   disabled={selectedTracks.size === 0 || isLoading}
                 >
-                  <Trash2 className=\"h-3 w-3 mr-1\" />
+                  <Trash2 className="h-3 w-3 mr-1" />
                   Supprimer ({selectedTracks.size})
                 </Button>
                 <Button
-                  size=\"sm\"
-                  variant=\"outline\"
+                  size="sm"
+                  variant="outline"
                   onClick={handleOptimizePlaylist}
                   disabled={isLoading}
                 >
-                  <Zap className=\"h-3 w-3 mr-1\" />
+                  <Zap className="h-3 w-3 mr-1" />
                   Optimiser
                 </Button>
               </div>
@@ -395,9 +395,9 @@ export function EnhancedPlaylistInterface({
           
           {/* Playlist items */}
           <Card>
-            <CardContent className=\"pt-6\">
-              <ScrollArea className=\"h-[400px] pr-4\">
-                <div className=\"space-y-2\">
+            <CardContent className="pt-6">
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-2">
                   {station.playlist.map((track, index) => renderTrackItem(track, index))}
                 </div>
               </ScrollArea>
@@ -406,20 +406,20 @@ export function EnhancedPlaylistInterface({
         </TabsContent>
         
         {/* Smart Generation Tab */}
-        <TabsContent value=\"smart\" className=\"space-y-4\">
+        <TabsContent value="smart" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className=\"flex items-center gap-2\">
-                <Sparkles className=\"h-5 w-5\" />
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
                 Génération Intelligente
               </CardTitle>
             </CardHeader>
-            <CardContent className=\"space-y-4\">
-              <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">
-                <div className=\"space-y-2\">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label>Durée cible (minutes)</Label>
                   <Input
-                    type=\"number\"
+                    type="number"
                     value={smartOptions.targetDuration}
                     onChange={(e) => setSmartOptions(prev => ({ 
                       ...prev, 
@@ -430,10 +430,10 @@ export function EnhancedPlaylistInterface({
                   />
                 </div>
                 
-                <div className=\"space-y-2\">
+                <div className="space-y-2">
                   <Label>Ratio de messages (%)</Label>
                   <Input
-                    type=\"number\"
+                    type="number"
                     value={Math.round(smartOptions.messageRatio * 100)}
                     onChange={(e) => setSmartOptions(prev => ({ 
                       ...prev, 
@@ -444,7 +444,7 @@ export function EnhancedPlaylistInterface({
                   />
                 </div>
                 
-                <div className=\"space-y-2\">
+                <div className="space-y-2">
                   <Label>Style DJ</Label>
                   <Select
                     value={smartOptions.djStyle}
@@ -454,15 +454,15 @@ export function EnhancedPlaylistInterface({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=\"energetic\">Énergique</SelectItem>
-                      <SelectItem value=\"calm\">Calme</SelectItem>
-                      <SelectItem value=\"mysterious\">Mystérieux</SelectItem>
-                      <SelectItem value=\"professional\">Professionnel</SelectItem>
+                      <SelectItem value="energetic">Énergique</SelectItem>
+                      <SelectItem value="calm">Calme</SelectItem>
+                      <SelectItem value="mysterious">Mystérieux</SelectItem>
+                      <SelectItem value="professional">Professionnel</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 
-                <div className=\"space-y-2\">
+                <div className="space-y-2">
                   <Label>Moment de la journée</Label>
                   <Select
                     value={smartOptions.timeOfDay}
@@ -472,30 +472,30 @@ export function EnhancedPlaylistInterface({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=\"morning\">Matin</SelectItem>
-                      <SelectItem value=\"afternoon\">Après-midi</SelectItem>
-                      <SelectItem value=\"evening\">Soir</SelectItem>
-                      <SelectItem value=\"night\">Nuit</SelectItem>
+                      <SelectItem value="morning">Matin</SelectItem>
+                      <SelectItem value="afternoon">Après-midi</SelectItem>
+                      <SelectItem value="evening">Soir</SelectItem>
+                      <SelectItem value="night">Nuit</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               
-              <div className=\"flex items-center space-x-2\">
+              <div className="flex items-center space-x-2">
                 <Switch
-                  id=\"auto-optimize\"
+                  id="auto-optimize"
                   checked={smartOptions.autoOptimize}
                   onCheckedChange={(checked) => setSmartOptions(prev => ({ ...prev, autoOptimize: checked }))}
                 />
-                <Label htmlFor=\"auto-optimize\">Optimisation automatique</Label>
+                <Label htmlFor="auto-optimize">Optimisation automatique</Label>
               </div>
               
               <Button
                 onClick={handleGenerateSmartPlaylist}
                 disabled={isLoading}
-                className=\"w-full\"
+                className="w-full"
               >
-                <Sparkles className=\"h-4 w-4 mr-2\" />
+                <Sparkles className="h-4 w-4 mr-2" />
                 {isLoading ? 'Génération...' : 'Générer Playlist Intelligente'}
               </Button>
             </CardContent>
@@ -504,15 +504,15 @@ export function EnhancedPlaylistInterface({
           {/* Templates */}
           <Card>
             <CardHeader>
-              <CardTitle className=\"flex items-center gap-2\">
-                <Template className=\"h-5 w-5\" />
+              <CardTitle className="flex items-center gap-2">
+                <Template className="h-5 w-5" />
                 Templates Prédéfinis
               </CardTitle>
             </CardHeader>
-            <CardContent className=\"space-y-4\">
+            <CardContent className="space-y-4">
               <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                 <SelectTrigger>
-                  <SelectValue placeholder=\"Choisir un template\" />
+                  <SelectValue placeholder="Choisir un template" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableTemplates.map(template => (
@@ -526,10 +526,10 @@ export function EnhancedPlaylistInterface({
               <Button
                 onClick={handleApplyTemplate}
                 disabled={!selectedTemplate || isLoading}
-                variant=\"outline\"
-                className=\"w-full\"
+                variant="outline"
+                className="w-full"
               >
-                <Template className=\"h-4 w-4 mr-2\" />
+                <Template className="h-4 w-4 mr-2" />
                 Appliquer Template
               </Button>
             </CardContent>
@@ -537,67 +537,67 @@ export function EnhancedPlaylistInterface({
         </TabsContent>
         
         {/* Analytics Tab */}
-        <TabsContent value=\"analytics\" className=\"space-y-4\">
+        <TabsContent value="analytics" className="space-y-4">
           {analytics && (
             <>
-              <div className=\"grid grid-cols-1 md:grid-cols-3 gap-4\">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
-                  <CardHeader className=\"pb-2\">
-                    <CardTitle className=\"text-sm\">Aperçu</CardTitle>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Aperçu</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className=\"space-y-2 text-sm\">
-                      <div className=\"flex justify-between\">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
                         <span>Total pistes:</span>
-                        <span className=\"font-medium\">{analytics.overview.totalTracks}</span>
+                        <span className="font-medium">{analytics.overview.totalTracks}</span>
                       </div>
-                      <div className=\"flex justify-between\">
+                      <div className="flex justify-between">
                         <span>Durée totale:</span>
-                        <span className=\"font-medium\">{analytics.overview.totalHours}h</span>
+                        <span className="font-medium">{analytics.overview.totalHours}h</span>
                       </div>
-                      <div className=\"flex justify-between\">
+                      <div className="flex justify-between">
                         <span>Durée moyenne:</span>
-                        <span className=\"font-medium\">{Math.round(analytics.overview.avgTrackDuration / 60)}min</span>
+                        <span className="font-medium">{Math.round(analytics.overview.avgTrackDuration / 60)}min</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card>
-                  <CardHeader className=\"pb-2\">
-                    <CardTitle className=\"text-sm\">Composition</CardTitle>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Composition</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className=\"space-y-2 text-sm\">
-                      <div className=\"flex justify-between\">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
                         <span>Musique:</span>
-                        <span className=\"font-medium\">{Math.round(analytics.composition.ratios.music * 100)}%</span>
+                        <span className="font-medium">{Math.round(analytics.composition.ratios.music * 100)}%</span>
                       </div>
-                      <div className=\"flex justify-between\">
+                      <div className="flex justify-between">
                         <span>Messages:</span>
-                        <span className=\"font-medium\">{Math.round(analytics.composition.ratios.message * 100)}%</span>
+                        <span className="font-medium">{Math.round(analytics.composition.ratios.message * 100)}%</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card>
-                  <CardHeader className=\"pb-2\">
-                    <CardTitle className=\"text-sm\">Distribution</CardTitle>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Distribution</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className=\"space-y-2 text-sm\">
-                      <div className=\"flex justify-between\">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
                         <span>Courtes (&lt;1min):</span>
-                        <span className=\"font-medium\">{analytics.distribution.shortTracks.percentage}%</span>
+                        <span className="font-medium">{analytics.distribution.shortTracks.percentage}%</span>
                       </div>
-                      <div className=\"flex justify-between\">
+                      <div className="flex justify-between">
                         <span>Moyennes (1-5min):</span>
-                        <span className=\"font-medium\">{analytics.distribution.mediumTracks.percentage}%</span>
+                        <span className="font-medium">{analytics.distribution.mediumTracks.percentage}%</span>
                       </div>
-                      <div className=\"flex justify-between\">
+                      <div className="flex justify-between">
                         <span>Longues (&gt;5min):</span>
-                        <span className=\"font-medium\">{analytics.distribution.longTracks.percentage}%</span>
+                        <span className="font-medium">{analytics.distribution.longTracks.percentage}%</span>
                       </div>
                     </div>
                   </CardContent>
@@ -608,17 +608,17 @@ export function EnhancedPlaylistInterface({
               {recommendations.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className=\"flex items-center gap-2\">
-                      <TrendingUp className=\"h-5 w-5\" />
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
                       Recommandations
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className=\"space-y-2\">
+                    <div className="space-y-2">
                       {recommendations.map((rec, index) => (
-                        <div key={index} className=\"flex items-start gap-2 p-2 bg-muted/50 rounded\">
-                          <Target className=\"h-4 w-4 mt-0.5 text-primary flex-shrink-0\" />
-                          <span className=\"text-sm\">{rec}</span>
+                        <div key={index} className="flex items-start gap-2 p-2 bg-muted/50 rounded">
+                          <Target className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                          <span className="text-sm">{rec}</span>
                         </div>
                       ))}
                     </div>
@@ -630,46 +630,46 @@ export function EnhancedPlaylistInterface({
           
           <Button
             onClick={loadAnalytics}
-            variant=\"outline\"
+            variant="outline"
             disabled={isLoading}
           >
-            <RefreshCw className=\"h-4 w-4 mr-2\" />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Actualiser Analytics
           </Button>
         </TabsContent>
         
         {/* Tools Tab */}
-        <TabsContent value=\"tools\" className=\"space-y-4\">
-          <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">
+        <TabsContent value="tools" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Export/Import */}
             <Card>
               <CardHeader>
-                <CardTitle className=\"text-sm\">Export/Import</CardTitle>
+                <CardTitle className="text-sm">Export/Import</CardTitle>
               </CardHeader>
-              <CardContent className=\"space-y-2\">
+              <CardContent className="space-y-2">
                 <Button
                   onClick={handleExport}
-                  variant=\"outline\"
-                  size=\"sm\"
-                  className=\"w-full\"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
                 >
-                  <Download className=\"h-3 w-3 mr-2\" />
+                  <Download className="h-3 w-3 mr-2" />
                   Exporter Playlist
                 </Button>
                 
-                <div className=\"relative\">
+                <div className="relative">
                   <input
-                    type=\"file\"
-                    accept=\".json\"
+                    type="file"
+                    accept=".json"
                     onChange={handleImport}
-                    className=\"absolute inset-0 w-full h-full opacity-0 cursor-pointer\"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                   <Button
-                    variant=\"outline\"
-                    size=\"sm\"
-                    className=\"w-full\"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
                   >
-                    <Upload className=\"h-3 w-3 mr-2\" />
+                    <Upload className="h-3 w-3 mr-2" />
                     Importer Playlist
                   </Button>
                 </div>
@@ -679,28 +679,28 @@ export function EnhancedPlaylistInterface({
             {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <CardTitle className=\"text-sm\">Actions Rapides</CardTitle>
+                <CardTitle className="text-sm">Actions Rapides</CardTitle>
               </CardHeader>
-              <CardContent className=\"space-y-2\">
+              <CardContent className="space-y-2">
                 <Button
                   onClick={() => playlist.optimizePlaylist({ removeDuplicates: true })}
-                  variant=\"outline\"
-                  size=\"sm\"
-                  className=\"w-full\"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
                   disabled={isLoading}
                 >
-                  <Zap className=\"h-3 w-3 mr-2\" />
+                  <Zap className="h-3 w-3 mr-2" />
                   Supprimer Doublons
                 </Button>
                 
                 <Button
                   onClick={() => playlist.optimizePlaylist({ sortByDuration: true })}
-                  variant=\"outline\"
-                  size=\"sm\"
-                  className=\"w-full\"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
                   disabled={isLoading}
                 >
-                  <BarChart3 className=\"h-3 w-3 mr-2\" />
+                  <BarChart3 className="h-3 w-3 mr-2" />
                   Trier par Durée
                 </Button>
               </CardContent>

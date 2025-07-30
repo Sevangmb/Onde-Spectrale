@@ -36,10 +36,12 @@ import {
   Upload,
   Tag,
   Star,
-  TrendingUp
+  TrendingUp,
+  Wrench
 } from 'lucide-react';
 import { radioStationManager, type CreateStationData, type UpdateStationData, type StationFilters } from '@/services/RadioStationManager';
 import type { Station, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 
 interface RadioStationManagerProps {
   user: User | null;
@@ -52,6 +54,8 @@ interface EditingStation {
 }
 
 export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) {
+  const router = useRouter();
+  
   // State management
   const [stations, setStations] = useState<Station[]>([]);
   const [filteredStations, setFilteredStations] = useState<Station[]>([]);
@@ -397,13 +401,23 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
                     size="sm"
                     variant="ghost"
                     onClick={() => setEditingStation({ station, isNew: false })}
+                    title="Édition rapide"
                   >
                     <Edit2 className="h-3 w-3" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    onClick={() => router.push(`/admin/stations/${station.id}/advanced`)}
+                    title="Éditeur avancé - Changement DJ, réorganisation playlist, gestion complète"
+                  >
+                    <Wrench className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() => handleDuplicateStation(station)}
+                    title="Dupliquer cette station"
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
