@@ -24,7 +24,7 @@ import {
   BarChart3,
   Settings,
   Zap,
-  Template,
+  Layout,
   Save,
   RefreshCw,
   FileText,
