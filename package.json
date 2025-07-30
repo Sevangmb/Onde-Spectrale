@@ -10,34 +10,27 @@
     "build:analyze": "ANALYZE=true next build",
     "build:staging": "NODE_ENV=staging next build",
     "build:production": "NODE_ENV=production next build",
-    
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    
     "deploy": "bash scripts/deploy.sh",
     "deploy:firebase": "firebase deploy --only hosting",
     "deploy:vercel": "vercel --prod",
     "deploy:staging": "firebase deploy --only hosting --project staging",
-    
     "workflow": "bash scripts/workflow.sh",
     "cleanup": "bash scripts/workflow.sh cleanup",
     "size-limit": "size-limit",
-    
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    
     "prebuild": "echo '🏗️ Préparation du build...'",
     "postbuild": "echo '✅ Build terminé - Prêt pour déploiement'",
     "pretest": "npm run typecheck",
@@ -101,6 +94,7 @@
     "@storybook/nextjs": "^9.0.18",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
