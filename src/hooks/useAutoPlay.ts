@@ -1,6 +1,7 @@
+// src/hooks/useAutoPlay.ts
 'use client';
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { interferenceAudioService } from '@/services/InterferenceAudioService';
 
 interface UseAutoPlayProps {
@@ -15,10 +16,14 @@ interface UseAutoPlayProps {
 export function useAutoPlay({ frequency, currentStation, playlistManager }: UseAutoPlayProps) {
   const [isAudioInitialized, setIsAudioInitialized] = useState(false);
   const [autoPlayReady, setAutoPlayReady] = useState(false);
+  const initAttempted = useRef(false);
 
-  // Fonction d'initialisation complète de l'audio
+  // Fonction d'initialisation complète de l'audio, déclenchée par la première interaction utilisateur
   const initializeAudio = useCallback(async () => {
-    if (isAudioInitialized) return true;
+    if (isAudioInitialized || initAttempted.current) return;
+    initAttempted.current = true;
+    
+    console.log('🎬 User interaction detected, attempting to initialize audio...');
 
     try {
       // Test si l'autoplay est possible
@@ -37,63 +42,49 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
         setIsAudioInitialized(true);
         setAutoPlayReady(true);
         
-        console.log('🎵 Audio initialisé avec autoplay automatique');
-        return true;
-      } else {
-        console.log('⚠️ Autoplay bloqué par le navigateur, nécessite interaction');
-        return false;
-      }
-    } catch (error) {
-      console.warn('Erreur initialisation audio:', error);
-      return false;
-    }
-  }, [isAudioInitialized, playlistManager]);
-
-  // Fonction pour gérer l'interaction utilisateur
-  const handleUserInteraction = useCallback(async () => {
-    if (!isAudioInitialized) {
-      const success = await initializeAudio();
-      
-      if (success) {
-        // Démarrer immédiatement l'audio approprié
+        console.log('🎵 Audio initialized successfully');
+        
+        // Démarrer immédiatement l'audio approprié après l'initialisation
         if (currentStation) {
-          // Station trouvée : démarrer la playlist
           if (playlistManager?.currentTrack && !playlistManager.isPlaying) {
             playlistManager.togglePlayPause();
           } else if (!playlistManager?.currentTrack && currentStation.playlist.length > 0) {
             playlistManager.togglePlayPause();
           }
         } else {
-          // Pas de station : jouer l'interférence
           await interferenceAudioService.transitionToFrequency(frequency, false);
         }
+
+      } else {
+        console.log('⚠️ Autoplay blocked by browser.');
       }
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize audio:', error);
     }
-  }, [isAudioInitialized, currentStation, frequency, playlistManager, initializeAudio]);
+  }, [isAudioInitialized, playlistManager, currentStation, frequency]);
 
-  // Effet pour tenter l'autoplay au chargement
+  // Effet pour ajouter un écouteur d'événement pour la première interaction
   useEffect(() => {
-    const attemptAutoPlay = async () => {
-      // Attendre un peu que le DOM soit prêt
-      setTimeout(async () => {
-        const success = await initializeAudio();
-        
-        if (success) {
-          // Démarrer automatiquement selon le contexte
-          if (currentStation) {
-            if (playlistManager?.autoPlayEnabled && currentStation.playlist.length > 0) {
-              playlistManager.togglePlayPause();
-            }
-          } else {
-            // Jouer l'interférence si pas de station
-            await interferenceAudioService.transitionToFrequency(frequency, false);
-          }
-        }
-      }, 1000);
-    };
+    // S'assurer que le code ne s'exécute que côté client
+    if (typeof window === 'undefined') return;
 
-    attemptAutoPlay();
-  }, []); // N'exécuter qu'une seule fois au montage
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    // Événements qui comptent comme une interaction utilisateur
+    const interactionEvents: (keyof DocumentEventMap)[] = ['click', 'touchstart', 'keydown'];
+
+    // Attacher les écouteurs d'événements
+    interactionEvents.forEach(event => {
+      document.addEventListener(event, initializeAudio, { once: true, signal });
+    });
+
+    // Nettoyer les écouteurs lorsque le composant est démonté
+    return () => {
+      controller.abort();
+    };
+  }, [initializeAudio]);
+
 
   // Effet pour gérer les changements de station/fréquence
   useEffect(() => {
@@ -105,33 +96,15 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
       if (currentStation && playlistManager?.autoPlayEnabled && !playlistManager.isPlaying) {
         if (currentStation.playlist.length > 0) {
           setTimeout(() => {
-            playlistManager.togglePlayPause();
+            if (playlistManager.togglePlayPause) playlistManager.togglePlayPause();
           }, 500); // Petit délai pour la transition
         }
       }
     }
   }, [currentStation, frequency, isAudioInitialized, playlistManager]);
 
-  // Effet pour configurer les événements d'interaction si l'autoplay n'est pas prêt
-  useEffect(() => {
-    if (!autoPlayReady) {
-      const events = ['click', 'touchstart', 'keydown'];
-      events.forEach(event => {
-        document.addEventListener(event, handleUserInteraction, { once: true });
-      });
-
-      return () => {
-        events.forEach(event => {
-          document.removeEventListener(event, handleUserInteraction);
-        });
-      };
-    }
-  }, [autoPlayReady, handleUserInteraction]);
-
   return {
     isAudioInitialized,
     autoPlayReady,
-    handleUserInteraction,
-    needsUserInteraction: !autoPlayReady
   };
 }

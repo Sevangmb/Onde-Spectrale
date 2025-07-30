@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRadioStore } from '@/shared/stores/useRadioStore';
-import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
+import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserOnLogin } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -126,8 +126,6 @@ export function OndeSpectraleRadio() {
   const { 
     isAudioInitialized, 
     autoPlayReady, 
-    handleUserInteraction, 
-    needsUserInteraction 
   } = useAutoPlay({
     frequency,
     currentStation,
@@ -219,7 +217,7 @@ export function OndeSpectraleRadio() {
     
     // La station sera automatiquement chargée par useStationForFrequency
     if (user) {
-      await updateUserFrequency(user.uid, newFreq);
+      await updateUserOnLogin(user.uid, user.email);
     }
   }, [setFrequency, user, isAudioInitialized]);
 
@@ -427,15 +425,6 @@ export function OndeSpectraleRadio() {
                                    playlistManager.isPlaying ? (autoPlayReady ? 'TRANSMISSION AUTO ♪' : 'TRANSMISSION EN COURS') : 
                                    (autoPlayReady ? 'STATION ACTIVE' : 'CONNEXION ÉTABLIE')}
                                 </div>
-                                
-                                {needsUserInteraction && playlistManager.currentTrack && (
-                                  <button
-                                    onClick={handleUserInteraction}
-                                    className="retro-button text-xs px-4 py-2 animate-pulse bg-primary/20 hover:bg-primary/30 border-primary/40"
-                                  >
-                                    🎵 ACTIVER L'AUDIO AUTO
-                                  </button>
-                                )}
                               </div>
                             ) : (
                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-destructive/10 border border-destructive/30 rounded-full text-destructive text-sm">
