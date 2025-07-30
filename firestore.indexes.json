@@ -6,7 +6,7 @@
       "fields": [
         {
           "fieldPath": "ownerId",
-          "arrayConfig": "CONTAINS"
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "frequency",

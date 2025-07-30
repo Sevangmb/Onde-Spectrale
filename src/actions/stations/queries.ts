@@ -78,8 +78,9 @@ export async function getStationsForUser(userId: string): Promise<Station[]> {
   try {
     const stationsCol = collection(db, 'stations');
     
+    // Utiliser une requête 'in' pour combiner les stations utilisateur et système
     const q = query(
-      stationsCol, 
+      stationsCol,
       where('ownerId', 'in', [userId, 'system']),
       orderBy('frequency', 'asc')
     );
