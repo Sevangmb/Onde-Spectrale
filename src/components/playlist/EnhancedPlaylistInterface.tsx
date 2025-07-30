@@ -106,8 +106,8 @@ export function EnhancedPlaylistInterface({
       totalDuration: Math.round(totalDuration / 60), // minutes
       music,
       messages,
-      musicRatio: music / total,
-      messageRatio: messages / total
+      musicRatio: total > 0 ? music / total : 0,
+      messageRatio: total > 0 ? messages / total : 0
     };
   }, [station.playlist]);
   
@@ -125,8 +125,12 @@ export function EnhancedPlaylistInterface({
       
       if (result.success && result.playlist) {
         // Apply to station if successful
-        await playlist.reorderPlaylist(result.playlist, smartOptions.autoOptimize);
-        onUpdate?.({ ...station, playlist: result.playlist });
+        const reorderResult = await playlist.reorderPlaylist(result.playlist, smartOptions.autoOptimize);
+        
+        if (reorderResult.success) {
+            const newStationState = { ...station, playlist: result.playlist };
+            onUpdate?.(newStationState);
+        }
         
         // Show insights
         if (result.insights) {
@@ -668,6 +672,7 @@ export function EnhancedPlaylistInterface({
                     variant="outline"
                     size="sm"
                     className="w-full"
+                    onClick={(e) => (e.currentTarget.previousSibling as HTMLInputElement)?.click()}
                   >
                     <Upload className="h-3 w-3 mr-2" />
                     Importer Playlist

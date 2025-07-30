@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useEnhancedRadioStore, useRadioActions, usePlaybackState, useDataState, useUIState } from '@/stores/enhancedRadioStore';
 import { playlistManagerService } from '@/services/PlaylistManagerService';
 import { audioService } from '@/services/AudioService';
-import { getAudioForTrack } from '@/app/actions';
+import { getAudioForTrack } from '@/actions/audio/generation';
 import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
 import { getAppUserId } from '@/lib/userConverter';
 
@@ -45,7 +45,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [playback.volume]);
   
   // Volume synchronization
   useEffect(() => {
@@ -376,7 +376,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
         actions.playTrack(firstTrack);
       }
     }
-  }, [station?.id]);
+  }, [station?.id, getFirstAvailableTrack, playback.currentTrack, actions]);
   
   // Auto-play effect for continuous playback
   useEffect(() => {
@@ -500,9 +500,6 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
     audioRef,
     
     // Backward compatibility methods for migration
-    addFailedTrack: actions.addFailedTrack,
-    ttsMessage: ui.ttsMessage,
-    ttsEnabled: ui.ttsEnabled,
     playlistLength: station?.playlist.length || 0,
   };
 }

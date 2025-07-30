@@ -208,7 +208,7 @@ export default function AdminDashboard() {
             </Card>
 
             {/* Top DJs */}
-            {stats && (
+            {stats && stats.mostUsedDJs && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

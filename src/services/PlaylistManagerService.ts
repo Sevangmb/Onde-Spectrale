@@ -2,19 +2,9 @@
 
 import { 
   doc, 
-  updateDoc, 
-  arrayUnion, 
-  arrayRemove,
-  writeBatch,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
+  updateDoc,
+  getDoc,
   Timestamp,
-  getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getRandomPlexTracks } from '@/lib/plex';
@@ -23,8 +13,7 @@ import type {
   PlaylistItem, 
   Station, 
   DJCharacter, 
-  CustomDJCharacter, 
-  AdminErrorLog 
+  CustomDJCharacter
 } from '@/lib/types';
 
 /**
@@ -302,8 +291,6 @@ export class PlaylistManagerService {
         djName: dj.name,
         djDescription: 'isCustom' in dj && dj.isCustom ? dj.description : dj.description,
         theme: stationTheme || 'radio post-apocalyptique',
-        trackCount: template.totalTracks,
-        messageRatio: template.structure[0].ratio
       };
 
       const { items } = await generatePlaylist(playlistInput);
@@ -390,7 +377,6 @@ export class PlaylistManagerService {
           lastModified: Timestamp.now()
         });
       } else {
-        // Append to existing playlist
         const stationDoc = await getDoc(stationRef);
         const currentPlaylist = stationDoc.exists() ? stationDoc.data()?.playlist || [] : [];
         
@@ -594,7 +580,7 @@ export class PlaylistManagerService {
       }, {});
 
       // Calculate averages
-      const avgTrackDuration = totalDuration / totalTracks;
+      const avgTrackDuration = totalTracks > 0 ? totalDuration / totalTracks : 0;
       const messageRatio = (tracksByType.message || 0) / totalTracks;
       const musicRatio = (tracksByType.music || 0) / totalTracks;
 
@@ -625,9 +611,9 @@ export class PlaylistManagerService {
           }
         },
         distribution: {
-          shortTracks: { count: shortTracks, percentage: parseFloat((shortTracks / totalTracks * 100).toFixed(1)) },
-          mediumTracks: { count: mediumTracks, percentage: parseFloat((mediumTracks / totalTracks * 100).toFixed(1)) },
-          longTracks: { count: longTracks, percentage: parseFloat((longTracks / totalTracks * 100).toFixed(1)) }
+          shortTracks: { count: shortTracks, percentage: parseFloat((totalTracks > 0 ? shortTracks / totalTracks * 100 : 0).toFixed(1)) },
+          mediumTracks: { count: mediumTracks, percentage: parseFloat((totalTracks > 0 ? mediumTracks / totalTracks * 100 : 0).toFixed(1)) },
+          longTracks: { count: longTracks, percentage: parseFloat((totalTracks > 0 ? longTracks / totalTracks * 100 : 0).toFixed(1)) }
         },
         insights: {
           estimatedListeningSessions,
@@ -658,6 +644,8 @@ export class PlaylistManagerService {
   private generateRecommendations(playlist: PlaylistItem[], stats: any): string[] {
     const recommendations: string[] = [];
 
+    if (stats.totalTracks === 0) return ['Commencez par ajouter des pistes'];
+
     if (stats.messageRatio > 0.5) {
       recommendations.push('Trop de messages - ajoutez plus de musique pour équilibrer');
     } else if (stats.messageRatio < 0.1) {
@@ -681,7 +669,7 @@ export class PlaylistManagerService {
     const recentTypes = recentTracks.map(t => t.type);
     const typeVariety = new Set(recentTypes).size;
     
-    if (typeVariety === 1) {
+    if (typeVariety === 1 && playlist.length > 1) {
       recommendations.push('Manque de variété en début de playlist - alternez musique et messages');
     }
 
@@ -770,7 +758,7 @@ export class PlaylistManagerService {
       }
 
       // Adjust message ratio if specified
-      if (options.targetMessageRatio !== undefined) {
+      if (options.targetMessageRatio !== undefined && playlist.length > 0) {
         const currentMessages = playlist.filter(t => t.type === 'message').length;
         const totalTracks = playlist.length;
         const currentRatio = currentMessages / totalTracks;
@@ -1000,7 +988,6 @@ export class PlaylistManagerService {
           id: 'smart-dj', 
           name: 'DJ Intelligent', 
           description: adjustedTheme,
-          voice: 'alloy'
         } as any,
         adjustedTheme
       );
