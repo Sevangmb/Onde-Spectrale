@@ -703,12 +703,5 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
     }
 }
 
-// Re-export advanced station management functions
-export { 
-  updateStation, 
-  deletePlaylistItem, 
-  reorderPlaylistItems, 
-  addPlaylistItems,
-  deleteStation,
-  cloneStation 
-} from '@/actions/stations/mutations';
+// Note: Re-exports moved to separate non-server file to comply with "use server" requirements
+// Advanced station management functions are available in @/actions/stations/mutations
