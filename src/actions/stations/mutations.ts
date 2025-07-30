@@ -220,3 +220,25 @@ export async function createDefaultStations(): Promise<void> {
     }
   }
 }
+
+export async function updateStation(stationId: string, updates: Partial<Station>): Promise<Station | null> {
+  try {
+    const stationRef = doc(db, 'stations', stationId);
+    await updateDoc(stationRef, {
+      ...updates,
+      lastModified: serverTimestamp(),
+    });
+
+    revalidatePath(`/admin/stations/${stationId}`);
+    revalidatePath(`/admin/stations`);
+    
+    const updatedDoc = await getDoc(stationRef);
+    if (!updatedDoc.exists()) return null;
+    
+    return { id: updatedDoc.id, ...updatedDoc.data() } as Station;
+
+  } catch (error) {
+    console.error(`Failed to update station ${stationId}:`, error);
+    return null;
+  }
+}

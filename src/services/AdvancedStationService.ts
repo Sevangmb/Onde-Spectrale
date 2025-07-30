@@ -1,7 +1,7 @@
 'use client';
 
 import type { Station, PlaylistItem, DJCharacter, CustomDJCharacter } from '@/lib/types';
-import { updateStation, deletePlaylistItem, reorderPlaylistItems } from '@/app/actions';
+import { updateStation, deletePlaylistItem, reorderPlaylistItems, addPlaylistItems } from '@/app/actions';
 
 export interface AdvancedStationServiceInterface {
   // DJ Management
@@ -155,7 +155,7 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
   async moveTrack(stationId: string, fromIndex: number, toIndex: number): Promise<Station> {
     try {
       // Récupérer la station actuelle pour construire le nouvel ordre
-      const { getStationById } = await import('@/app/actions');
+      const { getStationById } = await import('@/actions/stations/queries');
       const station = await getStationById(stationId);
       
       if (!station) {
@@ -217,7 +217,6 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
     try {
       console.log(`➕ Adding ${tracks.length} tracks to station ${stationId}`);
       
-      const { addPlaylistItems } = await import('@/app/actions');
       const updatedStation = await addPlaylistItems(stationId, tracks);
       
       if (!updatedStation) {
