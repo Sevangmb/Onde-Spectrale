@@ -6,6 +6,16 @@
       "fields": [
         {
           "fieldPath": "ownerId",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "stations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerId",
           "order": "ASCENDING"
         },
         {

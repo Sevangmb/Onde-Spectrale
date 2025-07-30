@@ -8,7 +8,8 @@ import {
   getDocs, 
   doc, 
   getDoc,
-  Timestamp 
+  Timestamp,
+  orderBy
 } from 'firebase/firestore';
 import type { Station } from '@/lib/types';
 import type { StationQueryResult } from './types';
@@ -77,20 +78,17 @@ export async function getStationsForUser(userId: string): Promise<Station[]> {
   try {
     const stationsCol = collection(db, 'stations');
     
-    const [userQuery, systemQuery] = [
-      query(stationsCol, where('ownerId', '==', userId)),
-      query(stationsCol, where('ownerId', '==', 'system'))
-    ];
+    const q = query(
+      stationsCol, 
+      where('ownerId', 'in', [userId, 'system']),
+      orderBy('frequency', 'asc')
+    );
     
-    const [userSnapshot, systemSnapshot] = await Promise.all([
-      getDocs(userQuery),
-      getDocs(systemQuery)
-    ]);
+    const querySnapshot = await getDocs(q);
     
-    const userStations = userSnapshot.docs.map(serializeStation);
-    const systemStations = systemSnapshot.docs.map(serializeStation);
+    const stations = querySnapshot.docs.map(serializeStation);
     
-    return [...systemStations, ...userStations].sort((a, b) => a.frequency - b.frequency);
+    return stations;
   } catch (error) {
     console.error('Error fetching user stations:', error);
     return [];
