@@ -1,3 +1,4 @@
+
 'use client';
 
 import { 
@@ -754,18 +755,43 @@ export class RadioStationManager {
    */
   private serializeStation(doc: any): Station {
     const data = doc.data();
+    
+    // Gérer les dates de manière robuste
+    const createdAt = data.createdAt;
+    let createdAtISO: string;
+    if (createdAt instanceof Timestamp) {
+      createdAtISO = createdAt.toDate().toISOString();
+    } else if (createdAt) {
+      createdAtISO = new Date(createdAt).toISOString();
+    } else {
+      console.warn(`Station ${doc.id} is missing 'createdAt' field. Using current date.`);
+      createdAtISO = new Date().toISOString();
+    }
+    
+    const lastModified = data.lastModified;
+    let lastModifiedISO: string;
+    if (lastModified instanceof Timestamp) {
+      lastModifiedISO = lastModified.toDate().toISOString();
+    } else if (lastModified) {
+      lastModifiedISO = new Date(lastModified).toISOString();
+    } else {
+      lastModifiedISO = createdAtISO; // Fallback to createdAt
+    }
+
+    const lastPlayedAt = data.lastPlayedAt;
+    let lastPlayedAtISO: string | null = null;
+    if (lastPlayedAt instanceof Timestamp) {
+      lastPlayedAtISO = lastPlayedAt.toDate().toISOString();
+    } else if (lastPlayedAt) {
+      lastPlayedAtISO = new Date(lastPlayedAt).toISOString();
+    }
+
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt instanceof Timestamp 
-        ? data.createdAt.toDate().toISOString() 
-        : new Date(data.createdAt).toISOString(),
-      lastModified: data.lastModified instanceof Timestamp
-        ? data.lastModified.toDate().toISOString()
-        : new Date(data.lastModified || data.createdAt).toISOString(),
-      lastPlayedAt: data.lastPlayedAt instanceof Timestamp
-        ? data.lastPlayedAt.toDate().toISOString()
-        : data.lastPlayedAt,
+      createdAt: createdAtISO,
+      lastModified: lastModifiedISO,
+      lastPlayedAt: lastPlayedAtISO,
       playlist: data.playlist || [],
       tags: data.tags || [],
       description: data.description || '',
@@ -830,3 +856,5 @@ export class RadioStationManager {
 // Export singleton instance
 export const radioStationManager = RadioStationManager.getInstance();
 export default radioStationManager;
+
+    
