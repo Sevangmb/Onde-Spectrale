@@ -15,6 +15,7 @@ import {
   arrayRemove,
   arrayUnion
 } from 'firebase/firestore';
+import { safeToISOString } from '@/lib/dateUtils';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 import { getRandomPlexTracks } from '@/lib/plex';
@@ -127,7 +128,7 @@ async function generateStationPlaylist(input: GeneratePlaylistInput): Promise<Pl
         artist: input.djName,
         duration: 10,
         url: '',
-        addedAt: new Date().toISOString(),
+        addedAt: safeToISOString(new Date()),
       });
     } else {
       if (plexTracks[plexIndex]) {
@@ -136,7 +137,7 @@ async function generateStationPlaylist(input: GeneratePlaylistInput): Promise<Pl
           ...plexTrack,
           id: `${Date.now()}-plex-${index}`,
           content: item.content || plexTrack.title,
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
         plexIndex++;
       } else {
@@ -147,7 +148,7 @@ async function generateStationPlaylist(input: GeneratePlaylistInput): Promise<Pl
           artist: 'Station Radio',
           duration: 180,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
       }
     }
@@ -374,7 +375,7 @@ export async function addPlaylistItems(stationId: string, tracks: Omit<PlaylistI
     const newTracks: PlaylistItem[] = tracks.map((track, index) => ({
       ...track,
       id: `${Date.now()}-${index}`,
-      addedAt: new Date().toISOString()
+      addedAt: safeToISOString(new Date())
     }));
 
     // Ajouter les nouvelles pistes à la playlist existante
@@ -475,7 +476,7 @@ export async function cloneStation(
       playlist: originalStation.playlist.map((track, index) => ({
         ...track,
         id: `${Date.now()}-clone-${index}`,
-        addedAt: new Date().toISOString()
+        addedAt: safeToISOString(new Date())
       })),
       createdAt: serverTimestamp(),
     };

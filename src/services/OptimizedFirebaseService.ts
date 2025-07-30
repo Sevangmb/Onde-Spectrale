@@ -22,6 +22,7 @@ import {
   QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { safeToISOString } from '@/lib/dateUtils';
 import type { Station, PlaylistItem, CustomDJCharacter, User } from '@/lib/types';
 import { enhancedCacheService } from './EnhancedCacheService';
 import { BackendError, ErrorCode, handleAsyncError } from '@/lib/errors';
@@ -202,7 +203,7 @@ export class OptimizedFirebaseService {
     const newStation: Station = {
       id: docRef!.id,
       ...validatedData,
-      createdAt: new Date().toISOString(),
+      createdAt: safeToISOString(new Date()),
       playlist: validatedData.playlist || [],
     };
 
@@ -542,9 +543,7 @@ export class OptimizedFirebaseService {
       djCharacterId: data.djCharacterId,
       playlist: data.playlist || [],
       theme: data.theme,
-      createdAt: data.createdAt instanceof Timestamp 
-        ? data.createdAt.toDate().toISOString() 
-        : new Date(data.createdAt).toISOString(),
+      createdAt: safeToISOString(data.createdAt),
     } as Station;
   }
 

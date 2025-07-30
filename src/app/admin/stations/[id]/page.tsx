@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
 import { getStationById, addMessageToStation, addMusicToStation, searchMusic, regenerateStationPlaylist } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { safeGetTime } from '@/lib/dateUtils';
 import type { Station, PlaylistItem, CustomDJCharacter, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
@@ -135,7 +136,7 @@ export default function StationDetailPage() {
 
   const sortedPlaylist = useMemo(() => {
     if (!station?.playlist) return [];
-    return [...station.playlist].sort((a, b) => new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime());
+    return [...station.playlist].sort((a, b) => safeGetTime(b.addedAt || 0) - safeGetTime(a.addedAt || 0));
   }, [station?.playlist]);
 
   const formatDuration = (seconds: number) => {

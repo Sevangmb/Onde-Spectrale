@@ -17,6 +17,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { safeToISOString } from '@/lib/dateUtils';
 import { playlistManagerService } from './PlaylistManagerService';
 import { stationService } from './StationService';
 import type { Station, PlaylistItem, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
@@ -153,8 +154,8 @@ export class RadioStationManager {
       const createdStation: Station = {
         id: docRef.id,
         ...stationData,
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
+        createdAt: safeToISOString(new Date()),
+        lastModified: safeToISOString(new Date()),
         lastPlayedAt: null
       };
 
@@ -334,7 +335,7 @@ export class RadioStationManager {
         const copiedPlaylist = originalStation.playlist.map((track, index) => ({
           ...track,
           id: `dup-${Date.now()}-${index}`,
-          addedAt: new Date().toISOString()
+          addedAt: safeToISOString(new Date())
         }));
 
         await this.updateStation(result.stationId, { playlist: copiedPlaylist }, true);
@@ -758,13 +759,13 @@ export class RadioStationManager {
       id: doc.id,
       ...data,
       createdAt: data.createdAt instanceof Timestamp 
-        ? data.createdAt.toDate().toISOString() 
-        : new Date(data.createdAt).toISOString(),
+        ? safeToISOString(data.createdAt) 
+        : safeToISOString(data.createdAt),
       lastModified: data.lastModified instanceof Timestamp
-        ? data.lastModified.toDate().toISOString()
-        : new Date(data.lastModified || data.createdAt).toISOString(),
+        ? safeToISOString(data.lastModified)
+        : safeToISOString(data.lastModified || data.createdAt),
       lastPlayedAt: data.lastPlayedAt instanceof Timestamp
-        ? data.lastPlayedAt.toDate().toISOString()
+        ? safeToISOString(data.lastPlayedAt)
         : data.lastPlayedAt,
       playlist: data.playlist || [],
       tags: data.tags || [],

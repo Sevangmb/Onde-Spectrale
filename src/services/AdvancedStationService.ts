@@ -1,6 +1,7 @@
 'use client';
 
 import type { Station, PlaylistItem, DJCharacter, CustomDJCharacter } from '@/lib/types';
+import { safeGetTime } from '@/lib/dateUtils';
 import { updateStation, deletePlaylistItem, reorderPlaylistItems } from '@/app/actions';
 
 export interface AdvancedStationServiceInterface {
@@ -276,7 +277,7 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
     // Pistes les plus anciennes/récentes
     const sortedByDate = playlist
       .filter(track => track.addedAt)
-      .sort((a, b) => new Date(a.addedAt!).getTime() - new Date(b.addedAt!).getTime());
+      .sort((a, b) => safeGetTime(a.addedAt) - safeGetTime(b.addedAt));
     
     const oldestTrack = sortedByDate[0];
     const newestTrack = sortedByDate[sortedByDate.length - 1];

@@ -9,6 +9,7 @@ import { db, storage, ref, getDownloadURL } from '@/lib/firebase';
 import { uploadBytesResumable } from 'firebase/storage';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayUnion, getDoc, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { safeToISOString } from '@/lib/dateUtils';
 import { generateDjAudio } from '@/ai/flows/generate-dj-audio';
 import { generateCustomDjAudio } from '@/ai/flows/generate-custom-dj-audio';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
@@ -29,7 +30,7 @@ function serializeStation(doc: any): Station {
     return {
         id: doc.id,
         ...data,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+        createdAt: safeToISOString(data.createdAt),
         playlist: data.playlist || [],
     } as Station;
 }
@@ -100,7 +101,7 @@ export async function createDefaultStations(): Promise<void> {
             artist: dj.name,
             duration: 10,
             url: '',
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           });
         } else {
           // Use real Plex track instead of placeholder
@@ -110,7 +111,7 @@ export async function createDefaultStations(): Promise<void> {
               ...plexTrack,
               id: `${Date.now()}-plex-${index}`,
               content: item.content || plexTrack.title, // Keep AI-generated context
-              addedAt: new Date().toISOString(),
+              addedAt: safeToISOString(new Date()),
             });
             plexIndex++;
           } else {
@@ -122,7 +123,7 @@ export async function createDefaultStations(): Promise<void> {
               artist: 'Station Radio',
               duration: 180,
               url: '',
-              addedAt: new Date().toISOString(),
+              addedAt: safeToISOString(new Date()),
             });
           }
         }
@@ -278,7 +279,7 @@ export async function createStation(ownerId: string, formData: FormData) {
         artist: dj.name,
         duration: 10,
         url: '',
-        addedAt: new Date().toISOString(),
+        addedAt: safeToISOString(new Date()),
       });
     } else {
       // Use real Plex track instead of placeholder
@@ -288,7 +289,7 @@ export async function createStation(ownerId: string, formData: FormData) {
           ...plexTrack,
           id: `${Date.now()}-plex-${index}`,
           content: item.content || plexTrack.title, // Keep AI-generated context
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
         plexIndex++;
       } else {
@@ -300,7 +301,7 @@ export async function createStation(ownerId: string, formData: FormData) {
           artist: 'Station Radio',
           duration: 180,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
       }
     }
@@ -365,7 +366,7 @@ export async function addMessageToStation(stationId: string, message: string): P
         url: '', // will be generated on the fly
         duration: 15, // Mock duration, will be dynamic on client
         artist: dj.name,
-        addedAt: new Date().toISOString(),
+        addedAt: safeToISOString(new Date()),
     };
     
     try {
@@ -415,7 +416,7 @@ export async function addMusicToStation(stationId: string, musicTrack: PlaylistI
 
     const newTrack = {
       ...musicTrack,
-      addedAt: new Date().toISOString(),
+      addedAt: safeToISOString(new Date()),
     }
 
     await updateDoc(stationRef, {
@@ -467,7 +468,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
               artist: dj.name,
               duration: 12,
               url: '',
-              addedAt: new Date().toISOString(),
+              addedAt: safeToISOString(new Date()),
             });
           } else {
             // Use real Plex track
@@ -477,7 +478,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
                 ...plexTrack,
                 id: `regen-${Date.now()}-plex-${index}`,
                 content: item.content || plexTrack.title,
-                addedAt: new Date().toISOString(),
+                addedAt: safeToISOString(new Date()),
               });
               plexIndex++;
             } else {
@@ -490,7 +491,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
                 artist: 'Station Radio',
                 duration: 180,
                 url: '',
-                addedAt: new Date().toISOString(),
+                addedAt: safeToISOString(new Date()),
               });
             }
           }
@@ -548,7 +549,7 @@ export async function getUserData(userId: string) {
     const plainObject: { [key: string]: any } = {};
     for (const key in data) {
         if (data[key] instanceof Timestamp) {
-            plainObject[key] = (data[key] as Timestamp).toDate().toISOString();
+            plainObject[key] = safeToISOString(data[key]);
         } else {
             plainObject[key] = data[key];
         }
@@ -594,7 +595,7 @@ export async function createCustomDj(userId: string, formData: FormData) {
     },
     isCustom: true,
     ownerId: userId,
-    createdAt: new Date().toISOString(),
+    createdAt: safeToISOString(new Date()),
   };
 
   const userCharactersCollection = collection(db, 'users', userId, 'characters');
@@ -624,7 +625,7 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
         voice: data.voice,
         isCustom: true,
         ownerId: data.ownerId,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString(),
+        createdAt: safeToISOString(data.createdAt),
       };
     });
   } catch (error: any) {

@@ -16,6 +16,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { safeParseDate } from '@/lib/dateUtils';
 import type { 
   SystemStatus, 
   AdminPlayerState, 
@@ -111,8 +112,8 @@ export class AdminMonitoringService {
               sessionId: data.sessionId || `session_${Date.now()}`,
               stationFrequency: data.stationFrequency || 100.7,
               ...data,
-              lastActivity: data.lastActivity?.toDate?.() || new Date(data.lastActivity),
-              connectionTime: data.connectionTime?.toDate?.() || new Date(data.connectionTime || Date.now()),
+              lastActivity: safeParseDate(data.lastActivity),
+              connectionTime: safeParseDate(data.connectionTime || Date.now()),
             } as AdminPlayerState;
           });
           
@@ -149,8 +150,8 @@ export class AdminMonitoringService {
             return {
               id: doc.id,
               ...data,
-              timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
-              resolvedAt: data.resolvedAt?.toDate?.() || (data.resolvedAt ? new Date(data.resolvedAt) : undefined),
+              timestamp: safeParseDate(data.timestamp),
+              resolvedAt: data.resolvedAt ? safeParseDate(data.resolvedAt) : undefined,
             } as AdminErrorLog;
           });
           
@@ -183,7 +184,7 @@ export class AdminMonitoringService {
               frequency: parseInt(doc.id),
               stationId: data.stationId || doc.id,
               ...data,
-              lastActivity: data.lastActivity?.toDate?.() || new Date(data.lastActivity || Date.now()),
+              lastActivity: safeParseDate(data.lastActivity || Date.now()),
             } as StationHealthMetrics;
           });
           

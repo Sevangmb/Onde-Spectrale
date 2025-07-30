@@ -2,6 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { safeToISOString } from '@/lib/dateUtils';
 
 // Import direct et simple
 import { 
@@ -59,7 +60,7 @@ export async function simpleFixStation876(): Promise<{ success: boolean; message
           artist: 'Sarah',
           duration: 15,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         },
         {
           id: `${Date.now()}-msg-2`,
@@ -69,7 +70,7 @@ export async function simpleFixStation876(): Promise<{ success: boolean; message
           artist: 'Sarah',
           duration: 12,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         },
         {
           id: `${Date.now()}-msg-3`,
@@ -79,7 +80,7 @@ export async function simpleFixStation876(): Promise<{ success: boolean; message
           artist: 'Sarah',
           duration: 18,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         },
         {
           id: `${Date.now()}-msg-4`,
@@ -89,7 +90,7 @@ export async function simpleFixStation876(): Promise<{ success: boolean; message
           artist: 'Sarah',
           duration: 8,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         }
       ],
       createdAt: serverTimestamp(),

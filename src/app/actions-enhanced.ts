@@ -5,6 +5,7 @@ import type { Station, PlaylistItem, CustomDJCharacter } from '@/lib/types';
 import { optimizedFirebaseService } from '@/services/OptimizedFirebaseService';
 import { enhancedCacheService } from '@/services/EnhancedCacheService';
 import { backendMonitoringService, measurePerformance } from '@/services/BackendMonitoringService';
+import { safeToISOString } from '@/lib/dateUtils';
 import { 
   BackendError, 
   ErrorCode, 
@@ -303,7 +304,7 @@ export async function getStationByIdEnhanced(stationId: string): Promise<Station
       djCharacterId: stationData!.djCharacterId,
       playlist: stationData!.playlist || [],
       theme: stationData!.theme,
-      createdAt: stationData!.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      createdAt: safeToISOString(stationData!.createdAt),
     };
 
     // Mettre en cache
@@ -362,7 +363,7 @@ export async function getUserStationsEnhanced(userId: string): Promise<Station[]
         djCharacterId: data.djCharacterId,
         playlist: data.playlist || [],
         theme: data.theme,
-        createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        createdAt: safeToISOString(data.createdAt),
       };
     });
 
@@ -430,14 +431,14 @@ export async function generatePlaylistEnhanced(
             ...plexTrack,
             id: `enhanced-${Date.now()}-${index}`,
             content: item.content, // Garder le contexte généré par l'IA
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           };
         }
         
         return {
           ...item,
           id: `enhanced-${Date.now()}-${index}`,
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         };
       });
 
@@ -454,7 +455,7 @@ export async function generatePlaylistEnhanced(
       items: generatedPlaylist.items.map((item, index) => ({
         ...item,
         id: `enhanced-${Date.now()}-${index}`,
-        addedAt: new Date().toISOString(),
+        addedAt: safeToISOString(new Date()),
       }))
     };
 

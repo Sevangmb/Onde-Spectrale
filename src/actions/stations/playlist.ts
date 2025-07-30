@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { safeToISOString } from '@/lib/dateUtils';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { getStationById } from './queries';
 import { getCustomCharactersForUser } from '../users/queries';
@@ -37,7 +38,7 @@ export async function addMessageToStation(
       url: '',
       duration: 15,
       artist: dj.name,
-      addedAt: new Date().toISOString(),
+      addedAt: safeToISOString(new Date()),
     };
     
     const stationRef = doc(db, 'stations', stationId);
@@ -71,7 +72,7 @@ export async function addMusicToStation(
 
     const newTrack = {
       ...musicTrack,
-      addedAt: new Date().toISOString(),
+      addedAt: safeToISOString(new Date()),
     };
 
     const stationRef = doc(db, 'stations', stationId);
@@ -129,7 +130,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
           artist: dj.name,
           duration: 12,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
       } else {
         // Use real Plex track
@@ -139,7 +140,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
             ...plexTrack,
             id: `regen-${Date.now()}-plex-${index}`,
             content: item.content || plexTrack.title,
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           });
           plexIndex++;
         } else {
@@ -152,7 +153,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
             artist: 'Station Radio',
             duration: 180,
             url: '',
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           });
         }
       }

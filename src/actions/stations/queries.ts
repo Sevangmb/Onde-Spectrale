@@ -12,15 +12,14 @@ import {
 } from 'firebase/firestore';
 import type { Station } from '@/lib/types';
 import type { StationQueryResult } from './types';
+import { safeToISOString } from '@/lib/dateUtils';
 
 function serializeStation(doc: any): Station {
   const data = doc.data();
   return {
     id: doc.id,
     ...data,
-    createdAt: data.createdAt instanceof Timestamp 
-      ? data.createdAt.toDate().toISOString() 
-      : new Date(data.createdAt).toISOString(),
+    createdAt: safeToISOString(data.createdAt),
     playlist: data.playlist || [],
   } as Station;
 }
