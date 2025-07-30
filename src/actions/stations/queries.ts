@@ -80,17 +80,25 @@ export async function getStationsForUser(userId: string): Promise<Station[]> {
   try {
     const stationsCol = collection(db, 'stations');
     
-    const q = query(
-      stationsCol,
-      where('ownerId', 'in', [userId, 'system']),
-      orderBy('frequency', 'asc')
-    );
+    // Requête 1: Stations de l'utilisateur
+    const userStationsQuery = query(stationsCol, where('ownerId', '==', userId));
     
-    const querySnapshot = await getDocs(q);
+    // Requête 2: Stations du système
+    const systemStationsQuery = query(stationsCol, where('ownerId', '==', 'system'));
+
+    const [userStationsSnapshot, systemStationsSnapshot] = await Promise.all([
+      getDocs(userStationsQuery),
+      getDocs(systemStationsQuery)
+    ]);
+
+    const userStations = userStationsSnapshot.docs.map(serializeStation);
+    const systemStations = systemStationsSnapshot.docs.map(serializeStation);
+
+    // Fusionner et trier en mémoire
+    const allStations = [...userStations, ...systemStations];
+    allStations.sort((a, b) => a.frequency - b.frequency);
     
-    const stations = querySnapshot.docs.map(serializeStation);
-    
-    return stations;
+    return allStations;
   } catch (error) {
     console.error('Error fetching user stations:', error);
     return [];
