@@ -37,7 +37,7 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
           analyserRef.current.fftSize = 256;
           analyserRef.current.smoothingTimeConstant = 0.8;
           
-          const source = audioContextRef.current.createMediaElementSource(audioRef.current);
+          const source = audioContextRef.current.createMediaElementSource(audioRef.current!);
           source.connect(analyserRef.current);
           analyserRef.current.connect(audioContextRef.current.destination);
           

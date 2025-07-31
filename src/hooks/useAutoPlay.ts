@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useState } from 'react';
-import { interferenceAudioService } from '@/services/InterferenceAudioService';
+// Import dynamique d'InterferenceAudioService pour éviter les erreurs SSR
 
 interface UseAutoPlayProps {
   frequency: number;
@@ -15,10 +15,20 @@ interface UseAutoPlayProps {
 export function useAutoPlay({ frequency, currentStation, playlistManager }: UseAutoPlayProps) {
   const [isAudioInitialized, setIsAudioInitialized] = useState(false);
   const [autoPlayReady, setAutoPlayReady] = useState(false);
+  const [interferenceAudioService, setInterferenceAudioService] = useState<any>(null);
+
+  // Charger le service d'interférence dynamiquement
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('@/services/InterferenceAudioService').then(({ interferenceAudioService }) => {
+        setInterferenceAudioService(interferenceAudioService);
+      }).catch(console.error);
+    }
+  }, []);
 
   // Fonction d'initialisation complète de l'audio
   const initializeAudio = useCallback(async () => {
-    if (isAudioInitialized) return true;
+    if (isAudioInitialized || !interferenceAudioService) return true;
 
     try {
       // Test si l'autoplay est possible
@@ -47,11 +57,11 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
       console.warn('Erreur initialisation audio:', error);
       return false;
     }
-  }, [isAudioInitialized, playlistManager]);
+  }, [isAudioInitialized, playlistManager, interferenceAudioService]);
 
   // Fonction pour gérer l'interaction utilisateur
   const handleUserInteraction = useCallback(async () => {
-    if (!isAudioInitialized) {
+    if (!isAudioInitialized && interferenceAudioService) {
       const success = await initializeAudio();
       
       if (success) {
@@ -69,7 +79,7 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
         }
       }
     }
-  }, [isAudioInitialized, currentStation, frequency, playlistManager, initializeAudio]);
+  }, [isAudioInitialized, currentStation, frequency, playlistManager, initializeAudio, interferenceAudioService]);
 
   // Effet pour tenter l'autoplay au chargement
   useEffect(() => {
@@ -84,7 +94,7 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
             if (playlistManager?.autoPlayEnabled && currentStation.playlist.length > 0) {
               playlistManager.togglePlayPause();
             }
-          } else {
+          } else if (interferenceAudioService) {
             // Jouer l'interférence si pas de station
             await interferenceAudioService.transitionToFrequency(frequency, false);
           }
@@ -93,7 +103,7 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
     };
 
     attemptAutoPlay();
-  }, []); // N'exécuter qu'une seule fois au montage
+  }, [interferenceAudioService]); // Dépendre de interferenceAudioService
 
   // Effet pour gérer les changements de station/fréquence
   useEffect(() => {

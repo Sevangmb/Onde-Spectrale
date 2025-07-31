@@ -138,7 +138,7 @@ export class RadioStationManager {
         createdAt: serverTimestamp(),
         lastModified: serverTimestamp(),
         playCount: 0,
-        lastPlayedAt: null
+        
       };
 
       const docRef = await addDoc(collection(db, 'stations'), stationData);
@@ -156,7 +156,7 @@ export class RadioStationManager {
         ...stationData,
         createdAt: safeToISOString(new Date()),
         lastModified: safeToISOString(new Date()),
-        lastPlayedAt: null
+        
       };
 
       console.log('✅ Station created successfully:', createdStation.name);
@@ -316,7 +316,7 @@ export class RadioStationManager {
         name: newName || `${originalStation.name} (Copie)`,
         frequency: newFrequency,
         djCharacterId: originalStation.djCharacterId,
-        theme: originalStation.theme,
+        theme: originalStation.theme || 'post-apocalyptic',
         ownerId: originalStation.ownerId,
         isActive: false, // Inactive par défaut
         tags: [...(originalStation.tags || [])],

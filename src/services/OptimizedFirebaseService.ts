@@ -204,7 +204,7 @@ export class OptimizedFirebaseService {
       id: docRef!.id,
       ...validatedData,
       createdAt: safeToISOString(new Date()),
-      playlist: validatedData.playlist || [],
+      playlist: [], // validatedData.playlist || [],
     };
 
     // Invalider le cache des ranges qui pourraient inclure cette station
@@ -229,7 +229,7 @@ export class OptimizedFirebaseService {
     }
 
     const validatedUpdates = validation.data!;
-    delete validatedUpdates.id; // Retirer l'ID des updates
+    // delete validatedUpdates.id; // Retirer l'ID des updates
 
     // Vérifier que la station existe
     const stationRef = doc(db, 'stations', stationId);

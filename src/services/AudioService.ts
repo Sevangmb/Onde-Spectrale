@@ -14,12 +14,23 @@ export class AudioService implements AudioServiceInterface {
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
   private analyserNode: AnalyserNode | null = null;
+  private isInitialized = false;
   
   constructor() {
-    this.initializeAudioContext();
+    // Don't initialize AudioContext in constructor for SSR compatibility
   }
   
   private async initializeAudioContext(): Promise<void> {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      console.warn('AudioContext not available in server environment');
+      return;
+    }
+    
+    if (this.isInitialized) {
+      return;
+    }
+    
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.gainNode = this.audioContext.createGain();
@@ -32,6 +43,8 @@ export class AudioService implements AudioServiceInterface {
       // Configure analyser for spectrum visualization
       this.analyserNode.fftSize = 256;
       this.analyserNode.smoothingTimeConstant = 0.8;
+      
+      this.isInitialized = true;
     } catch (error) {
       console.warn('AudioContext initialization failed:', error);
     }
@@ -62,12 +75,12 @@ export class AudioService implements AudioServiceInterface {
       
       // Wait for loadedmetadata event
       return new Promise((resolve, reject) => {
-        const onLoadedMetadata = () => {
+        const onLoadedMetadata = async () => {
           audioRef.removeEventListener('loadedmetadata', onLoadedMetadata);
           audioRef.removeEventListener('error', onError);
           
           // Connect to Web Audio API if available
-          this.connectToAudioContext(audioRef);
+          await this.connectToAudioContext(audioRef);
           
           resolve();
         };
@@ -135,7 +148,9 @@ export class AudioService implements AudioServiceInterface {
     }
   }
   
-  private connectToAudioContext(audioRef: HTMLAudioElement): void {
+  private async connectToAudioContext(audioRef: HTMLAudioElement): Promise<void> {
+    await this.initializeAudioContext();
+    
     if (!this.audioContext || !this.gainNode) return;
     
     try {

@@ -1,53 +1,37 @@
-import React from 'react';
+import type { Meta, StoryObj } from '@storybook/react';
 import { PlayerStatusCard } from './PlayerStatusCard';
 
-export default {
+const meta: Meta<typeof PlayerStatusCard> = {
   title: 'Components/PlayerStatusCard',
   component: PlayerStatusCard,
+  parameters: {
+    layout: 'centered',
+  },
 };
 
-export const Playing = () => (
-  <PlayerStatusCard
-    isPlaying={true}
-    currentTrack={{
-      title: 'Blue Moon',
-      artist: 'Billie Holiday',
-      url: '/music/blue-moon.mp3',
-      type: 'music'
-    }}
-    progress={45}
-    duration={180}
-    volume={75}
-    onVolumeChange={(volume) => console.log('Volume:', volume)}
-    onSeek={(time) => console.log('Seek:', time)}
-  />
-);
+export default meta;
+type Story = StoryObj<typeof meta>;
 
-export const Paused = () => (
-  <PlayerStatusCard
-    isPlaying={false}
-    currentTrack={{
-      title: 'Post-Apocalyptic News',
-      artist: 'Radio Onde Spectrale',
-      url: '/audio/news.mp3',
-      type: 'news'
-    }}
-    progress={30}
-    duration={120}
-    volume={50}
-    onVolumeChange={(volume) => console.log('Volume:', volume)}
-    onSeek={(time) => console.log('Seek:', time)}
-  />
-);
+export const Default: Story = {
+  args: {
+    stationId: 'station-1'
+  }
+};
 
-export const NoTrack = () => (
-  <PlayerStatusCard
-    isPlaying={false}
-    currentTrack={null}
-    progress={0}
-    duration={0}
-    volume={75}
-    onVolumeChange={(volume) => console.log('Volume:', volume)}
-    onSeek={(time) => console.log('Seek:', time)}
-  />
-);
+export const Loading: Story = {
+  args: {
+    stationId: 'station-loading'
+  }
+};
+
+export const Error: Story = {
+  args: {
+    stationId: 'station-error'
+  }
+};
+
+export const NoPlayer: Story = {
+  args: {
+    stationId: 'station-no-player'
+  }
+};

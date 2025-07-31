@@ -260,6 +260,8 @@ export function runAutoMigration(): void {
   }
 }
 
+import React from 'react';
+
 // Component wrapper for migration
 export function withMigration<P extends object>(
   Component: React.ComponentType<P>

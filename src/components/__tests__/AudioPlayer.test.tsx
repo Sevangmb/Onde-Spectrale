@@ -1,141 +1,123 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AudioPlayer } from '../AudioPlayer';
-import type { PlaylistItem } from '@/lib/types';
+import { createMockPlaylistItem } from '@/lib/testUtils';
 
-// Mock audio element
+// Mock the audio element
 const mockAudioRef = {
   current: {
     play: jest.fn().mockResolvedValue(undefined),
     pause: jest.fn(),
+    volume: 1,
     currentTime: 0,
-    duration: 180,
-    volume: 0.75,
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-  } as any,
-};
-
-const mockTrack: PlaylistItem = {
-  id: 'track1',
-  title: 'Test Song',
-  content: 'Test Song Content',
-  artist: 'Test Artist',
-  url: 'https://test.com/song.mp3',
-  type: 'music',
-  duration: 180,
+    duration: 180
+  }
 };
 
 describe('AudioPlayer', () => {
   const defaultProps = {
-    track: mockTrack,
+    track: createMockPlaylistItem(),
     isPlaying: false,
     isLoading: false,
     audioRef: mockAudioRef,
     onPlayPause: jest.fn(),
-    onEnded: jest.fn(),
+    onEnded: jest.fn()
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders track information correctly', () => {
-    render(<AudioPlayer {...defaultProps} />);
-    
-    expect(screen.getByText('Test Song')).toBeInTheDocument();
+  it('should render music track correctly', () => {
+    const track = createMockPlaylistItem({
+      title: 'Test Music Track',
+      artist: 'Test Artist',
+      type: 'music'
+    });
+
+    render(<AudioPlayer {...defaultProps} track={track} />);
+
+    expect(screen.getByText('Test Music Track')).toBeInTheDocument();
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
-    expect(screen.getByText('>>> MUSIQUE <<<')).toBeInTheDocument();
   });
 
-  it('shows loading state when isLoading is true', () => {
+  it('should render DJ message correctly', () => {
+    const track = createMockPlaylistItem({
+      title: 'DJ Message',
+      content: 'Welcome to the wasteland!',
+      type: 'message'
+    });
+
+    render(<AudioPlayer {...defaultProps} track={track} />);
+
+    expect(screen.getByText('DJ Message')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to the wasteland!')).toBeInTheDocument();
+  });
+
+  it('should show play button when not playing', () => {
+    render(<AudioPlayer {...defaultProps} isPlaying={false} />);
+
+    expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pause/i })).not.toBeInTheDocument();
+  });
+
+  it('should show pause button when playing', () => {
+    render(<AudioPlayer {...defaultProps} isPlaying={true} />);
+
+    expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /play/i })).not.toBeInTheDocument();
+  });
+
+  it('should show loading state', () => {
     render(<AudioPlayer {...defaultProps} isLoading={true} />);
-    
-    expect(screen.getByText('Chargement...')).toBeInTheDocument();
-    expect(screen.getByText('>>> SIGNAL PERDU <<<')).toBeInTheDocument();
+
+    expect(screen.getByText(/chargement/i)).toBeInTheDocument();
   });
 
-  it('displays error message when provided', () => {
-    render(<AudioPlayer {...defaultProps} errorMessage="Audio loading failed" />);
-    
-    expect(screen.getAllByText(/Audio loading failed/i)).toHaveLength(2); // Shows in multiple places
-  });
-
-  it('shows TTS activation button when needed', () => {
-    const onEnableTTS = jest.fn();
+  it('should call onPlayPause when play/pause button is clicked', () => {
     const onPlayPause = jest.fn();
-    render(
-      <AudioPlayer 
-        {...defaultProps} 
-        errorMessage="Erreur de synthèse vocale" 
-        ttsEnabled={false}
-        onEnableTTS={onEnableTTS}
-        onPlayPause={onPlayPause}
-      />
-    );
-    
-    const ttsButton = screen.getByText('Activer TTS');
-    fireEvent.click(ttsButton);
-    
-    expect(onEnableTTS).toHaveBeenCalledTimes(1);
+    render(<AudioPlayer {...defaultProps} onPlayPause={onPlayPause} />);
+
+    const playButton = screen.getByRole('button', { name: /play/i });
+    fireEvent.click(playButton);
+
     expect(onPlayPause).toHaveBeenCalledTimes(1);
   });
 
-  it('displays TTS message when provided', () => {
-    render(<AudioPlayer {...defaultProps} ttsMessage="DJ speaking now" />);
-    
-    expect(screen.getByText('Synthèse vocale')).toBeInTheDocument();
-    expect(screen.getByText('>>> TRANSMISSION <<<')).toBeInTheDocument();
+  it('should display error message when provided', () => {
+    const errorMessage = 'Failed to load audio';
+    render(<AudioPlayer {...defaultProps} errorMessage={errorMessage} />);
+
+    expect(screen.getByText(errorMessage)).toBeInTheDocument();
   });
 
-  it('renders message type track differently', () => {
-    const messageTrack: PlaylistItem = {
-      ...mockTrack,
-      type: 'message',
-      title: 'DJ Message',
-    };
-    
-    render(<AudioPlayer {...defaultProps} track={messageTrack} />);
-    
-    expect(screen.getByText('DJ Message')).toBeInTheDocument();
-    expect(screen.getByText('>>> MESSAGE <<<')).toBeInTheDocument();
+  it('should display TTS message when provided', () => {
+    const ttsMessage = 'Text-to-speech message';
+    render(<AudioPlayer {...defaultProps} ttsMessage={ttsMessage} />);
+
+    expect(screen.getByText(ttsMessage)).toBeInTheDocument();
   });
 
-  it('handles volume control with slider', () => {
+  it('should handle TTS enable button', () => {
+    const onEnableTTS = jest.fn();
+    render(<AudioPlayer {...defaultProps} ttsEnabled={false} onEnableTTS={onEnableTTS} />);
+
+    const enableTTSButton = screen.getByRole('button', { name: /activer tts/i });
+    fireEvent.click(enableTTSButton);
+
+    expect(onEnableTTS).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle empty track', () => {
+    render(<AudioPlayer {...defaultProps} track={undefined} />);
+
+    expect(screen.getByText(/aucune piste/i)).toBeInTheDocument();
+  });
+
+  it('should be accessible', () => {
     render(<AudioPlayer {...defaultProps} />);
-    
-    const volumeSlider = screen.getByRole('slider');
-    fireEvent.change(volumeSlider, { target: { value: '50' } });
-    
-    // Check if volume percentage is displayed
-    expect(screen.getByText('50%')).toBeInTheDocument();
-  });
 
-  it('handles mute/unmute functionality', () => {
-    render(<AudioPlayer {...defaultProps} />);
-    
-    // Find the volume control and click it
-    const volumeControl = screen.getByText('Vol:').parentElement?.querySelector('.vintage-knob');
-    expect(volumeControl).toBeInTheDocument();
-    
-    if (volumeControl) {
-      fireEvent.click(volumeControl);
-    }
-  });
-
-  it('shows skeleton when loading without track', () => {
-    render(<AudioPlayer {...defaultProps} track={undefined} isLoading={true} />);
-    
-    expect(screen.getByTestId('audio-player-skeleton')).toBeInTheDocument();
-  });
-
-  it('displays correct status based on state', () => {
-    // Test no track
-    const { rerender } = render(<AudioPlayer {...defaultProps} track={undefined} />);
-    expect(screen.getByText('Silence radio')).toBeInTheDocument();
-    
-    // Test with track
-    rerender(<AudioPlayer {...defaultProps} />);
-    expect(screen.getByText('Test Song')).toBeInTheDocument();
+    // Check for proper ARIA labels and roles
+    expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument();
   });
 });

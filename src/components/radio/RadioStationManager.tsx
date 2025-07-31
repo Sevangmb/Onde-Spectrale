@@ -342,13 +342,13 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
   };
 
   // Computed values
-  const userOwnedStations = useMemo(() => 
-    filteredStations.filter(s => s.ownerId === user?.id), 
+    const userOwnedStations = useMemo(() =>
+    (filteredStations || []).filter(s => s.ownerId === user?.id),
     [filteredStations, user?.id]
   );
 
-  const systemStations = useMemo(() => 
-    filteredStations.filter(s => s.ownerId === 'system'), 
+  const systemStations = useMemo(() =>
+    (filteredStations || []).filter(s => s.ownerId === 'system'),
     [filteredStations]
   );
 
@@ -767,20 +767,20 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {userOwnedStations.map(station => renderStationCard(station, true))}
+              {userOwnedStations && userOwnedStations.map(station => renderStationCard(station, true))}
             </div>
           )}
         </TabsContent>
         
         <TabsContent value="system" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {systemStations.map(station => renderStationCard(station, false))}
+            {systemStations && systemStations.map(station => renderStationCard(station, false))}
           </div>
         </TabsContent>
         
         <TabsContent value="all" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredStations.map(station => renderStationCard(station, station.ownerId === user?.id))}
+            {filteredStations && filteredStations.map(station => renderStationCard(station, station.ownerId === user?.id))}
           </div>
         </TabsContent>
       </Tabs>
@@ -815,7 +815,7 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
             <div className="mt-4">
               <h4 className="font-medium mb-2">DJs les plus utilisés</h4>
               <div className="space-y-2">
-                {stats.mostUsedDJs.slice(0, 5).map((dj: any, index: number) => (
+                {stats.mostUsedDJs && stats.mostUsedDJs.slice(0, 5).map((dj: any, index: number) => (
                   <div key={dj.djId} className="flex items-center justify-between text-sm">
                     <span>{getDjName(dj.djId)}</span>
                     <Badge variant="secondary">{dj.count}</Badge>

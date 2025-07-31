@@ -484,7 +484,7 @@ export function EnhancedOndeSpectraleRadio() {
                       
                       {/* Audio player */}
                       <MemoizedAudioPlayer
-                        track={playback.currentTrack}
+                        track={playback.currentTrack || undefined}
                         isPlaying={playback.isPlaying}
                         isLoading={playback.isLoading}
                         audioRef={playlistManager.audioRef}

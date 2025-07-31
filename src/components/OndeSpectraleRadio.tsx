@@ -17,8 +17,8 @@ import { useStationSync, useStationForFrequency } from '@/hooks/useStationSync';
 import { useAutoPlay } from '@/hooks/useAutoPlay';
 import { radioDebug } from '@/lib/debug';
 
-// Services
-import { interferenceAudioService } from '@/services/InterferenceAudioService';
+// Services - Import dynamique pour éviter les erreurs SSR
+// import { interferenceAudioService } from '@/services/InterferenceAudioService';
 
 // Composants UI
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,6 +62,16 @@ export function OndeSpectraleRadio() {
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [interferenceAudioService, setInterferenceAudioService] = useState<any>(null);
+
+  // Charger le service d'interférence dynamiquement
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('@/services/InterferenceAudioService').then(({ interferenceAudioService }) => {
+        setInterferenceAudioService(interferenceAudioService);
+      }).catch(console.error);
+    }
+  }, []);
 
   // Optimized particle generation with useMemo
   const particleStyles = useMemo<ParticleStyle[]>(() => 
@@ -167,7 +177,7 @@ export function OndeSpectraleRadio() {
     radioSounds.playTuning();
     
     // Jouer le son de scan radio pendant le balayage si l'audio est initialisé
-    if (isAudioInitialized) {
+    if (isAudioInitialized && interferenceAudioService) {
       try {
         await interferenceAudioService.playInterference(frequency, 'medium');
       } catch (error) {
@@ -182,7 +192,7 @@ export function OndeSpectraleRadio() {
       setSliderValue(clampedFreq);
       
       // Jouer différents types d'interférence pendant le scan
-      if (isAudioInitialized) {
+      if (isAudioInitialized && interferenceAudioService) {
         try {
           await interferenceAudioService.playInterference(clampedFreq, 'low');
         } catch (error) {
@@ -212,7 +222,7 @@ export function OndeSpectraleRadio() {
     setFrequency(newFreq);
     
     // Arrêter toute interférence existante puis vérifier la nouvelle fréquence
-    if (isAudioInitialized) {
+    if (isAudioInitialized && interferenceAudioService) {
       interferenceAudioService.stopInterference();
       // L'interférence sera automatiquement gérée par le hook useAutoPlay
     }

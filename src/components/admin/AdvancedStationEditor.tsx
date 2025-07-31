@@ -319,7 +319,9 @@ export function AdvancedStationEditor({
           <SortablePlaylist
             playlist={filteredPlaylist}
             selectedTrackIds={stationManager.selectedTracks}
-            onReorder={stationManager.reorderPlaylist}
+            onReorder={async (newOrder: string[]) => {
+              await stationManager.reorderPlaylist(newOrder);
+            }}
             onTrackSelect={stationManager.toggleTrackSelection}
             onTrackRemove={handleTrackRemove}
             isReordering={stationManager.isReorderingPlaylist}

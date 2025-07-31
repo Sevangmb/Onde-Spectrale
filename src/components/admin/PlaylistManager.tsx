@@ -22,7 +22,7 @@ import {
   BarChart3,
   Settings,
   Zap,
-  Template,
+
   Save,
   RefreshCw,
   FileText,
@@ -477,7 +477,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
           <Card className="border-orange-500/30 bg-black/40 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-orange-400 flex items-center gap-2">
-                <Template className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
                 Templates de Playlist
               </CardTitle>
             </CardHeader>
@@ -525,7 +525,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
                     disabled={isLoading}
                     className="bg-orange-600 hover:bg-orange-700"
                   >
-                    <Template className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2" />
                     Appliquer le Template
                   </Button>
                 </div>

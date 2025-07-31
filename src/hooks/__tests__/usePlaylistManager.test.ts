@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { usePlaylistManager } from '../usePlaylistManager';
+import type { DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { createMockMusic, createMockMessage, createMockPlaylist } from '@/lib/playlistUtils';
 import type { Station } from '@/lib/types';
 
@@ -103,7 +104,7 @@ beforeAll(() => {
 
 describe('usePlaylistManager', () => {
   const mockUser = { id: 'user1', email: 'test@test.com' };
-  const mockDJs = [];
+  const mockDJs: (DJCharacter | CustomDJCharacter)[] = [];
   
   beforeEach(() => {
     jest.clearAllMocks();

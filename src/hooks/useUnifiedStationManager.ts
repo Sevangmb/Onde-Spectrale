@@ -301,12 +301,25 @@ export function useUnifiedStationManager({
       sum + (s.playlist?.reduce((trackSum, track) => trackSum + (track.duration || 0), 0) || 0), 0
     );
 
+    // Calculate most used DJs
+    const djUsage = stations.reduce((acc, station) => {
+      const djId = station.djCharacterId;
+      acc[djId] = (acc[djId] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const mostUsedDJs = Object.entries(djUsage)
+      .map(([djId, count]) => ({ djId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     return {
       totalStations: stations.length,
       activeStations,
       totalTracks,
       totalDuration: Math.round(totalDuration / 60),
-      avgPlaylistLength: Math.round(totalTracks / stations.length)
+      avgPlaylistLength: Math.round(totalTracks / stations.length),
+      mostUsedDJs
     };
   }, [stations]);
 
@@ -321,10 +334,9 @@ export function useUnifiedStationManager({
   }, [allDjs]);
 
   return {
-    // Data
-    stations: filteredStations,
-    allStations: stations,
-    selectedStation,
+          // Data
+      stations: filteredStations,
+      allStations: stations,
     stats,
     
     // State

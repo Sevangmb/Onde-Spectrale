@@ -599,9 +599,9 @@ export class PlaylistManagerService {
       const musicRatio = (tracksByType.music || 0) / totalTracks;
 
       // Analyze track distribution
-      const shortTracks = playlist.filter(t => t.duration < 60).length;
-      const mediumTracks = playlist.filter(t => t.duration >= 60 && t.duration < 300).length;
-      const longTracks = playlist.filter(t => t.duration >= 300).length;
+      const shortTracks = playlist.filter((t: PlaylistItem) => t.duration < 60).length;
+      const mediumTracks = playlist.filter((t: PlaylistItem) => t.duration >= 60 && t.duration < 300).length;
+      const longTracks = playlist.filter((t: PlaylistItem) => t.duration >= 300).length;
 
       // Calculate estimated listening patterns
       const estimatedHours = totalDuration / 3600;

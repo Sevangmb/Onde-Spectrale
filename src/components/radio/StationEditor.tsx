@@ -27,11 +27,11 @@ import {
 } from 'lucide-react';
 import { radioStationManager, type CreateStationData, type UpdateStationData } from '@/services/RadioStationManager';
 import { EnhancedPlaylistInterface } from '@/components/playlist/EnhancedPlaylistInterface';
-import type { Station, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
+import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 
 interface StationEditorProps {
   station?: Station | null;
-  user: User | null;
+  user: any | null;
   allDjs: (DJCharacter | CustomDJCharacter)[];
   isOpen: boolean;
   onClose: () => void;
@@ -189,9 +189,9 @@ export function StationEditor({
 
   // Handle add tag
   const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+    if (tagInput.trim() && !formData.tags?.includes(tagInput.trim())) {
       updateFormData({
-        tags: [...formData.tags, tagInput.trim()]
+        tags: [...(formData.tags || []), tagInput.trim()]
       });
       setTagInput('');
     }
@@ -200,7 +200,7 @@ export function StationEditor({
   // Handle remove tag
   const handleRemoveTag = (tagToRemove: string) => {
     updateFormData({
-      tags: formData.tags.filter(tag => tag !== tagToRemove)
+      tags: formData.tags?.filter(tag => tag !== tagToRemove) || []
     });
   };
 
@@ -393,7 +393,7 @@ export function StationEditor({
                       </Button>
                     </div>
                     
-                    {formData.tags.length > 0 && (
+                    {formData.tags && formData.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {formData.tags.map(tag => (
                           <Badge 

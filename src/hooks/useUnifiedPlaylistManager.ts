@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useEnhancedRadioStore, useRadioActions, usePlaybackState, useDataState, useUIState } from '@/stores/enhancedRadioStore';
 import { playlistManagerService } from '@/services/PlaylistManagerService';
-import { audioService } from '@/services/AudioService';
+// Import dynamique d'AudioService pour éviter les erreurs SSR
 import { getAudioForTrack } from '@/app/actions';
 import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
 import { getAppUserId } from '@/lib/userConverter';
@@ -22,6 +22,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isMountedRef = useRef(true);
   const currentOperationId = useRef<string | null>(null);
+  const audioServiceRef = useRef<any>(null);
   
   // Store selectors
   const playback = usePlaybackState();
@@ -29,13 +30,18 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
   const ui = useUIState();
   const actions = useRadioActions();
   
-  // Initialize audio element
+  // Initialize audio element and load AudioService dynamically
   useEffect(() => {
     if (typeof window !== 'undefined' && !audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = 'anonymous';
       audioRef.current.preload = 'metadata';
       audioRef.current.volume = playback.volume;
+      
+      // Load AudioService dynamically
+      import('@/services/AudioService').then(({ audioService }) => {
+        audioServiceRef.current = audioService;
+      }).catch(console.error);
     }
     
     return () => {
@@ -49,8 +55,8 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
   
   // Volume synchronization
   useEffect(() => {
-    if (audioRef.current) {
-      audioService.setVolume(audioRef.current, playback.volume);
+    if (audioRef.current && audioServiceRef.current) {
+      audioServiceRef.current.setVolume(audioRef.current, playback.volume);
     }
   }, [playback.volume]);
   
@@ -104,7 +110,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
       }
       
       // Load and play audio using service
-      await audioService.loadTrack({...track, url: result.audioUrl}, audioRef.current);
+      await audioServiceRef.current.loadTrack({...track, url: result.audioUrl}, audioRef.current);
       
       // Handle TTS message
       if (result.audioUrl.startsWith('data:audio')) {
@@ -112,7 +118,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
       }
       
       try {
-        await audioService.play(audioRef.current);
+        await audioServiceRef.current.play(audioRef.current);
         
         // Auto-enable autoplay after successful play
         if (!ui.autoPlayEnabled) {
@@ -161,9 +167,9 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
     
     try {
       if (playback.isPlaying) {
-        audioService.pause(audioRef.current);
+        audioServiceRef.current.pause(audioRef.current);
       } else if (playback.currentTrack) {
-        await audioService.play(audioRef.current);
+        await audioServiceRef.current.play(audioRef.current);
         if (!ui.autoPlayEnabled) {
           actions.enableAutoPlay();
         }
@@ -499,11 +505,7 @@ export function useUnifiedPlaylistManager({ station, user, allDjs }: UnifiedPlay
     // Audio ref for compatibility
     audioRef,
     
-    // Backward compatibility methods for migration
-    addFailedTrack: actions.addFailedTrack,
-    ttsMessage: ui.ttsMessage,
-    ttsEnabled: ui.ttsEnabled,
-    playlistLength: station?.playlist.length || 0,
+    
   };
 }
 

@@ -114,7 +114,7 @@ export class AdminMonitoringService {
               ...data,
               lastActivity: safeParseDate(data.lastActivity),
               connectionTime: safeParseDate(data.connectionTime || Date.now()),
-            } as AdminPlayerState;
+            } as unknown as AdminPlayerState;
           });
           
           callback(players);
