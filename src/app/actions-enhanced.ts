@@ -440,9 +440,9 @@ export async function generatePlaylistEnhanced(
           id: `enhanced-${Date.now()}-${index}`,
           addedAt: safeToISOString(new Date()),
           // Ensure required PlaylistItem properties
-          title: item.title || item.content || 'Untitled',
-          url: item.url || '',
-          duration: item.duration || 180, // Default 3 minutes
+          title: (item as any).title || item.content || 'Untitled',
+          url: (item as any).url || '',
+          duration: (item as any).duration || 180, // Default 3 minutes
         } as PlaylistItem;
       });
 
@@ -461,9 +461,9 @@ export async function generatePlaylistEnhanced(
         id: `enhanced-${Date.now()}-${index}`,
         addedAt: safeToISOString(new Date()),
         // Ensure required PlaylistItem properties
-        title: item.title || item.content || 'Untitled',
-        url: item.url || '',
-        duration: item.duration || 180, // Default 3 minutes
+        title: (item as any).title || item.content || 'Untitled',
+        url: (item as any).url || '',
+        duration: (item as any).duration || 180, // Default 3 minutes
       } as PlaylistItem))
     };
 
