@@ -18,6 +18,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Performance optimizations
+  experimental: {
+    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+  },
+  // Enable bundle analyzer when ANALYZE=true
+  ...(process.env.ANALYZE === 'true' && {
+    webpack: (config: any) => {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        // Alias for better tree shaking
+      };
+      return config;
+    },
+  }),
 };
 
 export default nextConfig;

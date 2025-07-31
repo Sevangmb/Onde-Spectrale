@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioStationManager } from '@/components/radio/RadioStationManager';
 import { EnhancedPlaylistInterface } from '@/components/playlist/EnhancedPlaylistInterface';
+import { RealTimePlayerMonitor } from '@/components/admin/RealTimePlayerMonitor';
+import { SystemLogsViewer } from '@/components/admin/SystemLogsViewer';
 import type { User, Station } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
@@ -141,7 +143,7 @@ export default function AdminDashboard() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">
             <BarChart3 className="h-4 w-4 mr-2" />
             Vue d'ensemble
@@ -153,6 +155,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="playlists">
             <Music className="h-4 w-4 mr-2" />
             Playlists
+          </TabsTrigger>
+          <TabsTrigger value="monitoring">
+            <Activity className="h-4 w-4 mr-2" />
+            Monitoring
           </TabsTrigger>
           <TabsTrigger value="analytics">
             <TrendingUp className="h-4 w-4 mr-2" />
@@ -173,7 +179,7 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {stations.slice(0, 5).map(station => (
+                  {stations && stations.slice(0, 5).map(station => (
                     <div key={station.id} className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{station.name}</p>
@@ -198,7 +204,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
-                  {stations.length === 0 && (
+                  {(!stations || stations.length === 0) && (
                     <p className="text-muted-foreground text-center py-4">
                       Aucune station créée pour le moment
                     </p>
@@ -208,7 +214,7 @@ export default function AdminDashboard() {
             </Card>
 
             {/* Top DJs */}
-            {stats && (
+            {stats && stats.mostUsedDJs && stats.mostUsedDJs.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -255,7 +261,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {stations.map(station => (
+                {stations && stations.map(station => (
                   <Card 
                     key={station.id} 
                     className={`cursor-pointer transition-colors ${
@@ -279,7 +285,8 @@ export default function AdminDashboard() {
                   user={standardUser}
                   allDjs={allDjs}
                   onUpdate={(updatedStation) => {
-                    setSelectedStation(updatedStation);
+                    // TODO: Add playlistControls to updatedStation
+                    setSelectedStation(updatedStation as any);
                   }}
                 />
               ) : (
@@ -292,25 +299,52 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
 
+        {/* Monitoring Tab */}
+        <TabsContent value="monitoring">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Monitoring Temps Réel</h2>
+              <p className="text-muted-foreground">
+                Surveillez l'état de vos stations radio en temps réel
+              </p>
+            </div>
+            
+            {stations && stations.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {stations.slice(0, 4).map(station => (
+                  <RealTimePlayerMonitor 
+                    key={station.id}
+                    stationId={station.id} 
+                    stationName={station.name}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12 text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-4" />
+                  <p>Aucune station à surveiller</p>
+                  <p className="text-sm mt-2">
+                    Créez des stations pour commencer le monitoring
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Analytics Tab */}
         <TabsContent value="analytics">
-          <Card>
-            <CardHeader>
-              <CardTitle>Analytics Avancées</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Statistiques détaillées et insights sur vos stations
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Analytics et Logs Système</h2>
+              <p className="text-muted-foreground">
+                Surveillez les performances et les logs système de votre radio
               </p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4" />
-                <p>Analytics avancées en cours de développement</p>
-                <p className="text-sm mt-2">
-                  Graphiques de performance, tendances d'écoute et recommandations à venir
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            
+            <SystemLogsViewer />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

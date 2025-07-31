@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Récupérer la station depuis Firebase
-    const stationRef = await optimizedFirebaseService['getStationById'](id);
+    const stationRef = await optimizedFirebaseService.getDocument('stations', id);
     if (!stationRef) {
       throw new BackendError(
         'RESOURCE_NOT_FOUND' as any,
@@ -124,10 +124,11 @@ export async function PUT(
     }
 
     const updateData = validation.data!;
-    delete updateData.id; // Retirer l'ID des données de mise à jour
+    const { id: _id, ...dataWithoutId } = updateData; // Retirer l'ID des données de mise à jour
+    const cleanUpdateData = dataWithoutId;
 
     // Mettre à jour la station
-    const updatedStation = await optimizedFirebaseService.updateStation(id, updateData);
+    const updatedStation = await optimizedFirebaseService.updateStation(id, cleanUpdateData);
 
     // Invalider les caches associés
     await enhancedCacheService.delete(`station_id_${id}`, true);
@@ -287,7 +288,7 @@ export async function PATCH(
       case 'toggle-active':
         // Activer/désactiver la station (si cette fonctionnalité existe)
         const toggledStation = await optimizedFirebaseService.updateStation(id, {
-          active: data.active,
+          isActive: data.active,
         });
 
         return NextResponse.json({

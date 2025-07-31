@@ -4,6 +4,11 @@ export type DJCharacter = {
   name: string;
   description: string;
   isCustom?: boolean;
+  voice?: {
+    gender: string;
+    tone: string;
+    style: string;
+  };
 };
 
 export type CustomDJCharacter = DJCharacter & {
@@ -45,6 +50,10 @@ export type Station = {
   playlist: PlaylistItem[];
   createdAt: string; // ISO string
   theme?: string;
+  description?: string;
+  isActive?: boolean;
+  tags?: string[];
+  lastModified?: string;
 };
 
 export type User = {
@@ -105,7 +114,7 @@ export interface AdminErrorLog {
   id: string;
   timestamp: Date;
   level: 'critical' | 'error' | 'warning' | 'info';
-  source: 'player' | 'station' | 'api' | 'auth' | 'plex' | 'ai';
+  source: 'player' | 'station' | 'api' | 'auth' | 'plex' | 'ai' | 'admin';
   message: string;
   userId?: string;
   stationId?: string;

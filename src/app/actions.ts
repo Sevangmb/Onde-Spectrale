@@ -654,7 +654,7 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
         }
         
         try {
-            const { audioBase64 } = ('isCustom' in dj && dj.isCustom)
+            const { audioBase64 } = ('isCustom' in dj && dj.isCustom && dj.voice)
                 ? await generateCustomDjAudio({ message: messageContent, voice: dj.voice })
                 : await generateDjAudio({ message: messageContent, characterId: dj.id });
 

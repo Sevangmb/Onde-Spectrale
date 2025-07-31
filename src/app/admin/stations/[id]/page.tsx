@@ -12,6 +12,7 @@ import { DJ_CHARACTERS } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlayerStatusCard } from '@/components/PlayerStatusCard';
+import { RealTimePlayerMonitor } from '@/components/admin/RealTimePlayerMonitor';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -176,9 +177,11 @@ export default function StationDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4"/>
           Retour à toutes les stations
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
-        <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
-        <PlayerStatusCard stationId={station.id} />
+                 <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
+         <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
+         
+         {/* Real-time Player Monitoring */}
+         <RealTimePlayerMonitor stationId={station.id} stationName={station.name} />
 
       </div>
 
@@ -294,7 +297,7 @@ export default function StationDetailPage() {
                             )}
                             {searchResults.length > 0 ? (
                                 <div className="p-2 space-y-2">
-                                    {searchResults.map(track => (
+                                    {searchResults && searchResults.map(track => (
                                         <Card key={track.id} className="p-2 flex items-center justify-between gap-2">
                                             <CardContent className="p-0 flex-grow overflow-hidden">
                                                 <p className="font-semibold text-sm truncate">{track.title}</p>
@@ -329,7 +332,7 @@ export default function StationDetailPage() {
             {sortedPlaylist.length > 0 ? (
                 <ScrollArea className="h-96">
                     <div className="space-y-4">
-                        {sortedPlaylist.map((item) => (
+                        {sortedPlaylist && sortedPlaylist.map((item) => (
                             <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
                                 <div className="p-2 bg-muted rounded-md">
                                     {item.type === 'music' ? <Music className="h-5 w-5 text-muted-foreground"/> : <MessageSquare className="h-5 w-5 text-muted-foreground"/>}
