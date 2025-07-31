@@ -63,11 +63,11 @@ async function toWav(
       channels,
       sampleRate: rate,
       bitDepth: sampleWidth * 8,
-    });
+    }) as any; // Type assertion for wav package compatibility
 
     const bufs: Buffer[] = [];
     writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
+    writer.on('data', (d: Buffer) => bufs.push(d));
     writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
 
     writer.write(pcmData);
@@ -80,7 +80,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     inputSchema: GenerateCustomDjAudioInputSchema,
     outputSchema: GenerateCustomDjAudioOutputSchema,
   },
-  async (input) => {
+  async (input: GenerateCustomDjAudioInput) => {
     const { voice, message } = input;
     
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix';

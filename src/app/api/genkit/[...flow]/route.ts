@@ -9,4 +9,5 @@ import '@/ai/flows/generate-themed-message';
 import '@/ai/flows/generate-playlist-flow';
 
 
-export const { POST } = genkit();
+const handler = genkit();
+export const POST = handler;

@@ -7,6 +7,4 @@ export const ai = genkit({
       // Vous pouvez spécifier une version d'API si nécessaire, ex: 'v1beta'
     }),
   ],
-  logLevel: 'debug', // Niveaux possibles: 'debug', 'info', 'warn', 'error'
-  enableTracingAndMetrics: true,
 });
