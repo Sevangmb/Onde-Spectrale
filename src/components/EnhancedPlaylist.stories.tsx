@@ -63,17 +63,21 @@ const samplePlaylist: any[] = [
 export const Default: Story = {
   args: {
     playlist: samplePlaylist,
+    isPlaying: false,
+    isLoadingTrack: false,
+    failedTracks: new Set(),
+    canGoBack: true,
     onTrackSelect: async (trackId: string) => {
       console.log('Selected track:', trackId);
     },
-    onRemove: async (trackId: string) => {
-      console.log('Removed track:', trackId);
+    onPlayPause: async () => {
+      console.log('Play/Pause toggled');
     },
-    onAdd: async (track: any) => {
-      console.log('Added track:', track);
+    onNext: () => {
+      console.log('Next track');
     },
-    onGenerate: async (options: { theme?: string; count?: number }) => {
-      console.log('Generate playlist:', options);
+    onPrevious: () => {
+      console.log('Previous track');
     }
   }
 };
@@ -81,17 +85,21 @@ export const Default: Story = {
 export const Empty: Story = {
   args: {
     playlist: [],
+    isPlaying: false,
+    isLoadingTrack: false,
+    failedTracks: new Set(),
+    canGoBack: false,
     onTrackSelect: async (trackId: string) => {
       console.log('Selected track:', trackId);
     },
-    onRemove: async (trackId: string) => {
-      console.log('Removed track:', trackId);
+    onPlayPause: async () => {
+      console.log('Play/Pause toggled');
     },
-    onAdd: async (track: any) => {
-      console.log('Added track:', track);
+    onNext: () => {
+      console.log('Next track');
     },
-    onGenerate: async (options: { theme?: string; count?: number }) => {
-      console.log('Generate playlist:', options);
+    onPrevious: () => {
+      console.log('Previous track');
     }
   }
 };
@@ -107,17 +115,22 @@ export const LongPlaylist: Story = {
       duration: 180 + (i * 30),
       type: i % 3 === 0 ? 'message' as const : 'music' as const
     })),
+    isPlaying: true,
+    isLoadingTrack: false,
+    failedTracks: new Set(['track-5', 'track-12']),
+    canGoBack: true,
+    currentTrackId: 'track-3',
     onTrackSelect: async (trackId: string) => {
       console.log('Selected track:', trackId);
     },
-    onRemove: async (trackId: string) => {
-      console.log('Removed track:', trackId);
+    onPlayPause: async () => {
+      console.log('Play/Pause toggled');
     },
-    onAdd: async (track: any) => {
-      console.log('Added track:', track);
+    onNext: () => {
+      console.log('Next track');
     },
-    onGenerate: async (options: { theme?: string; count?: number }) => {
-      console.log('Generate playlist:', options);
+    onPrevious: () => {
+      console.log('Previous track');
     }
   }
 };

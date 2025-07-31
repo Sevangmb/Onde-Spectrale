@@ -120,7 +120,7 @@ export class EnhancedCacheService {
 
     // Compression si activée
     if (this.config.compressionEnabled && this.shouldCompress(data)) {
-      entry.data = await this.compressData(data);
+      entry.data = await this.compressData(data) as T;
       entry.compressed = true;
     }
 
@@ -291,7 +291,7 @@ export class EnhancedCacheService {
 
       // Décompresser si nécessaire
       if (entry.compressed) {
-        entry.data = await this.decompressData(entry.data);
+        entry.data = await this.decompressData(entry.data as string) as T;
         entry.compressed = false;
       }
 

@@ -439,7 +439,11 @@ export async function generatePlaylistEnhanced(
           ...item,
           id: `enhanced-${Date.now()}-${index}`,
           addedAt: safeToISOString(new Date()),
-        };
+          // Ensure required PlaylistItem properties
+          title: item.title || item.content || 'Untitled',
+          url: item.url || '',
+          duration: item.duration || 180, // Default 3 minutes
+        } as PlaylistItem;
       });
 
       const result = { items: enhancedItems };
@@ -456,7 +460,11 @@ export async function generatePlaylistEnhanced(
         ...item,
         id: `enhanced-${Date.now()}-${index}`,
         addedAt: safeToISOString(new Date()),
-      }))
+        // Ensure required PlaylistItem properties
+        title: item.title || item.content || 'Untitled',
+        url: item.url || '',
+        duration: item.duration || 180, // Default 3 minutes
+      } as PlaylistItem))
     };
 
     // Mettre en cache

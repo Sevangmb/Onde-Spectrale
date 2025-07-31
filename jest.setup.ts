@@ -46,7 +46,7 @@ jest.mock('@/components/ui/slider', () => ({
       max,
       step,
       value: value?.[0] || 0,
-      onChange: (e) => onValueChange?.([Number(e.target.value)]),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => onValueChange?.([Number(e.target.value)]),
       ...props
     });
   }),

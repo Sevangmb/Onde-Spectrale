@@ -526,6 +526,36 @@ export class OptimizedFirebaseService {
   }
 
   // ========================================
+  // MÉTHODES GÉNÉRIQUES
+  // ========================================
+
+  /**
+   * Récupère un document par son ID dans une collection donnée
+   */
+  async getDocument(collectionName: string, documentId: string): Promise<any | null> {
+    const docRef = doc(db, collectionName, documentId);
+    const [error, docSnapshot] = await handleAsyncError(getDoc(docRef));
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!docSnapshot || !docSnapshot.exists()) {
+      return null;
+    }
+    
+    const data = docSnapshot.data();
+    if (collectionName === 'stations' && data) {
+      return this.serializeStation(docSnapshot);
+    }
+    
+    return {
+      id: docSnapshot.id,
+      ...data,
+    };
+  }
+
+  // ========================================
   // MÉTHODES UTILITAIRES
   // ========================================
 
