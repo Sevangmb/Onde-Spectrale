@@ -6,7 +6,7 @@ import { useEnhancedRadioStore, useRadioActions, usePlaybackState as usePlayback
 import { getAudioForTrack } from '@/app/actions';
 import type { PlaylistItem, Station, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
 import { getAppUserId } from '@/lib/userConverter';
-import { log } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 interface UnifiedPlaylistManagerProps {
   station: Station | null;
@@ -61,7 +61,7 @@ export function useUnifiedPlaylistManager(
           .then((module) => {
             audioServiceRef.current = module.audioService;
           })
-          .catch((error) => log.error(String(error)));
+          .catch((error) => logger.error(String(error)));
       }
     
     return () => {
@@ -256,7 +256,7 @@ export function useUnifiedPlaylistManager(
     }, [audioServiceRef, audioRef, ui.autoPlayEnabled, actions]);
   
     const handlePlaybackError = useCallback((trackId: string, error: any): void => {
-      log.error(`Failed to play track ${trackId}: ${String(error.message)}`, String({ trackId, error }));
+      logger.error(`Failed to play track ${trackId}: ${String(error.message)}`, String({ trackId, error }));
       actions.setError(`Impossible de lire la piste. Passage à la piste suivante.`);
   
       // Add to failed tracks
@@ -299,7 +299,7 @@ export function useUnifiedPlaylistManager(
     if (playback.isLoading) return;
     
     if (!audioRef.current) {
-      log.error('Audio element not available');
+      logger.error('Audio element not available');
       return;
     }
     
@@ -316,7 +316,7 @@ export function useUnifiedPlaylistManager(
       await actions.togglePlayback();
       
     } catch (error: any) {
-      log.error(`Playback error: ${String(error.message)}`, String({ error }));
+      logger.error(`Playback error: ${String(error.message)}`, String({ error }));
       actions.setError(`Erreur de lecture : ${error.message}`);
       if (error.message.includes('User interaction required')) {
         actions.enableAudioContext();
@@ -530,7 +530,7 @@ const getAvailableTemplates = useCallback(
     
     const handleEnded = () => handleAudioEnded();
     const handleError = (event: Event) => {
-      log.error(`Audio error: ${String(event)}`, String({ event }));
+      logger.error(`Audio error: ${String(event)}`, String({ event }));
       if (playback.currentTrack) {
         actions.addFailedTrack(playback.currentTrack.id);
         if (ui.autoPlayEnabled) {

@@ -1,6 +1,6 @@
 import type { Station, PlaylistItem } from '@/lib/types';
 import { getStationForFrequency, createDefaultStations, updateUserFrequency } from '@/app/actions';
-import { log } from '@/lib/logger';
+import logger from '@/lib/logger';
 import { BackendError, ErrorCode, handleAsyncError } from '@/lib/errors';
 
 export interface StationServiceInterface {
@@ -60,7 +60,7 @@ export class StationService implements StationServiceInterface {
   
   private async loadStationWithRetry(frequency: number, retryCount = 0): Promise<Station | null> {
     try {
-      log.info(`Loading station for frequency ${frequency}`, 'StationService', {
+      logger.info(`Loading station for frequency ${frequency}`, 'StationService', {
         frequency,
         attempt: retryCount + 1,
         maxRetries: this.MAX_RETRIES
@@ -69,26 +69,26 @@ export class StationService implements StationServiceInterface {
       const station = await getStationForFrequency(frequency);
       
       if (station) {
-        log.info(`Station loaded successfully`, 'StationService', {
+        logger.info(`Station loaded successfully`, 'StationService', {
           stationName: station.name,
           frequency,
           stationId: station.id
         });
         return station;
       } else {
-        log.debug(`No station found at frequency`, 'StationService', { frequency });
+        logger.debug(`No station found at frequency`, 'StationService', { frequency });
         return null;
       }
       
     } catch (error) {
-      log.error(`Error loading station`, 'StationService', {
+      logger.error(`Error loading station`, 'StationService', {
         frequency,
         attempt: retryCount + 1,
         error: error instanceof Error ? error.message : String(error)
       });
       
       if (retryCount < this.MAX_RETRIES) {
-        log.debug(`Retrying station load`, 'StationService', {
+        logger.debug(`Retrying station load`, 'StationService', {
           frequency,
           retryDelay: this.RETRY_DELAY,
           nextAttempt: retryCount + 2
@@ -118,7 +118,7 @@ export class StationService implements StationServiceInterface {
     };
     
     this.cache.set(frequency, cacheEntry);
-    log.debug(`Station cached`, 'StationService', { frequency, ttl: this.DEFAULT_TTL });
+    logger.debug(`Station cached`, 'StationService', { frequency, ttl: this.DEFAULT_TTL });
   }
   
   getCachedStation(frequency: number): Station | null {
@@ -133,12 +133,12 @@ export class StationService implements StationServiceInterface {
     const isExpired = (now - cacheEntry.timestamp) > cacheEntry.ttl;
     
     if (isExpired) {
-      log.debug(`Cache expired`, 'StationService', { frequency, age: now - cacheEntry.timestamp });
+      logger.debug(`Cache expired`, 'StationService', { frequency, age: now - cacheEntry.timestamp });
       this.cache.delete(frequency);
       return null;
     }
     
-    log.debug(`Cache hit`, 'StationService', { frequency });
+    logger.debug(`Cache hit`, 'StationService', { frequency });
     return cacheEntry.station;
   }
   
@@ -146,28 +146,28 @@ export class StationService implements StationServiceInterface {
     if (frequency !== undefined) {
       const deleted = this.cache.delete(frequency);
       if (deleted) {
-        log.debug(`Cache invalidated for frequency`, 'StationService', { frequency });
+        logger.debug(`Cache invalidated for frequency`, 'StationService', { frequency });
       }
     } else {
       const size = this.cache.size;
       this.cache.clear();
-      log.info(`All station cache cleared`, 'StationService', { entriesCleared: size });
+      logger.info(`All station cache cleared`, 'StationService', { entriesCleared: size });
     }
   }
   
   async createDefaultStations(): Promise<void> {
     try {
-      log.info('Creating default stations', 'StationService');
+      logger.info('Creating default stations', 'StationService');
       const [error] = await handleAsyncError(createDefaultStations());
       if (error) {
         throw error;
       }
-      log.info('Default stations created successfully', 'StationService');
+      logger.info('Default stations created successfully', 'StationService');
       
       // Invalidate cache to ensure fresh data
       this.invalidateStationCache();
     } catch (error) {
-      log.error('Error creating default stations', 'StationService', {
+      logger.error('Error creating default stations', 'StationService', {
         error: error instanceof Error ? error.message : String(error)
       });
       throw error instanceof BackendError ? error : new BackendError(
@@ -182,9 +182,9 @@ export class StationService implements StationServiceInterface {
   async updateUserFrequency(userId: string, frequency: number): Promise<void> {
     try {
       await updateUserFrequency(userId, frequency);
-      log.info('User frequency updated', 'StationService', { userId, frequency });
+      logger.info('User frequency updated', 'StationService', { userId, frequency });
     } catch (error) {
-      log.error('Error updating user frequency', 'StationService', {
+      logger.error('Error updating user frequency', 'StationService', {
         userId,
         frequency,
         error: error instanceof Error ? error.message : String(error)
@@ -227,7 +227,7 @@ export class StationService implements StationServiceInterface {
     }
     
     if (cleanedCount > 0) {
-      log.info('Cache cleanup completed', 'StationService', { entriesRemoved: cleanedCount });
+      logger.info('Cache cleanup completed', 'StationService', { entriesRemoved: cleanedCount });
     }
     
     return cleanedCount;
@@ -245,7 +245,7 @@ export class StationService implements StationServiceInterface {
       }
     }
     
-    log.info('Preloading nearby stations', 'StationService', {
+    logger.info('Preloading nearby stations', 'StationService', {
       currentFrequency,
       range,
       stationsToLoad: frequencies.length
@@ -254,7 +254,7 @@ export class StationService implements StationServiceInterface {
     // Load stations in parallel but with limited concurrency
     const loadPromises = frequencies.map(freq => 
       this.loadStationForFrequency(freq).catch(error => {
-        log.warn('Failed to preload station', 'StationService', {
+        logger.warn('Failed to preload station', 'StationService', {
           frequency: freq,
           error: error instanceof Error ? error.message : String(error)
         });
@@ -263,7 +263,7 @@ export class StationService implements StationServiceInterface {
     );
     
     await Promise.allSettled(loadPromises);
-    log.info('Station preloading completed', 'StationService', {
+    logger.info('Station preloading completed', 'StationService', {
       currentFrequency,
       stationsPreloaded: frequencies.length
     });
