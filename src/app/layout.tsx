@@ -1,16 +1,22 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AlertTriangle } from 'lucide-react';
 import RadioErrorBoundary from '@/components/ErrorBoundary';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#00ff41',
+};
 
 export const metadata: Metadata = {
   title: 'Onde Spectrale',
   description:
     'Une application radio post-apocalyptique où les utilisateurs peuvent scanner des fréquences et créer leurs propres stations avec des DJs IA.',
   manifest: '/manifest.json',
-  themeColor: '#00ff41',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -56,7 +62,7 @@ export default function RootLayout({
                 <AlertTriangle />
                 <div>
                   <h1 className="font-bold">JavaScript est requis</h1>
-                  <p>Cette application interactive nécessite l'activation de JavaScript pour fonctionner.</p>
+                  <p>Cette application interactive nécessite l&apos;activation de JavaScript pour fonctionner.</p>
                 </div>
             </div>
         </noscript>

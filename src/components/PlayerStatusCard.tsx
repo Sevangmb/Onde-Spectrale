@@ -17,7 +17,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({ stationId })
         <CardTitle>État du lecteur en temps réel</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && <div className="flex items-center gap-2"><Loader2 className="animate-spin" />Chargement de l'état...</div>}
+        {loading && <div className="flex items-center gap-2"><Loader2 className="animate-spin" />Chargement de l&apos;état...</div>}
         {error && <div className="flex items-center gap-2 text-destructive"><AlertTriangle />Erreur de connexion au lecteur.</div>}
         
         {playerState ? (
@@ -41,7 +41,7 @@ export const PlayerStatusCard: React.FC<PlayerStatusCardProps> = ({ stationId })
             
             {playerState.ttsMessage && (
               <div className="text-sm p-2 bg-blue-900/50 border border-blue-500/30 rounded-md">
-                🎤 <span className="italic">"{playerState.ttsMessage}"</span>
+                🎤 <span className="italic">&quot;{playerState.ttsMessage}&quot;</span>
               </div>
             )}
 

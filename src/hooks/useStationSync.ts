@@ -13,7 +13,6 @@ export function useStationSync() {
   const forceRefresh = useCallback(() => {
     invalidateStationsCache();
     setLastSync(Date.now());
-    console.log('🔄 Synchronisation forcée des stations');
   }, []);
   
   // Écouter les changements de storage pour synchroniser entre onglets
@@ -64,7 +63,6 @@ export function useStationForFrequency(frequency: number) {
     setError(null);
     
     try {
-      console.log(`🔍 Recherche station pour fréquence ${freq} MHz`);
       const result = await getStationForFrequency(freq);
       
       // Mettre en cache avec TTL plus court pour les stations null
@@ -72,7 +70,6 @@ export function useStationForFrequency(frequency: number) {
       clientCache.set(cacheKey, result, ttl);
       
       setStation(result);
-      console.log(result ? `✅ Station trouvée: ${result.name}` : `❌ Aucune station sur ${freq} MHz`);
       return result;
     } catch (err: any) {
       const errorMsg = `Erreur de recherche station: ${err.message}`;

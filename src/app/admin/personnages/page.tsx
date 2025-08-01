@@ -235,7 +235,7 @@ export default function PersonnagesManagement() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {DJ_CHARACTERS.map((dj) => (
+            {DJ_CHARACTERS && DJ_CHARACTERS.map((dj) => (
               <div key={dj.id} className="p-4 bg-muted/50 border rounded-lg">
                 <div className="flex items-center gap-3 mb-2">
                   <User className="h-5 w-5" />
@@ -255,11 +255,11 @@ export default function PersonnagesManagement() {
           <CardContent>
              {customCharacters.length === 0 ? (
                  <div className="text-center text-muted-foreground py-8">
-                    <p>Vous n'avez pas encore créé de DJ personnalisé.</p>
+                    <p>Vous n&apos;avez pas encore créé de DJ personnalisé.</p>
                  </div>
              ) : (
                 <div className="grid gap-4">
-                  {customCharacters.map((character) => (
+                  {customCharacters && customCharacters.map((character) => (
                     <div key={character.id} className="p-4 border rounded-lg flex items-start justify-between">
                        <div className="flex-grow">
                          <h3 className="font-semibold text-lg">{character.name}</h3>

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Play, AlertTriangle, AudioLines, CheckCircle, Mic, RotateCw } from 'lucide-react';
 
-interface AudioPreviewerProps {
+export interface AudioPreviewerProps {
   character: CustomDJCharacter;
 }
 

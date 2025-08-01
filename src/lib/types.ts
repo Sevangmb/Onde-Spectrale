@@ -1,9 +1,15 @@
+// src/lib/types.ts - Version corrigée
 
 export type DJCharacter = {
   id: string;
   name: string;
   description: string;
   isCustom?: boolean;
+  voice?: {
+    gender: string;
+    tone: string;
+    style: string;
+  };
 };
 
 export type CustomDJCharacter = DJCharacter & {
@@ -21,19 +27,20 @@ export type PlaylistItem = {
   id: string;
   type: 'message' | 'music';
   title: string;
-  content: string; 
+  content: string; // Contenu réel (texte du message ou nom de recherche)
   artist?: string;
   album?: string; // Album name
   year?: number; // Release year
   genre?: string; // Comma-separated genres
   artwork?: string; // Album/track artwork URL
-  url: string; // URL to the audio file in Firebase Storage or Plex
+  url: string; // URL to the audio file in Firebase Storage, Plex, or Archive.org
   duration: number; // in seconds
   addedAt?: string; // ISO string
  
   plexKey?: string; // Plex media key
-  isLoading?: boolean; 
-  error?: string; 
+  archiveId?: string; // ID spécifique Archive.org pour les musiques
+  isLoading?: boolean; // État de chargement
+  error?: string; // Message d'erreur
 };
 
 export type Station = {
@@ -44,7 +51,11 @@ export type Station = {
   djCharacterId: string;
   playlist: PlaylistItem[];
   createdAt: string; // ISO string
-  theme?: string;
+  theme?: string; // Thème de la station
+  description?: string;
+  isActive?: boolean;
+  tags?: string[];
+  lastModified?: string;
 };
 
 export type User = {
@@ -105,7 +116,7 @@ export interface AdminErrorLog {
   id: string;
   timestamp: Date;
   level: 'critical' | 'error' | 'warning' | 'info';
-  source: 'player' | 'station' | 'api' | 'auth' | 'plex' | 'ai';
+  source: 'player' | 'station' | 'api' | 'auth' | 'plex' | 'ai' | 'admin';
   message: string;
   userId?: string;
   stationId?: string;

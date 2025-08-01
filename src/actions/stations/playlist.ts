@@ -2,13 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { safeToISOString } from '@/lib/dateUtils';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { getStationById } from './queries';
 import { getCustomCharactersForUser } from '../users/queries';
 import { generatePlaylist, type GeneratePlaylistInput } from '@/ai/flows/generate-playlist-flow';
 import { getRandomPlexTracks } from '@/lib/plex';
-import type { PlaylistItem, DJCharacter, CustomDJCharacter, Station } from '@/lib/types';
+import type { PlaylistItem, DJCharacter, CustomDJCharacter } from '@/lib/types';
 
 export async function addMessageToStation(
   stationId: string, 
@@ -37,7 +38,7 @@ export async function addMessageToStation(
       url: '',
       duration: 15,
       artist: dj.name,
-      addedAt: new Date().toISOString(),
+      addedAt: safeToISOString(new Date()),
     };
     
     const stationRef = doc(db, 'stations', stationId);
@@ -71,7 +72,7 @@ export async function addMusicToStation(
 
     const newTrack = {
       ...musicTrack,
-      addedAt: new Date().toISOString(),
+      addedAt: safeToISOString(new Date()),
     };
 
     const stationRef = doc(db, 'stations', stationId);
@@ -129,7 +130,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
           artist: dj.name,
           duration: 12,
           url: '',
-          addedAt: new Date().toISOString(),
+          addedAt: safeToISOString(new Date()),
         });
       } else {
         // Use real Plex track
@@ -139,7 +140,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
             ...plexTrack,
             id: `regen-${Date.now()}-plex-${index}`,
             content: item.content || plexTrack.title,
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           });
           plexIndex++;
         } else {
@@ -152,7 +153,7 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
             artist: 'Station Radio',
             duration: 180,
             url: '',
-            addedAt: new Date().toISOString(),
+            addedAt: safeToISOString(new Date()),
           });
         }
       }
@@ -170,52 +171,4 @@ export async function regenerateStationPlaylist(stationId: string): Promise<{ su
     console.error('Error regenerating playlist:', error);
     return { error: `Erreur de l'IA lors de la régénération: ${error.message}` };
   }
-}
-
-export async function deletePlaylistItem(
-  stationId: string, 
-  trackId: string
-): Promise<Station | null> {
-  const station = await getStationById(stationId);
-  if (!station) return null;
-
-  const newPlaylist = station.playlist.filter(track => track.id !== trackId);
-  
-  return await updateDoc(doc(db, 'stations', stationId), { playlist: newPlaylist })
-    .then(() => ({ ...station, playlist: newPlaylist }));
-}
-
-export async function reorderPlaylistItems(
-  stationId: string, 
-  newOrder: string[]
-): Promise<Station | null> {
-  const station = await getStationById(stationId);
-  if (!station) return null;
-
-  const newPlaylist = newOrder.map(id => {
-    const track = station.playlist.find(t => t.id === id);
-    if (!track) throw new Error(`Piste ${id} non trouvée`);
-    return track;
-  });
-
-  return await updateDoc(doc(db, 'stations', stationId), { playlist: newPlaylist })
-    .then(() => ({ ...station, playlist: newPlaylist }));
-}
-
-export async function addPlaylistItems(
-  stationId: string,
-  tracks: Omit<PlaylistItem, 'id'>[]
-): Promise<Station | null> {
-  const stationRef = doc(db, 'stations', stationId);
-  const newTracks = tracks.map(track => ({
-    ...track,
-    id: `added-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    addedAt: new Date().toISOString(),
-  }));
-
-  await updateDoc(stationRef, {
-    playlist: arrayUnion(...newTracks)
-  });
-
-  return getStationById(stationId);
 }

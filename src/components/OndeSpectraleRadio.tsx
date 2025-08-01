@@ -1,9 +1,10 @@
-// src/components/OndeSpectraleRadio.tsx
+// src/components/OndeSpectraleRadio.tsx - Version mise à jour avec le nouveau système de playlist
+
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useRadioStore } from '@/shared/stores/useRadioStore';
-import { getStationForFrequency, createDefaultStations, getCustomCharactersForUser, updateUserOnLogin } from '@/app/actions';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useDebounce } from 'use-debounce';
+import { getStationForFrequency, updateUserFrequency, getCustomCharactersForUser } from '@/app/actions';
 import type { Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -12,13 +13,6 @@ import { useRouter } from 'next/navigation';
 
 // Hooks personnalisés
 import { usePlaylistManager } from '@/hooks/usePlaylistManager';
-import { useRadioSoundEffects } from '@/hooks/useRadioSoundEffects';
-import { useStationSync, useStationForFrequency } from '@/hooks/useStationSync';
-import { useAutoPlay } from '@/hooks/useAutoPlay';
-import { radioDebug } from '@/lib/debug';
-
-// Services
-import { interferenceAudioService } from '@/services/InterferenceAudioService';
 
 // Composants UI
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,26 +21,18 @@ import { Button } from '@/components/ui/button';
 import { OndeSpectraleLogo } from '@/components/icons';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumAnalyzer } from '@/components/SpectrumAnalyzer';
-import { StationSkeleton, SpectrumSkeleton } from '@/components/LoadingSkeleton';
 import { EnhancedPlaylist } from '@/components/EnhancedPlaylist';
 import { EmergencyAlertSystem } from '@/components/EmergencyAlertSystem';
 
-// Memoized components for performance
-const MemoizedAudioPlayer = React.memo(AudioPlayer);
-const MemoizedSpectrumAnalyzer = React.memo(SpectrumAnalyzer);
-const MemoizedEnhancedPlaylist = React.memo(EnhancedPlaylist);
-const MemoizedEmergencyAlertSystem = React.memo(EmergencyAlertSystem);
-
-import {
-  RadioTower,
-  Rss,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  UserCog,
+import { 
+  RadioTower, 
+  Rss, 
+  ChevronLeft, 
+  ChevronRight, 
+  Zap, 
+  UserCog, 
   Settings,
-  ListMusic,
-  RefreshCw
+  ListMusic
 } from 'lucide-react';
 
 interface ParticleStyle {
@@ -57,94 +43,51 @@ interface ParticleStyle {
 }
 
 export function OndeSpectraleRadio() {
-  const router = useRouter();
+  // État de base
+  const [frequency, setFrequency] = useState(92.1);
+  const [debouncedFrequency] = useDebounce(frequency, 500);
+  const [currentStation, setCurrentStation] = useState<Station | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [allDjs, setAllDjs] = useState<(DJCharacter | CustomDJCharacter)[]>(DJ_CHARACTERS);
-  const [showPlaylist, setShowPlaylist] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-
-  // Optimized particle generation with useMemo
-  const particleStyles = useMemo<ParticleStyle[]>(() => 
-    Array.from({ length: 15 }, (_, i) => ({
-      left: `${(i * 7 + Math.sin(i) * 20) % 100}%`,
-      top: `${(i * 13 + Math.cos(i) * 20) % 100}%`,
-      animationDelay: `${(i * 0.3) % 5}s`,
-      animationDuration: `${3 + (i % 4)}s`,
-    })), []
-  );
-
-  const {
-    frequency,
-    sliderValue,
-    isScanning,
-    signalStrength,
-    setFrequency,
-    setSliderValue,
-    setIsScanning,
-    setSignalStrength,
-    setError
-  } = useRadioStore();
-
-  // Nouveau système de synchronisation des stations
-  const { notifyStationsUpdated } = useStationSync();
-  const { 
-    station: currentStation, 
-    isLoading: isLoadingStation, 
-    error: stationError,
-    refresh: refreshStation 
-  } = useStationForFrequency(frequency);
-
-  // Effet pour mettre à jour la force du signal selon la station
-  useEffect(() => {
-    const newSignalStrength = currentStation 
-      ? Math.floor(Math.random() * 20) + 80 
-      : Math.floor(Math.random() * 30) + 10;
-    setSignalStrength(newSignalStrength);
-    
-    if (stationError) {
-      setError(`Erreur de données: ${stationError}`);
-    } else {
-      setError(null);
-    }
-  }, [currentStation, stationError, setSignalStrength, setError]);
-
   
+  // Interface
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [signalStrength, setSignalStrength] = useState(0);
+  const [particleStyles, setParticleStyles] = useState<ParticleStyle[]>([]);
+  const [isClient, setIsClient] = useState(false);
+  
+  const router = useRouter();
+
+  // Hook de gestion de playlist
   const playlistManager = usePlaylistManager({
     station: currentStation,
     user,
     allDjs
   });
 
-  const radioSounds = useRadioSoundEffects({
-    volume: 0.2,
-    enableEffects: false,
-    fadeInDuration: 300,
-    fadeOutDuration: 200
-  });
-
-  // Hook pour gérer l'autoplay automatique et les interférences
-  const { 
-    isAudioInitialized, 
-    autoPlayReady, 
-  } = useAutoPlay({
-    frequency,
-    currentStation,
-    playlistManager
-  });
-  
-  // Initial setup effect, runs only once
+  // Initialisation
   useEffect(() => {
     setIsClient(true);
     
-    const init = async () => {
-      await createDefaultStations();
-      // La station sera automatiquement chargée par useStationForFrequency
-    };
-    init();
+    // Génération des particules
+    setParticleStyles(
+      Array.from({ length: 15 }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 5}s`,
+        animationDuration: `${3 + Math.random() * 4}s`,
+      }))
+    );
 
+    // Authentification
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
       if (currentUser) {
+        // Charger les DJ personnalisés
         try {
           const customDjs = await getCustomCharactersForUser(currentUser.uid);
           setAllDjs([...DJ_CHARACTERS, ...customDjs]);
@@ -154,248 +97,253 @@ export function OndeSpectraleRadio() {
       }
     });
 
-    return () => unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return unsubscribe;
   }, []);
 
-  const handleScan = useCallback(async (direction: 'up' | 'down') => {
-    if (isScanning) return;
-    
-    setIsScanning(true);
-    radioSounds.playTuning();
-    
-    // Jouer le son de scan radio pendant le balayage si l'audio est initialisé
-    if (isAudioInitialized) {
-      try {
-        await interferenceAudioService.playInterference(frequency, 'medium');
-      } catch (error) {
-        console.warn('Erreur scan interférence:', error);
-      }
-    }
-    
-    let newFrequency = sliderValue;
-    const intervalId = setInterval(async () => {
-      newFrequency += direction === 'up' ? 0.1 : -0.1;
-      const clampedFreq = Math.max(87.0, Math.min(108.0, newFrequency));
-      setSliderValue(clampedFreq);
-      
-      // Jouer différents types d'interférence pendant le scan
-      if (isAudioInitialized) {
-        try {
-          await interferenceAudioService.playInterference(clampedFreq, 'low');
-        } catch (error) {
-          // Ignore les erreurs pendant le scan rapide
-        }
-      }
-    }, 50);
+  // Récupération des données de station
+  useEffect(() => {
+    const fetchStationData = async () => {
+      setIsLoading(true);
+      setError(null);
 
-    setTimeout(() => {
-      clearInterval(intervalId);
-      const finalFrequency = Math.round(newFrequency * 2)/2;
-      const clampedFrequency = Math.max(87.0, Math.min(108.0, finalFrequency));
-      setFrequency(clampedFrequency);
-      setSliderValue(clampedFrequency);
-      // La station sera automatiquement chargée par useStationForFrequency
-      // L'interférence sera gérée par l'effet useEffect
-      setIsScanning(false);
-    }, 1000);
-  }, [isScanning, sliderValue, frequency, isAudioInitialized, radioSounds, setIsScanning, setSliderValue, setFrequency]);
+      try {
+        const station = await getStationForFrequency(debouncedFrequency);
+        
+        // Calcul de la force du signal
+        const newSignalStrength = station 
+          ? Math.floor(Math.random() * 20) + 80 
+          : Math.floor(Math.random() * 30) + 10;
+        
+        setSignalStrength(newSignalStrength);
+        setCurrentStation(station);
+        
+      } catch (err: any) {
+        setError(`Erreur de données: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStationData();
+  }, [debouncedFrequency]);
+
+  // Gestion du scan des fréquences
+  const handleScanUp = useCallback(() => {
+    if (isScanning) return;
+    setIsScanning(true);
+    const newFreq = Math.min(108.0, frequency + 0.5);
+    setFrequency(newFreq);
+    setTimeout(() => setIsScanning(false), 1000);
+  }, [frequency, isScanning]);
+
+  const handleScanDown = useCallback(() => {
+    if (isScanning) return;
+    setIsScanning(true);
+    const newFreq = Math.max(87.0, frequency - 0.5);
+    setFrequency(newFreq);
+    setTimeout(() => setIsScanning(false), 1000);
+  }, [frequency, isScanning]);
 
   const handleFrequencyChange = (value: number[]) => {
-    setSliderValue(value[0]);
+    setFrequency(value[0]);
   };
 
-  const handleFrequencyCommit = useCallback(async (value: number[]) => {
-    const newFreq = value[0];
-    setFrequency(newFreq);
-    
-    // Arrêter toute interférence existante puis vérifier la nouvelle fréquence
-    if (isAudioInitialized) {
-      interferenceAudioService.stopInterference();
-      // L'interférence sera automatiquement gérée par le hook useAutoPlay
-    }
-    
-    // La station sera automatiquement chargée par useStationForFrequency
+  const handleFrequencyCommit = async (value: number[]) => {
     if (user) {
-      await updateUserOnLogin(user.uid, user.email);
+      await updateUserFrequency(user.uid, value[0]);
     }
-  }, [setFrequency, user, isAudioInitialized]);
+  };
 
-  const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
+  // État calculé
+  const isRadioActive = useMemo(() => {
+    return isClient && !isLoading && currentStation !== null;
+  }, [isClient, isLoading, currentStation]);
 
   return (
     <>
-      <audio
-        ref={playlistManager.audioRef}
-        crossOrigin="anonymous"
-        preload="metadata"
-      />
+      <audio ref={playlistManager.audioRef} crossOrigin="anonymous" preload="metadata" />
       
-      <div className="relative w-full min-h-[90vh] overflow-hidden bg-background">
-        {isClient && particleStyles.map((style, i) => (
-          <div
-            key={i}
-            className="absolute w-px h-px bg-primary/30 rounded-full animate-float"
-            style={style}
+      <div className="relative w-full min-h-[90vh] overflow-hidden">
+        {/* Arrière-plans et effets */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-black to-zinc-900"></div>
+        
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-red-700/20 rounded-full blur-2xl animate-pulse delay-1000"></div>
+        </div>
+        
+        <div className="absolute inset-0 opacity-10">
+          <div 
+            className="w-full h-full"
+            style={{
+              backgroundImage: `linear-gradient(90deg, transparent 49%, rgba(255, 165, 0, 0.3) 49%, rgba(255, 165, 0, 0.3) 51%, transparent 51%),
+                              linear-gradient(0deg, transparent 49%, rgba(255, 165, 0, 0.2) 49%, rgba(255, 165, 0, 0.2) 51%, transparent 51%)`,
+              backgroundSize: '50px 50px',
+              animation: 'drift 20s linear infinite'
+            }}
           />
-        ))}
+        </div>
+        
+        {/* Particules */}
+        {isClient && (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {particleStyles.map((style, i) => (
+              <div 
+                key={i} 
+                className="absolute w-1 h-1 bg-orange-400/50 rounded-full animate-float" 
+                style={style} 
+              />
+            ))}
+          </div>
+        )}
 
+        {/* Contenu principal */}
         <div className="relative z-10 flex min-h-[90vh] w-full flex-col items-center justify-center p-4 sm:p-6 md:p-8">
           <div className="w-full max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
+              {/* Panneau de contrôle principal */}
               <div className="lg:col-span-2">
-                <Card className="w-full pip-boy-terminal shadow-2xl relative overflow-hidden fade-in">
-                  <CardHeader className="relative border-b-2 border-primary/40 pb-4">
+                <Card className="w-full border-2 border-orange-500/30 bg-black/80 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-orange-400/50 to-transparent animate-scanline"></div>
+                  </div>
+                  <div className="absolute inset-1 border border-orange-400/20 rounded-lg pointer-events-none animate-pulse-subtle"></div>
+                  
+                  <CardHeader className="relative border-b-2 border-orange-500/30 pb-4 bg-gradient-to-r from-black/90 to-zinc-900/90">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <OndeSpectraleLogo className="h-8 w-8 text-primary phosphor-glow drop-shadow-lg" />
+                          <OndeSpectraleLogo className="h-8 w-8 text-orange-400 drop-shadow-lg" />
+                          <div className="absolute inset-0 bg-orange-400/30 blur-sm animate-pulse"></div>
                         </div>
-                        <CardTitle className="font-headline text-3xl text-primary tracking-wider drop-shadow-lg uppercase">
-                          <span className="inline-block">Onde Spectrale</span>
+                        <CardTitle className="font-headline text-3xl text-orange-100 tracking-wider drop-shadow-lg">
+                          <span className="inline-block animate-flicker">Onde Spectrale</span>
                         </CardTitle>
                       </div>
                       
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="retro-button"
-                          onClick={() => router.push('/admin')}
-                        >
-                          <UserCog className="mr-1 h-4 w-4" /> Admin
-                        </Button>
-                        
-                        {isRadioActive && (
-                          <Button
-                            variant="outline"
-                            size="sm"
+                      <div className="flex items-center gap-2">
+                        {/* Bouton playlist */}
+                        {currentStation && currentStation.playlist.length > 0 && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
                             onClick={() => setShowPlaylist(!showPlaylist)}
-                            className="retro-button"
+                            className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300"
                           >
                             <ListMusic className="mr-2 h-4 w-4" /> 
                             Playlist ({playlistManager.playlistLength})
                           </Button>
                         )}
                         
+                        {/* Boutons utilisateur */}
                         {user ? (
                           <>
                             {currentStation && currentStation.ownerId === user.uid && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="retro-button"
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-orange-500/30 hover:bg-orange-500/20 text-orange-300" 
                                 onClick={() => router.push(`/admin/stations/${currentStation.id}`)}
                               >
                                 <Settings className="mr-2 h-4 w-4" /> Gérer
                               </Button>
                             )}
+                            <Button 
+                              variant="default" 
+                              className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" 
+                              onClick={() => router.push('/admin')}
+                            >
+                              <UserCog className="mr-2 h-4 w-4" /> Admin
+                            </Button>
                           </>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="retro-button"
+                          <Button 
+                            variant="default" 
+                            className="bg-orange-600/80 text-orange-100 hover:bg-orange-500/90 border border-orange-400/50 shadow-lg shadow-orange-500/20" 
                             onClick={() => router.push('/login')}
                           >
-                            <Rss className="mr-2 h-4 w-4" /> Connexion
+                            <Rss className="mr-2 h-4 w-4" /> Créer ou Gérer
                           </Button>
                         )}
                       </div>
                     </div>
                   </CardHeader>
                   
-                  <CardContent className="p-6 relative">
+                  <CardContent className="p-6 relative bg-gradient-to-br from-black/70 to-zinc-900/70">
                     <div className="flex flex-col gap-6">
-                      <div className="vintage-radio-frame pip-boy-terminal p-6 shadow-2xl relative overflow-hidden slide-up">
+                      
+                      {/* Syntoniseur */}
+                      <div className="bg-black/80 border-2 border-orange-500/40 rounded-lg p-6 backdrop-blur-sm shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-20 pointer-events-none">
+                          <div className={`w-full h-full bg-gradient-to-r from-transparent via-orange-400/30 to-transparent ${isScanning ? 'animate-scan' : ''}`}></div>
+                        </div>
+                        
                         <div className="relative z-10 space-y-4">
                           <div className="flex items-center justify-between">
-                            <label htmlFor="frequency" className="text-sm font-mono font-bold text-primary/80 tracking-wider uppercase">
-                              {'>>>'} Syntoniseur {'<<<'}
+                            <label htmlFor="frequency" className="text-sm font-medium text-orange-300/80 font-headline tracking-wider uppercase">
+                              Syntoniseur
                             </label>
                             <div className="flex items-center gap-2">
-                              <Zap className="h-4 w-4 text-primary" />
+                              <Zap className="h-4 w-4 text-orange-400" />
                               <div className="flex gap-1">
                                 {[...Array(5)].map((_, i) => (
                                   <div
                                     key={i}
-                                    className={`w-2 h-5 rounded-sm transition-all duration-300 ${
-                                      i < Math.floor(signalStrength / 20)
-                                        ? 'bg-primary shadow-lg'
-                                        : 'bg-muted'
+                                    className={`w-1 h-4 rounded-full transition-all duration-300 ${
+                                      i < Math.floor(signalStrength / 20) 
+                                        ? 'bg-orange-400 shadow-lg shadow-orange-400/50' 
+                                        : 'bg-gray-600'
                                     }`}
                                   />
                                 ))}
                               </div>
-                              <span className="text-xs text-muted-foreground font-mono w-12">
-                                SIG:{signalStrength}%
+                              <span className="text-xs text-orange-300/60 font-mono w-8">
+                                {signalStrength}%
                               </span>
-                              {process.env.NODE_ENV === 'development' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={refreshStation}
-                                  className="h-6 w-6 p-0 ml-2"
-                                  title="Rafraîchir la station"
-                                >
-                                  <RefreshCw className="h-3 w-3" />
-                                </Button>
-                              )}
-                              {process.env.NODE_ENV === 'development' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => radioDebug.testFrequency(frequency)}
-                                  className="h-6 w-6 p-0 ml-2"
-                                  title="Debug fréquence"
-                                >
-                                  🐛
-                                </Button>
-                              )}
                             </div>
                           </div>
 
                           <div className="text-center">
-                            <div className="text-6xl font-mono font-bold tracking-widest relative mb-2 text-primary frequency-display">
-                              <span>
-                                {sliderValue.toFixed(1)}
+                            <div className="text-6xl font-headline font-bold text-orange-400 tracking-widest drop-shadow-lg relative">
+                              <span className={`${currentStation ? 'animate-flicker-subtle' : 'animate-flicker'}`}>
+                                {frequency.toFixed(1)}
                               </span>
-                              <span className="text-2xl ml-3 text-primary/70">MHz</span>
+                              <span className="text-3xl text-orange-300 ml-2">MHz</span>
                               
                               {currentStation && (
-                                <div className="absolute -top-2 -right-2 w-4 h-4 bg-primary rounded-full animate-pulse shadow-lg"></div>
+                                <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50"></div>
                               )}
                             </div>
                             
                             {isScanning && (
-                              <div className="text-primary text-sm mt-2 animate-pulse font-mono uppercase tracking-wider">
-                                {'>>>'} SCAN EN COURS {'<<<'}
+                              <div className="text-orange-300/60 text-sm mt-2 animate-pulse">
+                                SCAN EN COURS...
                               </div>
                             )}
                           </div>
 
                           <div className="flex items-center justify-center gap-4">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleScan('down')}
-                              disabled={frequency <= 87.0 || isScanning}
-                              className="retro-button disabled:opacity-50"
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={handleScanDown} 
+                              disabled={frequency <= 87.0 || isScanning} 
+                              className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50"
                             >
-                              <ChevronLeft className="h-4 w-4 mr-1" /> SCAN-
+                              <ChevronLeft className="h-4 w-4 mr-1" /> SCAN
                             </Button>
-                            <div className="text-muted-foreground px-4 py-2 text-xs font-mono">
+                            <div className="px-4 py-2 bg-black/60 border border-orange-500/20 rounded text-orange-300/80 text-xs font-mono">
                               87.0 - 108.0 MHz
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleScan('up')}
-                              disabled={frequency >= 108.0 || isScanning}
-                              className="retro-button disabled:opacity-50"
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={handleScanUp} 
+                              disabled={frequency >= 108.0 || isScanning} 
+                              className="border border-orange-500/30 hover:bg-orange-500/20 text-orange-300 disabled:opacity-50"
                             >
-                              SCAN+ <ChevronRight className="h-4 w-4 ml-1" />
+                              SCAN <ChevronRight className="h-4 w-4 ml-1" />
                             </Button>
                           </div>
 
@@ -405,83 +353,76 @@ export function OndeSpectraleRadio() {
                               min={87.0}
                               max={108.0}
                               step={0.1}
-                              value={[sliderValue]}
+                              value={[frequency]}
                               onValueChange={handleFrequencyChange}
                               onValueCommit={handleFrequencyCommit}
                               className="w-full"
-                              disabled={isScanning}
+                              disabled={!!error || isScanning}
                             />
-                            <div className="flex justify-between text-xs text-muted-foreground font-mono">
+                            <div className="flex justify-between text-xs text-orange-400/60 font-mono">
                               <span>87.0</span><span>95.0</span><span>108.0</span>
                             </div>
                           </div>
 
-                          <div className="text-center space-y-2">
+                          <div className="text-center">
                             {currentStation ? (
-                              <div className="space-y-2">
-                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/30 rounded-full text-primary text-sm">
-                                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse mr-1"></div>
-                                  {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
-                                   playlistManager.isPlaying ? (autoPlayReady ? 'TRANSMISSION AUTO ♪' : 'TRANSMISSION EN COURS') : 
-                                   (autoPlayReady ? 'STATION ACTIVE' : 'CONNEXION ÉTABLIE')}
-                                </div>
+                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-500/30 rounded-full text-green-300 text-sm">
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                {playlistManager.isLoadingTrack ? 'CHARGEMENT...' : 
+                                 playlistManager.isPlaying ? 'TRANSMISSION EN COURS' : 'CONNEXION ÉTABLIE'}
                               </div>
                             ) : (
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-destructive/10 border border-destructive/30 rounded-full text-destructive text-sm">
-                                <div className="w-2 h-2 bg-destructive rounded-full animate-pulse mr-1"></div>
-                                {isLoadingStation ? 'ANALYSE DU SPECTRE...' : 
-                                 isAudioInitialized ? 'INTERFÉRENCE RADIO' : 'STATIQUE'}
+                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-900/30 border border-red-500/30 rounded-full text-red-300 text-sm">
+                                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                                {isLoading ? 'ANALYSE DU SPECTRE...' : 'STATIQUE'}
                               </div>
                             )}
                           </div>
                         </div>
                       </div>
                       
-                      {isLoadingStation ? (
-                        <SpectrumSkeleton className="h-24" />
-                      ) : (
-                        <MemoizedSpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
-                      )}
+                      {/* Analyseur de spectre */}
+                      <SpectrumAnalyzer isPlaying={playlistManager.isPlaying} className="h-24" />
                       
-                      <MemoizedAudioPlayer
-                        track={playlistManager.currentTrack}
-                        isPlaying={playlistManager.isPlaying}
+                      {/* Lecteur audio */}
+                      <AudioPlayer 
+                        track={playlistManager.currentTrack} 
+                        isPlaying={playlistManager.isPlaying} 
                         isLoading={playlistManager.isLoadingTrack}
-                        audioRef={playlistManager.audioRef}
-                        ttsMessage={playlistManager.ttsMessage}
-                        errorMessage={playlistManager.errorMessage}
-                        ttsEnabled={playlistManager.ttsEnabled}
-                        onEnableTTS={playlistManager.enableTTS}
-                        onPlayPause={playlistManager.togglePlayPause}
-                        onEnded={playlistManager.nextTrack}
+                        audioRef={playlistManager.audioRef} 
                       />
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {(isRadioActive && currentStation && showPlaylist) && (
-                <div className="lg:col-span-1 transition-opacity duration-500">
-                     <MemoizedEnhancedPlaylist
-                        playlist={currentStation.playlist}
-                        currentTrackId={playlistManager.currentTrack?.id}
-                        isPlaying={playlistManager.isPlaying}
-                        isLoadingTrack={playlistManager.isLoadingTrack}
-                        failedTracks={playlistManager.failedTracks}
-                        onTrackSelect={playlistManager.playTrackById}
-                        onPlayPause={playlistManager.togglePlayPause}
-                        onNext={playlistManager.nextTrack}
-                        onPrevious={playlistManager.previousTrack}
-                        canGoBack={playlistManager.canGoBack}
-                        className="h-full"
-                      />
+              {/* Panneau playlist (conditionnellement affiché) */}
+              {(showPlaylist && currentStation && currentStation.playlist.length > 0) && (
+                <div className="lg:col-span-1">
+                  <EnhancedPlaylist
+                    playlist={currentStation.playlist}
+                    currentTrackIndex={playlistManager.currentTrackIndex}
+                    currentTrack={playlistManager.currentTrack}
+                    isPlaying={playlistManager.isPlaying}
+                    isLoadingTrack={playlistManager.isLoadingTrack}
+                    failedTracks={playlistManager.failedTracks}
+                    onTrackSelect={async (index: number) => {
+                      await playlistManager.playTrack(index);
+                    }}
+                    onPlayPause={playlistManager.togglePlayPause}
+                    onNext={playlistManager.nextTrack}
+                    onPrevious={playlistManager.previousTrack}
+                    canGoBack={playlistManager.canGoBack}
+                    className="h-full"
+                  />
                 </div>
               )}
             </div>
           </div>
         </div>
         
-        <MemoizedEmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
+        {/* Système d'alerte d'urgence */}
+        <EmergencyAlertSystem isRadioActive={isRadioActive} currentFrequency={frequency} />
       </div>
     </>
   );

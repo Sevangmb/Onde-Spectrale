@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "📋 Post-commit maintenance..."
+
+# Get commit info
+commit_hash=$(git rev-parse HEAD)
+commit_msg=$(git log --format=%s -n 1 HEAD)
+
+# Update package-lock.json if package.json was modified
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "package.json"; then
+  echo "📦 Package.json modified, ensuring package-lock.json is up to date..."
+  npm install --package-lock-only
+  if [ -n "$(git status --porcelain package-lock.json)" ]; then
+    echo "⚠️  package-lock.json was updated. Consider committing the changes."
+  fi
+fi
+
+# Check for merge conflicts markers
+echo "🔍 Checking for merge conflict markers..."
+conflict_files=$(git ls-files | xargs grep -l '<<<<<<< HEAD\|======= \|>>>>>>> ' 2>/dev/null || true)
+if [ -n "$conflict_files" ]; then
+  echo "⚠️  Merge conflict markers found in:" 
+  echo "$conflict_files"
+fi
+
+# Performance tracking
+if command -v node >/dev/null 2>&1; then
+  # Track bundle size changes
+  if [ -f "package.json" ] && [ -f ".next/static" ] 2>/dev/null; then
+    echo "📊 Tracking build metrics..."
+    # This could be expanded with actual bundle analysis
+  fi
+fi
+
+echo "✅ Post-commit maintenance completed for: $commit_msg"

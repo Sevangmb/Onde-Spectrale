@@ -1,8 +1,7 @@
-// src/hooks/useAutoPlay.ts
 'use client';
 
-import { useEffect, useCallback, useState, useRef } from 'react';
-import { interferenceAudioService } from '@/services/InterferenceAudioService';
+import { useEffect, useCallback, useState } from 'react';
+// Import dynamique d'InterferenceAudioService pour éviter les erreurs SSR
 
 interface UseAutoPlayProps {
   frequency: number;
@@ -16,14 +15,20 @@ interface UseAutoPlayProps {
 export function useAutoPlay({ frequency, currentStation, playlistManager }: UseAutoPlayProps) {
   const [isAudioInitialized, setIsAudioInitialized] = useState(false);
   const [autoPlayReady, setAutoPlayReady] = useState(false);
-  const initAttempted = useRef(false);
+  const [interferenceAudioService, setInterferenceAudioService] = useState<any>(null);
 
-  // Fonction d'initialisation complète de l'audio, déclenchée par la première interaction utilisateur
+  // Charger le service d'interférence dynamiquement
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('@/services/InterferenceAudioService').then(({ interferenceAudioService }) => {
+        setInterferenceAudioService(interferenceAudioService);
+      }).catch(console.error);
+    }
+  }, []);
+
+  // Fonction d'initialisation complète de l'audio
   const initializeAudio = useCallback(async () => {
-    if (isAudioInitialized || initAttempted.current) return;
-    initAttempted.current = true;
-    
-    console.log('🎬 User interaction detected, attempting to initialize audio...');
+    if (isAudioInitialized || !interferenceAudioService) return true;
 
     try {
       // Test si l'autoplay est possible
@@ -42,49 +47,61 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
         setIsAudioInitialized(true);
         setAutoPlayReady(true);
         
-        console.log('🎵 Audio initialized successfully');
-        
-        // Démarrer immédiatement l'audio approprié après l'initialisation
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error) {
+      console.warn('Erreur initialisation audio:', error);
+      return false;
+    }
+  }, [isAudioInitialized, playlistManager, interferenceAudioService]);
+
+  // Fonction pour gérer l'interaction utilisateur
+  const handleUserInteraction = useCallback(async () => {
+    if (!isAudioInitialized && interferenceAudioService) {
+      const success = await initializeAudio();
+      
+      if (success) {
+        // Démarrer immédiatement l'audio approprié
         if (currentStation) {
+          // Station trouvée : démarrer la playlist
           if (playlistManager?.currentTrack && !playlistManager.isPlaying) {
             playlistManager.togglePlayPause();
           } else if (!playlistManager?.currentTrack && currentStation.playlist.length > 0) {
             playlistManager.togglePlayPause();
           }
         } else {
+          // Pas de station : jouer l'interférence
           await interferenceAudioService.transitionToFrequency(frequency, false);
         }
-
-      } else {
-        console.log('⚠️ Autoplay blocked by browser.');
       }
-    } catch (error) {
-      console.warn('⚠️ Failed to initialize audio:', error);
     }
-  }, [isAudioInitialized, playlistManager, currentStation, frequency]);
+  }, [isAudioInitialized, currentStation, frequency, playlistManager, initializeAudio, interferenceAudioService]);
 
-  // Effet pour ajouter un écouteur d'événement pour la première interaction
+  // Effet pour tenter l'autoplay au chargement
   useEffect(() => {
-    // S'assurer que le code ne s'exécute que côté client
-    if (typeof window === 'undefined') return;
-
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    // Événements qui comptent comme une interaction utilisateur
-    const interactionEvents: (keyof DocumentEventMap)[] = ['click', 'touchstart', 'keydown'];
-
-    // Attacher les écouteurs d'événements
-    interactionEvents.forEach(event => {
-      document.addEventListener(event, initializeAudio, { once: true, signal });
-    });
-
-    // Nettoyer les écouteurs lorsque le composant est démonté
-    return () => {
-      controller.abort();
+    const attemptAutoPlay = async () => {
+      // Attendre un peu que le DOM soit prêt
+      setTimeout(async () => {
+        const success = await initializeAudio();
+        
+        if (success) {
+          // Démarrer automatiquement selon le contexte
+          if (currentStation) {
+            if (playlistManager?.autoPlayEnabled && currentStation.playlist.length > 0) {
+              playlistManager.togglePlayPause();
+            }
+          } else if (interferenceAudioService) {
+            // Jouer l'interférence si pas de station
+            await interferenceAudioService.transitionToFrequency(frequency, false);
+          }
+        }
+      }, 1000);
     };
-  }, [initializeAudio]);
 
+    attemptAutoPlay();
+  }, [interferenceAudioService, currentStation, frequency, initializeAudio, playlistManager]); // Dépendre de interferenceAudioService
 
   // Effet pour gérer les changements de station/fréquence
   useEffect(() => {
@@ -96,15 +113,33 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
       if (currentStation && playlistManager?.autoPlayEnabled && !playlistManager.isPlaying) {
         if (currentStation.playlist.length > 0) {
           setTimeout(() => {
-            if (playlistManager.togglePlayPause) playlistManager.togglePlayPause();
+            playlistManager.togglePlayPause();
           }, 500); // Petit délai pour la transition
         }
       }
     }
-  }, [currentStation, frequency, isAudioInitialized, playlistManager]);
+  }, [currentStation, frequency, isAudioInitialized, playlistManager, interferenceAudioService]);
+
+  // Effet pour configurer les événements d'interaction si l'autoplay n'est pas prêt
+  useEffect(() => {
+    if (!autoPlayReady) {
+      const events = ['click', 'touchstart', 'keydown'];
+      events.forEach(event => {
+        document.addEventListener(event, handleUserInteraction, { once: true });
+      });
+
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleUserInteraction);
+        });
+      };
+    }
+  }, [autoPlayReady, handleUserInteraction]);
 
   return {
     isAudioInitialized,
     autoPlayReady,
+    handleUserInteraction,
+    needsUserInteraction: !autoPlayReady
   };
 }

@@ -19,7 +19,7 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            La section des statistiques est en cours de développement. Revenez bientôt pour découvrir des données détaillées sur l'écoute de vos stations.
+            La section des statistiques est en cours de développement. Revenez bientôt pour découvrir des données détaillées sur l&apos;écoute de vos stations.
           </p>
         </CardContent>
       </Card>

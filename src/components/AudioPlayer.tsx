@@ -164,7 +164,7 @@ export function AudioPlayer({
             )}
             {ttsMessage && (
               <p className="text-sm text-accent phosphor-glow truncate italic font-mono">
-                "🎤 {ttsMessage.substring(0, 80)}{ttsMessage.length > 80 ? '...' : ''}"
+                &quot;🎤 {ttsMessage.substring(0, 80)}{ttsMessage.length > 80 ? '...' : ''}&quot;
               </p>
             )}
             {errorMessage && (

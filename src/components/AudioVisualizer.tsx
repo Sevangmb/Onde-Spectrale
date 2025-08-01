@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart3, Waves, Activity, Eye, EyeOff } from 'lucide-react';
@@ -37,7 +37,7 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
           analyserRef.current.fftSize = 256;
           analyserRef.current.smoothingTimeConstant = 0.8;
           
-          const source = audioContextRef.current.createMediaElementSource(audioRef.current);
+          const source = audioContextRef.current.createMediaElementSource(audioRef.current!);
           source.connect(analyserRef.current);
           analyserRef.current.connect(audioContextRef.current.destination);
           
@@ -55,17 +55,7 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
     setupAudioContext();
   }, [audioRef, isEnabled]);
 
-  useEffect(() => {
-    if (isPlaying && isEnabled && analyserRef.current && dataArrayRef.current) {
-      startVisualization();
-    } else {
-      stopVisualization();
-    }
-
-    return () => stopVisualization();
-  }, [isPlaying, isEnabled, visualizerType]);
-
-  const startVisualization = () => {
+  const startVisualization = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current || !dataArrayRef.current) return;
 
     const canvas = canvasRef.current;
@@ -96,7 +86,7 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
     };
 
     draw();
-  };
+  }, [visualizerType]);
 
   const stopVisualization = () => {
     if (animationRef.current) {
@@ -189,6 +179,16 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
       case 'circular': return <Activity className="h-4 w-4" />;
     }
   };
+
+  useEffect(() => {
+    if (isPlaying && isEnabled && analyserRef.current && dataArrayRef.current) {
+      startVisualization();
+    } else {
+      stopVisualization();
+    }
+
+    return () => stopVisualization();
+  }, [isPlaying, isEnabled, visualizerType, startVisualization]);
 
   return (
     <Card className={`border-orange-500/30 bg-black/40 backdrop-blur-sm ${className}`}>

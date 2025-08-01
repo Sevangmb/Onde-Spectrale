@@ -6,11 +6,13 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAdminLayout } from '../../layout';
 import { getStationById, addMessageToStation, addMusicToStation, searchMusic, regenerateStationPlaylist } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { safeGetTime } from '@/lib/dateUtils';
 import type { Station, PlaylistItem, CustomDJCharacter, DJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PlayerStatusCard } from '@/components/PlayerStatusCard';
+import { RealTimePlayerMonitor } from '@/components/admin/RealTimePlayerMonitor';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -135,7 +137,7 @@ export default function StationDetailPage() {
 
   const sortedPlaylist = useMemo(() => {
     if (!station?.playlist) return [];
-    return [...station.playlist].sort((a, b) => new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime());
+    return [...station.playlist].sort((a, b) => safeGetTime(b.addedAt || 0) - safeGetTime(a.addedAt || 0));
   }, [station?.playlist]);
 
   const formatDuration = (seconds: number) => {
@@ -162,7 +164,7 @@ export default function StationDetailPage() {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Station non trouvée</h1>
-        <p className="text-muted-foreground">Cette station n'existe pas ou vous n'y avez pas accès.</p>
+        <p className="text-muted-foreground">Cette station n&apos;existe pas ou vous n&apos;y avez pas accès.</p>
         <Button onClick={() => router.push('/admin/stations')} className="mt-4">Retour aux stations</Button>
       </div>
     );
@@ -175,9 +177,11 @@ export default function StationDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4"/>
           Retour à toutes les stations
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
-        <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
-        <PlayerStatusCard stationId={station.id} />
+                 <h1 className="text-3xl font-bold tracking-tight">{station.name}</h1>
+         <p className="text-muted-foreground">{station.frequency.toFixed(1)} MHz</p>
+         
+         {/* Real-time Player Monitoring */}
+         <RealTimePlayerMonitor stationId={station.id} stationName={station.name} />
 
       </div>
 
@@ -217,11 +221,11 @@ export default function StationDetailPage() {
          <Card className="lg:col-span-2">
             <CardHeader>
                 <CardTitle>Gestion de la Playlist</CardTitle>
-                 <CardDescription>La playlist de cette station est un mix de pistes générées par IA et d'ajouts manuels. Vous pouvez la régénérer à tout moment.</CardDescription>
+                 <CardDescription>La playlist de cette station est un mix de pistes générées par IA et d&apos;ajouts manuels. Vous pouvez la régénérer à tout moment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="space-y-2">
-                    <Label htmlFor="message-theme">Thème de la station pour l'IA</Label>
+                    <Label htmlFor="message-theme">Thème de la station pour l&apos;IA</Label>
                     <Input
                         id="message-theme"
                         value={station.theme}
@@ -229,7 +233,7 @@ export default function StationDetailPage() {
                         className="font-mono"
                     />
                      <p className="text-xs text-muted-foreground">
-                        Ce thème est utilisé par l'IA lors de la régénération de la playlist.
+                        Ce thème est utilisé par l&apos;IA lors de la régénération de la playlist.
                      </p>
                 </div>
                 <Button onClick={handleRegeneratePlaylist} disabled={isRegenerating} className="w-full">
@@ -293,7 +297,7 @@ export default function StationDetailPage() {
                             )}
                             {searchResults.length > 0 ? (
                                 <div className="p-2 space-y-2">
-                                    {searchResults.map(track => (
+                                    {searchResults && searchResults.map(track => (
                                         <Card key={track.id} className="p-2 flex items-center justify-between gap-2">
                                             <CardContent className="p-0 flex-grow overflow-hidden">
                                                 <p className="font-semibold text-sm truncate">{track.title}</p>
@@ -322,13 +326,13 @@ export default function StationDetailPage() {
        <Card>
           <CardHeader>
             <CardTitle>Playlist Actuelle</CardTitle>
-            <CardDescription>Les pistes sont jouées dans l'ordre de la radio (aléatoire pour l'instant).</CardDescription>
+            <CardDescription>Les pistes sont jouées dans l&apos;ordre de la radio (aléatoire pour l&apos;instant).</CardDescription>
           </CardHeader>
           <CardContent>
             {sortedPlaylist.length > 0 ? (
                 <ScrollArea className="h-96">
                     <div className="space-y-4">
-                        {sortedPlaylist.map((item) => (
+                        {sortedPlaylist && sortedPlaylist.map((item) => (
                             <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
                                 <div className="p-2 bg-muted rounded-md">
                                     {item.type === 'music' ? <Music className="h-5 w-5 text-muted-foreground"/> : <MessageSquare className="h-5 w-5 text-muted-foreground"/>}

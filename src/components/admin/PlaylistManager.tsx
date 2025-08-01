@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ import {
   BarChart3,
   Settings,
   Zap,
-  Template,
+
   Save,
   RefreshCw,
   FileText,
@@ -54,12 +54,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
 
   const templates = playlistManagerService.getAvailableTemplates();
 
-  // Load analytics on mount
-  useEffect(() => {
-    loadAnalytics();
-  }, [station.id]);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     try {
       const result = await playlistManagerService.analyzePlaylistPerformance(station.id);
       if (result.success) {
@@ -68,7 +63,12 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
     } catch (error) {
       console.error('Failed to load analytics:', error);
     }
-  };
+  }, [station.id]);
+
+  // Load analytics on mount
+  useEffect(() => {
+    loadAnalytics();
+  }, [station.id, loadAnalytics]);
 
   // Handle drag and drop
   const handleDragStart = (trackId: string) => {
@@ -477,7 +477,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
           <Card className="border-orange-500/30 bg-black/40 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-orange-400 flex items-center gap-2">
-                <Template className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
                 Templates de Playlist
               </CardTitle>
             </CardHeader>
@@ -525,7 +525,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
                     disabled={isLoading}
                     className="bg-orange-600 hover:bg-orange-700"
                   >
-                    <Template className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2" />
                     Appliquer le Template
                   </Button>
                 </div>
@@ -613,7 +613,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
                 <CardHeader>
                   <CardTitle className="text-orange-400 flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Vue d'ensemble
+                    Vue d&apos;ensemble
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

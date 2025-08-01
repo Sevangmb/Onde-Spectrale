@@ -1,7 +1,8 @@
 'use client';
 
 import type { Station, PlaylistItem, DJCharacter, CustomDJCharacter } from '@/lib/types';
-import { updateStation, deletePlaylistItem, reorderPlaylistItems, addPlaylistItems } from '@/app/actions';
+import { safeGetTime } from '@/lib/dateUtils';
+import { updateStation, deletePlaylistItem, reorderPlaylistItems, addPlaylistItems, getStationById } from '@/app/actions';
 
 export interface AdvancedStationServiceInterface {
   // DJ Management
@@ -57,12 +58,10 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
     try {
       console.log(`🎤 Changing DJ for station ${stationId} to ${newDJId}`);
       
-      const updatedStation = await updateStation(stationId, {
-        djCharacterId: newDJId,
-      });
+      const updatedStation = await updateStation(stationId, { djCharacterId: newDJId });
 
       if (!updatedStation) {
-        throw new Error(`Station ${stationId} not found`);
+        throw new Error('Failed to update station DJ');
       }
 
       console.log(`✅ DJ changed successfully for station ${updatedStation.name}`);
@@ -155,7 +154,6 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
   async moveTrack(stationId: string, fromIndex: number, toIndex: number): Promise<Station> {
     try {
       // Récupérer la station actuelle pour construire le nouvel ordre
-      const { getStationById } = await import('@/actions/stations/queries');
       const station = await getStationById(stationId);
       
       if (!station) {
@@ -275,7 +273,7 @@ export class AdvancedStationService implements AdvancedStationServiceInterface {
     // Pistes les plus anciennes/récentes
     const sortedByDate = playlist
       .filter(track => track.addedAt)
-      .sort((a, b) => new Date(a.addedAt!).getTime() - new Date(b.addedAt!).getTime());
+      .sort((a, b) => safeGetTime(a.addedAt) - safeGetTime(b.addedAt));
     
     const oldestTrack = sortedByDate[0];
     const newestTrack = sortedByDate[sortedByDate.length - 1];

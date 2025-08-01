@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Music, Calendar, Disc, User } from 'lucide-react';
@@ -30,9 +31,11 @@ export function EnhancedMusicDisplay({ track, className = '' }: EnhancedMusicDis
           {/* Artwork */}
           <div className="flex-shrink-0">
             {track.artwork ? (
-              <img
+              <Image
                 src={track.artwork}
                 alt={`${track.album || track.title} artwork`}
+                width={96}
+                height={96}
                 className="w-24 h-24 rounded-lg object-cover border-2 border-orange-500/30 shadow-lg"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';

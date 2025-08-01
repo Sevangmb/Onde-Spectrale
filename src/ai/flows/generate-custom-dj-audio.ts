@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -12,6 +11,7 @@ import {ai} from '@/ai/genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {z} from 'genkit';
 import wav from 'wav';
+import logger from '@/lib/logger';
 
 // Define a mapping from your simplified gender/style to Google TTS voice names
 const voiceMap: { [key: string]: { [key: string]: string } } = {
@@ -37,6 +37,8 @@ const VoiceInputSchema = z.object({
   gender: z.string().describe('The gender of the voice (e.g., "male", "female").'),
   tone: z.string().describe('The tone of the voice (e.g., "deep", "medium", "high").'),
   style: z.string().describe('The speaking style (e.g., "calm", "energetic", "joker").'),
+  volume: z.number().optional().describe('The volume of the voice (e.g., 0.5 for half volume).'),
+  toneAdjust: z.number().optional().describe('The tone adjustment of the voice (e.g., -2 for lower tone, 2 for higher tone).'),
 });
 
 const GenerateCustomDjAudioInputSchema = z.object({
@@ -63,11 +65,11 @@ async function toWav(
       channels,
       sampleRate: rate,
       bitDepth: sampleWidth * 8,
-    });
+    }) as any; // Type assertion for wav package compatibility
 
     const bufs: Buffer[] = [];
     writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
+    writer.on('data', (d: Buffer) => bufs.push(d));
     writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
 
     writer.write(pcmData);
@@ -80,7 +82,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     inputSchema: GenerateCustomDjAudioInputSchema,
     outputSchema: GenerateCustomDjAudioOutputSchema,
   },
-  async (input) => {
+  async (input: GenerateCustomDjAudioInput) => {
     const { voice, message } = input;
     
     const voiceName = voiceMap[voice.gender]?.[voice.style] || voiceMap[voice.gender]?.[voice.tone] || 'vindemiatrix';
@@ -92,6 +94,8 @@ const generateCustomDjAudioFlow = ai.defineFlow({
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voiceName },
+            // pitch: voice.toneAdjust,
+            // gain: voice.volume,
           },
         },
       },
@@ -99,6 +103,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     });
     
     if (!media) {
+      logger.error('No media was returned from the TTS service.');
       throw new Error('No media was returned from the TTS service.');
     }
     
@@ -108,6 +113,7 @@ const generateCustomDjAudioFlow = ai.defineFlow({
     );
 
     if (pcmBuffer.length === 0) {
+      logger.error('Generated PCM buffer is empty.');
       throw new Error('Generated PCM buffer is empty.');
     }
     

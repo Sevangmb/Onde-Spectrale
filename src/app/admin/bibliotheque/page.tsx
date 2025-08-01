@@ -146,7 +146,7 @@ export default function BibliothequePage() {
                   Bibliothèques musicales trouvées:
                 </p>
                 <ul className="text-green-300 text-sm space-y-1">
-                  {connectionStatus.libraries.map((lib: any, index: number) => (
+                  {connectionStatus.libraries && connectionStatus.libraries.map((lib: any, index: number) => (
                     <li key={index}>• {lib.title} ({lib.type})</li>
                   ))}
                 </ul>
@@ -187,7 +187,7 @@ export default function BibliothequePage() {
               </div>
 
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {searchResults.map((track) => (
+                {searchResults && searchResults.map((track) => (
                   <div 
                     key={track.id} 
                     className="p-3 bg-slate-800/50 rounded-md flex items-center justify-between"
@@ -211,7 +211,7 @@ export default function BibliothequePage() {
 
               {searchResults.length === 0 && searchQuery && !isLoading && (
                 <p className="text-muted-foreground text-center py-4">
-                  Aucun résultat trouvé pour "{searchQuery}"
+                  Aucun résultat trouvé pour &quot;{searchQuery}&quot;
                 </p>
               )}
             </CardContent>
@@ -289,7 +289,7 @@ export default function BibliothequePage() {
             
             <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-md">
               <p className="text-blue-400 text-sm">
-                ℹ️ Les informations sont lues depuis vos variables d'environnement.
+                ℹ️ Les informations sont lues depuis vos variables d&apos;environnement.
               </p>
             </div>
           </CardContent>

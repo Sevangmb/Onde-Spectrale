@@ -74,11 +74,11 @@ async function toWav(
       channels,
       sampleRate: rate,
       bitDepth: sampleWidth * 8,
-    });
+    }) as any; // Type assertion for wav package compatibility
 
-    let bufs: any[] = [];
+    const bufs: Buffer[] = [];
     writer.on('error', reject);
-    writer.on('data', function (d) {
+    writer.on('data', function (d: Buffer) {
       bufs.push(d);
     });
     writer.on('end', function () {
@@ -95,7 +95,7 @@ const generateDjAudioFlow = ai.defineFlow({
     inputSchema: GenerateDjAudioInputSchema,
     outputSchema: GenerateDjAudioOutputSchema,
   },
-  async input => {
+  async (input: GenerateDjAudioInput) => {
     const character = await getDjCharacter(input);
 
     const {media} = await ai.generate({

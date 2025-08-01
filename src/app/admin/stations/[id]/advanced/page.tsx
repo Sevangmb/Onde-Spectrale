@@ -154,7 +154,7 @@ export default function AdvancedStationEditorPage() {
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4 text-yellow-500" />
           <AlertDescription>
-            La station demandée n'existe pas ou a été supprimée.
+            La station demandée n&apos;existe pas ou a été supprimée.
           </AlertDescription>
         </Alert>
 
@@ -180,7 +180,7 @@ export default function AdvancedStationEditorPage() {
         <Alert className="border-red-200 bg-red-50">
           <AlertTriangle className="h-4 w-4 text-red-500" />
           <AlertDescription>
-            Vous n'avez pas les permissions nécessaires pour modifier cette station.
+            Vous n&apos;avez pas les permissions nécessaires pour modifier cette station.
           </AlertDescription>
         </Alert>
 

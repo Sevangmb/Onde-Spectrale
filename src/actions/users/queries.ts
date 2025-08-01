@@ -12,6 +12,7 @@ import {
   Timestamp,
   addDoc
 } from 'firebase/firestore';
+import { safeToISOString } from '@/lib/dateUtils';
 import { z } from 'zod';
 import type { CustomDJCharacter } from '@/lib/types';
 
@@ -35,9 +36,7 @@ export async function getCustomCharactersForUser(userId: string): Promise<Custom
         voice: data.voice,
         isCustom: true,
         ownerId: data.ownerId,
-        createdAt: data.createdAt instanceof Timestamp 
-          ? data.createdAt.toDate().toISOString() 
-          : new Date(data.createdAt).toISOString(),
+        createdAt: safeToISOString(data.createdAt),
       };
     });
   } catch (error: any) {
@@ -84,7 +83,7 @@ export async function getUserData(userId: string) {
   const plainObject: { [key: string]: any } = {};
   for (const key in data) {
     if (data[key] instanceof Timestamp) {
-      plainObject[key] = (data[key] as Timestamp).toDate().toISOString();
+      plainObject[key] = safeToISOString(data[key]);
     } else {
       plainObject[key] = data[key];
     }
@@ -130,7 +129,7 @@ export async function createCustomDj(userId: string, formData: FormData) {
     },
     isCustom: true,
     ownerId: userId,
-    createdAt: new Date().toISOString(),
+    createdAt: safeToISOString(new Date()),
   };
 
   try {

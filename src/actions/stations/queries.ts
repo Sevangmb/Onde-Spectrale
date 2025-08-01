@@ -8,22 +8,18 @@ import {
   getDocs, 
   doc, 
   getDoc,
-  Timestamp,
-  orderBy
+  Timestamp 
 } from 'firebase/firestore';
 import type { Station } from '@/lib/types';
+import type { StationQueryResult } from './types';
+import { safeToISOString } from '@/lib/dateUtils';
 
 function serializeStation(doc: any): Station {
   const data = doc.data();
   return {
     id: doc.id,
     ...data,
-    createdAt: data.createdAt instanceof Timestamp 
-      ? data.createdAt.toDate().toISOString() 
-      : new Date(data.createdAt || Date.now()).toISOString(),
-    lastModified: data.lastModified instanceof Timestamp
-      ? data.lastModified.toDate().toISOString()
-      : new Date(data.lastModified || data.createdAt || Date.now()).toISOString(),
+    createdAt: safeToISOString(data.createdAt),
     playlist: data.playlist || [],
   } as Station;
 }
@@ -80,25 +76,20 @@ export async function getStationsForUser(userId: string): Promise<Station[]> {
   try {
     const stationsCol = collection(db, 'stations');
     
-    // Requête 1: Stations de l'utilisateur
-    const userStationsQuery = query(stationsCol, where('ownerId', '==', userId));
+    const [userQuery, systemQuery] = [
+      query(stationsCol, where('ownerId', '==', userId)),
+      query(stationsCol, where('ownerId', '==', 'system'))
+    ];
     
-    // Requête 2: Stations du système
-    const systemStationsQuery = query(stationsCol, where('ownerId', '==', 'system'));
-
-    const [userStationsSnapshot, systemStationsSnapshot] = await Promise.all([
-      getDocs(userStationsQuery),
-      getDocs(systemStationsQuery)
+    const [userSnapshot, systemSnapshot] = await Promise.all([
+      getDocs(userQuery),
+      getDocs(systemQuery)
     ]);
-
-    const userStations = userStationsSnapshot.docs.map(serializeStation);
-    const systemStations = systemStationsSnapshot.docs.map(serializeStation);
-
-    // Fusionner et trier en mémoire
-    const allStations = [...userStations, ...systemStations];
-    allStations.sort((a, b) => a.frequency - b.frequency);
     
-    return allStations;
+    const userStations = userSnapshot.docs.map(serializeStation);
+    const systemStations = systemSnapshot.docs.map(serializeStation);
+    
+    return [...systemStations, ...userStations].sort((a, b) => a.frequency - b.frequency);
   } catch (error) {
     console.error('Error fetching user stations:', error);
     return [];

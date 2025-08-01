@@ -1,5 +1,7 @@
 import type { Station, PlaylistItem } from '@/lib/types';
 import { getStationForFrequency, createDefaultStations, updateUserFrequency } from '@/app/actions';
+import logger from '@/lib/logger';
+import { BackendError, ErrorCode, handleAsyncError } from '@/lib/errors';
 
 export interface StationServiceInterface {
   loadStationForFrequency(frequency: number): Promise<Station | null>;
@@ -58,28 +60,49 @@ export class StationService implements StationServiceInterface {
   
   private async loadStationWithRetry(frequency: number, retryCount = 0): Promise<Station | null> {
     try {
-      console.log(`📻 Loading station for frequency ${frequency} (attempt ${retryCount + 1})`);
+      logger.info(`Loading station for frequency ${frequency}`, 'StationService', {
+        frequency,
+        attempt: retryCount + 1,
+        maxRetries: this.MAX_RETRIES
+      });
       
       const station = await getStationForFrequency(frequency);
       
       if (station) {
-        console.log(`✅ Station loaded: ${station.name} at ${frequency} MHz`);
+        logger.info(`Station loaded successfully`, 'StationService', {
+          stationName: station.name,
+          frequency,
+          stationId: station.id
+        });
         return station;
       } else {
-        console.log(`📭 No station found at ${frequency} MHz`);
+        logger.debug(`No station found at frequency`, 'StationService', { frequency });
         return null;
       }
       
     } catch (error) {
-      console.error(`❌ Error loading station at ${frequency} MHz:`, error);
+      logger.error(`Error loading station`, 'StationService', {
+        frequency,
+        attempt: retryCount + 1,
+        error: error instanceof Error ? error.message : String(error)
+      });
       
       if (retryCount < this.MAX_RETRIES) {
-        console.log(`🔄 Retrying in ${this.RETRY_DELAY}ms...`);
+        logger.debug(`Retrying station load`, 'StationService', {
+          frequency,
+          retryDelay: this.RETRY_DELAY,
+          nextAttempt: retryCount + 2
+        });
         await this.delay(this.RETRY_DELAY);
         return this.loadStationWithRetry(frequency, retryCount + 1);
       }
       
-      throw new Error(`Failed to load station after ${this.MAX_RETRIES} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new BackendError(
+        ErrorCode.RESOURCE_NOT_FOUND,
+        `Failed to load station after ${this.MAX_RETRIES} attempts`,
+        404,
+        { frequency, attempts: this.MAX_RETRIES, originalError: error instanceof Error ? error.message : String(error) }
+      );
     }
   }
   
@@ -95,7 +118,7 @@ export class StationService implements StationServiceInterface {
     };
     
     this.cache.set(frequency, cacheEntry);
-    console.log(`💾 Station cached for ${frequency} MHz`);
+    logger.debug(`Station cached`, 'StationService', { frequency, ttl: this.DEFAULT_TTL });
   }
   
   getCachedStation(frequency: number): Station | null {
@@ -110,12 +133,12 @@ export class StationService implements StationServiceInterface {
     const isExpired = (now - cacheEntry.timestamp) > cacheEntry.ttl;
     
     if (isExpired) {
-      console.log(`⏰ Cache expired for ${frequency} MHz`);
+      logger.debug(`Cache expired`, 'StationService', { frequency, age: now - cacheEntry.timestamp });
       this.cache.delete(frequency);
       return null;
     }
     
-    console.log(`💾 Cache hit for ${frequency} MHz`);
+    logger.debug(`Cache hit`, 'StationService', { frequency });
     return cacheEntry.station;
   }
   
@@ -123,36 +146,55 @@ export class StationService implements StationServiceInterface {
     if (frequency !== undefined) {
       const deleted = this.cache.delete(frequency);
       if (deleted) {
-        console.log(`🗑️ Cache invalidated for ${frequency} MHz`);
+        logger.debug(`Cache invalidated for frequency`, 'StationService', { frequency });
       }
     } else {
       const size = this.cache.size;
       this.cache.clear();
-      console.log(`🗑️ All station cache cleared (${size} entries)`);
+      logger.info(`All station cache cleared`, 'StationService', { entriesCleared: size });
     }
   }
   
   async createDefaultStations(): Promise<void> {
     try {
-      console.log('🏗️ Creating default stations...');
-      await createDefaultStations();
-      console.log('✅ Default stations created');
+      logger.info('Creating default stations', 'StationService');
+      const [error] = await handleAsyncError(createDefaultStations());
+      if (error) {
+        throw error;
+      }
+      logger.info('Default stations created successfully', 'StationService');
       
       // Invalidate cache to ensure fresh data
       this.invalidateStationCache();
     } catch (error) {
-      console.error('❌ Error creating default stations:', error);
-      throw error;
+      logger.error('Error creating default stations', 'StationService', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error instanceof BackendError ? error : new BackendError(
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        'Failed to create default stations',
+        500,
+        { originalError: error instanceof Error ? error.message : String(error) }
+      );
     }
   }
   
   async updateUserFrequency(userId: string, frequency: number): Promise<void> {
     try {
       await updateUserFrequency(userId, frequency);
-      console.log(`👤 User frequency updated to ${frequency} MHz`);
+      logger.info('User frequency updated', 'StationService', { userId, frequency });
     } catch (error) {
-      console.error('❌ Error updating user frequency:', error);
-      throw error;
+      logger.error('Error updating user frequency', 'StationService', {
+        userId,
+        frequency,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error instanceof BackendError ? error : new BackendError(
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        'Failed to update user frequency',
+        500,
+        { userId, frequency, originalError: error instanceof Error ? error.message : String(error) }
+      );
     }
   }
   
@@ -185,7 +227,7 @@ export class StationService implements StationServiceInterface {
     }
     
     if (cleanedCount > 0) {
-      console.log(`🧹 Cleaned up ${cleanedCount} expired cache entries`);
+      logger.info('Cache cleanup completed', 'StationService', { entriesRemoved: cleanedCount });
     }
     
     return cleanedCount;
@@ -203,18 +245,28 @@ export class StationService implements StationServiceInterface {
       }
     }
     
-    console.log(`🔄 Preloading ${frequencies.length} nearby stations...`);
+    logger.info('Preloading nearby stations', 'StationService', {
+      currentFrequency,
+      range,
+      stationsToLoad: frequencies.length
+    });
     
     // Load stations in parallel but with limited concurrency
     const loadPromises = frequencies.map(freq => 
       this.loadStationForFrequency(freq).catch(error => {
-        console.warn(`Failed to preload station at ${freq} MHz:`, error);
+        logger.warn('Failed to preload station', 'StationService', {
+          frequency: freq,
+          error: error instanceof Error ? error.message : String(error)
+        });
         return null;
       })
     );
     
     await Promise.allSettled(loadPromises);
-    console.log(`✅ Preloading completed`);
+    logger.info('Station preloading completed', 'StationService', {
+      currentFrequency,
+      stationsPreloaded: frequencies.length
+    });
   }
 }
 

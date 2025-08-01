@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -38,14 +38,7 @@ export function AdminAnalytics() {
   const adminState = useAdminState();
   const { updateRealTimeAnalytics } = useAdminActions();
 
-  // Load analytics data when period changes
-  useEffect(() => {
-    if (adminState.isMonitoringActive) {
-      loadAnalyticsData();
-    }
-  }, [selectedPeriod, adminState.isMonitoringActive]);
-
-  const loadAnalyticsData = async () => {
+  const loadAnalyticsData = useCallback(async () => {
     if (!adminState.isMonitoringActive) return;
     
     setIsLoading(true);
@@ -57,7 +50,14 @@ export function AdminAnalytics() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedPeriod, adminState.isMonitoringActive, updateRealTimeAnalytics]);
+
+  // Load analytics data when period changes
+  useEffect(() => {
+    if (adminState.isMonitoringActive) {
+      loadAnalyticsData();
+    }
+  }, [selectedPeriod, adminState.isMonitoringActive, loadAnalyticsData]);
 
   // Use real analytics data from store
   const analyticsData = {
@@ -188,7 +188,7 @@ export function AdminAnalytics() {
 
         <Card className="border-orange-500/30 bg-black/40 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-200">Temps d'Écoute Moyen</CardTitle>
+            <CardTitle className="text-sm font-medium text-orange-200">Temps d&apos;Écoute Moyen</CardTitle>
             <Clock className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
@@ -202,7 +202,7 @@ export function AdminAnalytics() {
 
         <Card className="border-orange-500/30 bg-black/40 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-200">Pic d'Audience</CardTitle>
+            <CardTitle className="text-sm font-medium text-orange-200">Pic d&apos;Audience</CardTitle>
             <BarChart3 className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
