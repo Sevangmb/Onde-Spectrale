@@ -222,7 +222,7 @@ export function UserPreferences({ onPreferencesChange }: UserPreferencesProps) {
           </div>
 
           <div className="flex items-center justify-between">
-            <Label className="text-orange-200">Alertes d'urgence</Label>
+            <Label className="text-orange-200">Alertes d&apos;urgence</Label>
             <Switch
               checked={preferences.emergencyAlerts}
               onCheckedChange={(checked) => updatePreference('emergencyAlerts', checked)}

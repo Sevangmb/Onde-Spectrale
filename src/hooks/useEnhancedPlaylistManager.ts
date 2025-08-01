@@ -49,7 +49,7 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [playback.volume]);
   
   // Volume synchronization
   useEffect(() => {
@@ -189,7 +189,7 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
         actions.enableAudioContext();
       }
     }
-  }, [playback.isPlaying, playback.isLoading, playback.currentTrack, ui.autoPlayEnabled, actions, playTrackById]);
+  }, [playback.isPlaying, playback.isLoading, playback.currentTrack, ui.autoPlayEnabled, actions, playTrackById, getFirstAvailableTrack]);
   
   // Helper function to get first available track
   const getFirstAvailableTrack = useCallback((): PlaylistItem | null => {
@@ -274,7 +274,7 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
         actions.playTrack(firstTrack);
       }
     }
-  }, [data.currentStation?.id]);
+  }, [data.currentStation?.id, data.currentStation, getFirstAvailableTrack, playback.currentTrack, actions]);
   
   // Auto-play effect for continuous playback
   useEffect(() => {
@@ -294,6 +294,7 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
     }
   }, [
     ui.autoPlayEnabled,
+    playback.currentTrack,
     playback.currentTrack?.id,
     playback.isPlaying,
     playback.isLoading,

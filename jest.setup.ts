@@ -26,6 +26,11 @@ jest.mock('lucide-react', () => ({
   Volume1: 'div',
   Radio: 'div',
   MessageSquare: 'div',
+  Users: 'div',
+  Clock: 'div',
+  Activity: 'div',
+  Wifi: 'div',
+  WifiOff: 'div',
 }));
 
 // Mock UI components

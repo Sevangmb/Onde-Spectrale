@@ -7,7 +7,7 @@ export default function ParametresPage() {
     <div className="space-y-6">
        <div>
         <h1 className="text-2xl font-bold tracking-tight">Paramètres</h1>
-        <p className="text-muted-foreground">Gérez les paramètres de votre compte et de l'application.</p>
+        <p className="text-muted-foreground">Gérez les paramètres de votre compte et de l&apos;application.</p>
       </div>
 
       <Card className="flex flex-col items-center justify-center text-center p-12 border-dashed">

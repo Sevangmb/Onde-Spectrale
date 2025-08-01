@@ -47,12 +47,12 @@ export function useUnifiedStationManager({
     if (autoLoad && user?.id) {
       loadStations();
     }
-  }, [user?.id, autoLoad]);
+  }, [user?.id, autoLoad, loadStations]);
 
   // Apply filters
   useEffect(() => {
     applyFilters();
-  }, [stations, searchTerm, filters]);
+  }, [stations, searchTerm, filters, applyFilters]);
 
   // Enhanced station loader with playlist controls
   const loadStations = useCallback(async () => {
@@ -80,10 +80,10 @@ export function useUnifiedStationManager({
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, createPlaylistControls]);
 
   // Create playlist controls for a station
-  const createPlaylistControls = (stationId: string) => ({
+  const createPlaylistControls = useCallback((stationId: string) => ({
     addTrack: async (track: PlaylistItem): Promise<boolean> => {
       try {
         const station = stations.find(s => s.id === stationId);
@@ -191,7 +191,7 @@ export function useUnifiedStationManager({
         return false;
       }
     }
-  });
+  }), [stations, loadStations, allDjs]);
 
   // Apply filters and search
   const applyFilters = useCallback(() => {

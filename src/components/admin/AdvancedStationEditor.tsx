@@ -63,7 +63,7 @@ export function AdvancedStationEditor({
   // Charger les DJs disponibles au montage
   useEffect(() => {
     stationManager.loadAvailableDJs();
-  }, []);
+  }, [stationManager]);
 
   // Filtrer et rechercher dans la playlist
   const filteredPlaylist = stationManager.searchPlaylist(searchQuery)

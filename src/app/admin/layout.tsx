@@ -143,7 +143,7 @@ function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-center h-screen bg-background text-foreground">
         <div className="flex flex-col items-center gap-4">
             <RadioTower className="h-12 w-12 animate-pulse text-primary"/>
-            <p className="text-muted-foreground">Chargement de la console d'administration...</p>
+            <p className="text-muted-foreground">Chargement de la console d&apos;administration...</p>
         </div>
       </div>
     );

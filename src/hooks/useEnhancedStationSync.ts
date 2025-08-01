@@ -131,7 +131,7 @@ export function useStationForFrequency(frequency: number) {
       
       return () => clearTimeout(preloadTimeout);
     }
-  }, [dataState.currentStation?.id, frequency, radioState.isScanning]);
+  }, [dataState.currentStation, dataState.currentStation?.id, frequency, radioState.isScanning]);
 
   return {
     station: dataState.currentStation,

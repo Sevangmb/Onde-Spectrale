@@ -153,7 +153,7 @@ export default function LoginPage() {
                 <span className="inline-block">Onde Spectrale</span>
               </CardTitle>
               <p className="text-muted-foreground text-sm">
-                Accès à la console d'administration
+                Accès à la console d&apos;administration
               </p>
             </div>
           </CardHeader>
@@ -186,7 +186,7 @@ export default function LoginPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">
-                      Signal d'identification
+                      Signal d&apos;identification
                     </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />
@@ -238,7 +238,7 @@ export default function LoginPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">
-                      Nouveau signal d'identification
+                      Nouveau signal d&apos;identification
                     </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary/60" />

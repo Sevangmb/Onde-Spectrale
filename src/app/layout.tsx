@@ -62,7 +62,7 @@ export default function RootLayout({
                 <AlertTriangle />
                 <div>
                   <h1 className="font-bold">JavaScript est requis</h1>
-                  <p>Cette application interactive nécessite l'activation de JavaScript pour fonctionner.</p>
+                  <p>Cette application interactive nécessite l&apos;activation de JavaScript pour fonctionner.</p>
                 </div>
             </div>
         </noscript>

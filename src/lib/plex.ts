@@ -2,6 +2,7 @@
 'use server';
 
 import { PlaylistItem } from '@/lib/types';
+import { PlexLibrary, PlexResponse as PlexApiResponse, PlexGenre } from '@/types/plex';
 
 interface PlexTrack {
   key: string;
@@ -111,7 +112,7 @@ export async function getPlexMusicLibraries() {
     }
 
     const data = await response.json();
-    return data.MediaContainer.Directory?.filter((lib: any) => lib.type === 'artist') || [];
+    return data.MediaContainer.Directory?.filter((lib: PlexLibrary) => lib.type === 'artist') || [];
 
   } catch (error) {
     console.error('Erreur récupération bibliothèques Plex:', error);
@@ -266,7 +267,7 @@ export async function getPlexGenres(): Promise<string[]> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const genres = data.MediaContainer?.Metadata || [];
-    return genres.map((genre: any) => genre.title).sort();
+    return genres.map((genre: PlexGenre) => genre.title).sort();
   } catch (error) {
     console.error('Erreur récupération genres Plex:', error);
     return [];

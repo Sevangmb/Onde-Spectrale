@@ -421,7 +421,7 @@ export function StationEditor({
                   <div className="space-y-0.5">
                     <Label htmlFor="active">Station active</Label>
                     <p className="text-sm text-muted-foreground">
-                      Les stations inactives n'apparaissent pas dans le scanner
+                      Les stations inactives n&apos;apparaissent pas dans le scanner
                     </p>
                   </div>
                   <Switch
@@ -453,7 +453,7 @@ export function StationEditor({
                     <Music className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium mb-2">Playlist non disponible</h3>
                     <p className="text-muted-foreground">
-                      Sauvegardez d'abord la station pour gérer sa playlist
+                      Sauvegardez d&apos;abord la station pour gérer sa playlist
                     </p>
                   </CardContent>
                 </Card>

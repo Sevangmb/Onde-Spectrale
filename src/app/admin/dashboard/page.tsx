@@ -80,7 +80,7 @@ export default function AdminDashboard() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Tableau de Bord Admin</h1>
         <p className="text-muted-foreground">
-          Vue d'ensemble et gestion complète de vos stations radio et playlists.
+          Vue d&apos;ensemble et gestion complète de vos stations radio et playlists.
         </p>
       </div>
 
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">
             <BarChart3 className="h-4 w-4 mr-2" />
-            Vue d'ensemble
+            Vue d&apos;ensemble
           </TabsTrigger>
           <TabsTrigger value="stations">
             <RadioTower className="h-4 w-4 mr-2" />
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="text-2xl font-bold mb-2">Monitoring Temps Réel</h2>
               <p className="text-muted-foreground">
-                Surveillez l'état de vos stations radio en temps réel
+                Surveillez l&apos;état de vos stations radio en temps réel
               </p>
             </div>
             

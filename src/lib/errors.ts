@@ -2,6 +2,8 @@
 // SYSTÈME DE GESTION D'ERREURS BACKEND
 // ========================================
 
+import { FirebaseError } from '@/types/firebase';
+
 export enum ErrorCode {
   // Erreurs de validation
   VALIDATION_ERROR = 'VALIDATION_ERROR',
@@ -45,7 +47,7 @@ export interface ErrorDetails {
   message: string;
   statusCode: number;
   timestamp: Date;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   stack?: string;
   userId?: string;
   sessionId?: string;
@@ -95,7 +97,7 @@ export class BackendError extends Error {
     };
   }
 
-  static fromFirebaseError(error: any, context?: Record<string, any>): BackendError {
+  static fromFirebaseError(error: FirebaseError | { code: string; message: string }, context?: Record<string, unknown>): BackendError {
     const firebaseErrorMap: Record<string, { code: ErrorCode; statusCode: number }> = {
       'permission-denied': { code: ErrorCode.FORBIDDEN, statusCode: 403 },
       'unauthenticated': { code: ErrorCode.UNAUTHORIZED, statusCode: 401 },

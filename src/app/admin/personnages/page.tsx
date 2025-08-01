@@ -255,7 +255,7 @@ export default function PersonnagesManagement() {
           <CardContent>
              {customCharacters.length === 0 ? (
                  <div className="text-center text-muted-foreground py-8">
-                    <p>Vous n'avez pas encore créé de DJ personnalisé.</p>
+                    <p>Vous n&apos;avez pas encore créé de DJ personnalisé.</p>
                  </div>
              ) : (
                 <div className="grid gap-4">

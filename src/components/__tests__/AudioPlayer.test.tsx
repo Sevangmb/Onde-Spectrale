@@ -1,17 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AudioPlayer } from '../AudioPlayer';
-import { createMockPlaylistItem } from '@/lib/testUtils';
+import { createMockPlaylistItem, mockAudioElement } from '@/lib/testUtils';
 
 // Mock the audio element
 const mockAudioRef = {
-  current: {
-    play: jest.fn().mockResolvedValue(undefined),
-    pause: jest.fn(),
-    volume: 1,
-    currentTime: 0,
-    duration: 180
-  }
+  current: mockAudioElement
 };
 
 describe('AudioPlayer', () => {

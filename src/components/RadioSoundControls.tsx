@@ -182,7 +182,7 @@ export function RadioSoundControls({ className }: RadioSoundControlsProps) {
 
         {/* Bibliothèque d'effets */}
         <div className="space-y-4">
-          <h4 className="text-sm font-medium">Bibliothèque d'effets</h4>
+          <h4 className="text-sm font-medium">Bibliothèque d&apos;effets</h4>
           
           {effectCategories.map((category) => (
             <div key={category.type} className="space-y-2">

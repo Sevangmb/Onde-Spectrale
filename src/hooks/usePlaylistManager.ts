@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { usePlaybackState } from './audio/usePlaybackState';
 import { useTrackSelection } from './audio/useTrackSelection';
 import { useAutoPlay } from './audio/useAutoPlay';
@@ -27,7 +27,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   const audioEffects = useAudioEffects();
 
   // Main play function - simplified and focused
-  const playTrackById = async (trackId: string): Promise<void> => {
+  const playTrackById = useCallback(async (trackId: string): Promise<void> => {
     if (!isMountedRef.current || !station || currentOperationId.current === trackId) {
       return;
     }
@@ -107,7 +107,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
         currentOperationId.current = null;
       }
     }
-  };
+  }, [station, user, trackSelection, playback, audioEffects, autoPlay, addFailedTrack]);
 
   // Simplified toggle function
   const togglePlayPause = async () => {
@@ -135,11 +135,11 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
   };
 
   // Event handlers
-  const handleAudioEnded = () => {
+  const handleAudioEnded = useCallback(() => {
     if (isMountedRef.current) {
       trackSelection.selectNextTrack();
     }
-  };
+  }, [trackSelection]);
 
   // Effects
   useEffect(() => {
@@ -153,7 +153,6 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     if (station && trackSelection.availableTracks.length > 0) {
       const firstTrack = trackSelection.availableTracks[0];
       trackSelection.selectTrack(firstTrack);
-      console.log('🎵 Station loaded - first track ready');
     }
 
     return () => {
@@ -161,7 +160,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       playback.setIdle();
       audioEffects.stopAllAudio();
     };
-  }, [station?.id]);
+  }, [station?.id, station, audioEffects, playback, trackSelection]);
 
   // Auto-play effect
   useEffect(() => {
@@ -179,10 +178,14 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
     }
   }, [
     autoPlay.autoPlayEnabled, 
+    autoPlay,
     trackSelection.currentTrack?.id, 
+    trackSelection.currentTrack,
     playback.isPlaying, 
     playback.isLoading,
-    station?.id
+    station?.id,
+    station,
+    playTrackById
   ]);
 
   // Audio event listeners
@@ -192,7 +195,7 @@ export function usePlaylistManager({ station, user }: PlaylistManagerProps) {
       audio.addEventListener('ended', handleAudioEnded);
       return () => audio.removeEventListener('ended', handleAudioEnded);
     }
-  }, []);
+  }, [handleAudioEnded, playback.audioRef]);
 
   // Public API
   return {

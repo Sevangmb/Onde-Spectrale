@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,15 +87,15 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
   useEffect(() => {
     loadStations();
     loadStats();
-  }, [user?.id]);
+  }, [user?.id, loadStations, loadStats]);
 
   // Apply filters and search
   useEffect(() => {
     applyFiltersAndSearch();
-  }, [stations, searchTerm, filters]);
+  }, [stations, searchTerm, filters, applyFiltersAndSearch]);
 
   // Load stations from database
-  const loadStations = async () => {
+  const loadStations = useCallback(async () => {
     if (!user?.id) return;
     
     setIsLoading(true);
@@ -110,20 +110,20 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
 
   // Load statistics
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const statistics = await radioStationManager.getStationStats();
       setStats(statistics);
     } catch (error) {
       console.error('Error loading stats:', error);
     }
-  };
+  }, []);
 
   // Apply filters and search
-  const applyFiltersAndSearch = () => {
+  const applyFiltersAndSearch = useCallback(() => {
     let filtered = [...stations];
 
     // Search filter
@@ -162,7 +162,7 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
     }
 
     setFilteredStations(filtered);
-  };
+  }, [stations, searchTerm, filters]);
 
   // Create new station
   const handleCreateStation = async () => {
@@ -431,7 +431,7 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
                       <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer la station</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Êtes-vous sûr de vouloir supprimer "{station.name}" ? Cette action est irréversible.
+                          Êtes-vous sûr de vouloir supprimer &quot;{station.name}&quot; ? Cette action est irréversible.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

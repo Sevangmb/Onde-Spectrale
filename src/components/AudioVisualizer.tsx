@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart3, Waves, Activity, Eye, EyeOff } from 'lucide-react';
@@ -63,9 +63,9 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
     }
 
     return () => stopVisualization();
-  }, [isPlaying, isEnabled, visualizerType]);
+  }, [isPlaying, isEnabled, visualizerType, startVisualization]);
 
-  const startVisualization = () => {
+  const startVisualization = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current || !dataArrayRef.current) return;
 
     const canvas = canvasRef.current;
@@ -96,7 +96,7 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
     };
 
     draw();
-  };
+  }, [visualizerType]);
 
   const stopVisualization = () => {
     if (animationRef.current) {

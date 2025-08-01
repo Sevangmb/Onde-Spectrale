@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,9 +57,9 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
   // Load analytics on mount
   useEffect(() => {
     loadAnalytics();
-  }, [station.id]);
+  }, [station.id, loadAnalytics]);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     try {
       const result = await playlistManagerService.analyzePlaylistPerformance(station.id);
       if (result.success) {
@@ -68,7 +68,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
     } catch (error) {
       console.error('Failed to load analytics:', error);
     }
-  };
+  }, [station.id]);
 
   // Handle drag and drop
   const handleDragStart = (trackId: string) => {
@@ -613,7 +613,7 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
                 <CardHeader>
                   <CardTitle className="text-orange-400 flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Vue d'ensemble
+                    Vue d&apos;ensemble
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

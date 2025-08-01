@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,21 +76,21 @@ export function EnhancedPlaylistInterface({
   useEffect(() => {
     loadAnalytics();
     loadRecommendations();
-  }, [station.id]);
+  }, [station.id, loadAnalytics, loadRecommendations]);
   
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     const result = await playlist.analyzePlaylist();
     if (result.success && result.analytics) {
       setAnalytics(result.analytics);
     }
-  };
+  }, [playlist]);
   
-  const loadRecommendations = async () => {
+  const loadRecommendations = useCallback(async () => {
     const result = await playlist.getRecommendations();
     if (result.success && result.recommendations) {
       setRecommendations(result.recommendations);
     }
-  };
+  }, [playlist]);
   
   // Computed playlist statistics
   const playlistStats = useMemo(() => {

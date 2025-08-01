@@ -704,5 +704,133 @@ export async function getAudioForTrack(track: PlaylistItem, djCharacterId: strin
     }
 }
 
+/**
+ * Updates a station with new data
+ */
+export async function updateStation(stationId: string, updates: Partial<Station>): Promise<Station | null> {
+    try {
+        const stationRef = doc(db, 'stations', stationId);
+        const stationDoc = await getDoc(stationRef);
+        
+        if (!stationDoc.exists()) {
+            return null;
+        }
+
+        // Filter out invalid fields for Firestore update
+        const validUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([key, value]) => 
+                key !== 'id' && value !== undefined
+            )
+        );
+
+        await updateDoc(stationRef, validUpdates);
+        
+        revalidatePath(`/admin/stations/${stationId}`);
+        revalidatePath('/admin/stations');
+        revalidatePath('/');
+        
+        return await getStationById(stationId);
+    } catch (error) {
+        console.error('Error updating station:', error);
+        throw error;
+    }
+}
+
+/**
+ * Deletes a playlist item from a station
+ */
+export async function deletePlaylistItem(stationId: string, trackId: string): Promise<Station | null> {
+    try {
+        const station = await getStationById(stationId);
+        if (!station) {
+            return null;
+        }
+
+        const updatedPlaylist = station.playlist.filter(track => track.id !== trackId);
+        const stationRef = doc(db, 'stations', stationId);
+        
+        await updateDoc(stationRef, { playlist: updatedPlaylist });
+        
+        revalidatePath(`/admin/stations/${stationId}`);
+        revalidatePath('/admin/stations');
+        revalidatePath('/');
+        
+        return await getStationById(stationId);
+    } catch (error) {
+        console.error('Error deleting playlist item:', error);
+        throw error;
+    }
+}
+
+/**
+ * Reorders playlist items according to new order
+ */
+export async function reorderPlaylistItems(stationId: string, newOrder: string[]): Promise<Station | null> {
+    try {
+        const station = await getStationById(stationId);
+        if (!station) {
+            return null;
+        }
+
+        // Create a map for quick lookup
+        const trackMap = new Map(station.playlist.map(track => [track.id, track]));
+        
+        // Reorder according to newOrder array
+        const reorderedPlaylist = newOrder
+            .map(trackId => trackMap.get(trackId))
+            .filter(track => track !== undefined) as PlaylistItem[];
+
+        // Add any tracks that weren't in the newOrder array (safety measure)
+        const orderedIds = new Set(newOrder);
+        const remainingTracks = station.playlist.filter(track => !orderedIds.has(track.id));
+        const finalPlaylist = [...reorderedPlaylist, ...remainingTracks];
+
+        const stationRef = doc(db, 'stations', stationId);
+        await updateDoc(stationRef, { playlist: finalPlaylist });
+        
+        revalidatePath(`/admin/stations/${stationId}`);
+        revalidatePath('/admin/stations');
+        revalidatePath('/');
+        
+        return await getStationById(stationId);
+    } catch (error) {
+        console.error('Error reordering playlist:', error);
+        throw error;
+    }
+}
+
+/**
+ * Adds multiple playlist items to a station
+ */
+export async function addPlaylistItems(stationId: string, tracks: Omit<PlaylistItem, 'id'>[]): Promise<Station | null> {
+    try {
+        const station = await getStationById(stationId);
+        if (!station) {
+            return null;
+        }
+
+        // Generate IDs and add timestamps for new tracks
+        const newTracks: PlaylistItem[] = tracks.map((track, index) => ({
+            ...track,
+            id: `${Date.now()}-${index}`,
+            addedAt: safeToISOString(new Date())
+        }));
+
+        const updatedPlaylist = [...station.playlist, ...newTracks];
+        const stationRef = doc(db, 'stations', stationId);
+        
+        await updateDoc(stationRef, { playlist: updatedPlaylist });
+        
+        revalidatePath(`/admin/stations/${stationId}`);
+        revalidatePath('/admin/stations');
+        revalidatePath('/');
+        
+        return await getStationById(stationId);
+    } catch (error) {
+        console.error('Error adding playlist items:', error);
+        throw error;
+    }
+}
+
 // Note: Re-exports moved to separate non-server file to comply with "use server" requirements
 // Advanced station management functions are available in @/actions/stations/mutations

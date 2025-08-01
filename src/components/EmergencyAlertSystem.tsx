@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, X, Volume2, RadioIcon } from 'lucide-react';
@@ -116,9 +116,23 @@ export function EmergencyAlertSystem({ isRadioActive, currentFrequency }: Emerge
       clearInterval(interval);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [isRadioActive, currentFrequency]);
+  }, [isRadioActive, currentFrequency, showAlert]);
 
-  const showAlert = (alert: EmergencyAlert) => {
+  const hideAlert = useCallback(() => {
+    setIsAnimating(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      setCurrentAlert(null);
+      setIsAnimating(false);
+    }, 300);
+
+    if (alertTimeoutRef.current) {
+      clearTimeout(alertTimeoutRef.current);
+      alertTimeoutRef.current = null;
+    }
+  }, []);
+
+  const showAlert = useCallback((alert: EmergencyAlert) => {
     if (currentAlert) return; // Ne pas superposer les alertes
 
     setCurrentAlert(alert);
@@ -137,21 +151,8 @@ export function EmergencyAlertSystem({ isRadioActive, currentFrequency }: Emerge
     alertTimeoutRef.current = setTimeout(() => {
       hideAlert();
     }, alert.duration);
-  };
+  }, [currentAlert, hideAlert]);
 
-  const hideAlert = () => {
-    setIsAnimating(true);
-    setTimeout(() => {
-      setIsVisible(false);
-      setCurrentAlert(null);
-      setIsAnimating(false);
-    }, 300);
-
-    if (alertTimeoutRef.current) {
-      clearTimeout(alertTimeoutRef.current);
-      alertTimeoutRef.current = null;
-    }
-  };
 
   if (!isVisible || !currentAlert) return null;
 
@@ -177,7 +178,7 @@ export function EmergencyAlertSystem({ isRadioActive, currentFrequency }: Emerge
               <div className="flex items-center gap-2 mb-2">
                 <RadioIcon className="h-4 w-4 opacity-75" />
                 <div className="text-xs font-mono opacity-75">
-                  SYSTÈME D'ALERTE D'URGENCE
+                  SYSTÈME D&apos;ALERTE D&apos;URGENCE
                 </div>
               </div>
               

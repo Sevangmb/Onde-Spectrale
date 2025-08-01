@@ -47,10 +47,8 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
         setIsAudioInitialized(true);
         setAutoPlayReady(true);
         
-        console.log('🎵 Audio initialisé avec autoplay automatique');
         return true;
       } else {
-        console.log('⚠️ Autoplay bloqué par le navigateur, nécessite interaction');
         return false;
       }
     } catch (error) {
@@ -103,7 +101,7 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
     };
 
     attemptAutoPlay();
-  }, [interferenceAudioService]); // Dépendre de interferenceAudioService
+  }, [interferenceAudioService, currentStation, frequency, initializeAudio, playlistManager]); // Dépendre de interferenceAudioService
 
   // Effet pour gérer les changements de station/fréquence
   useEffect(() => {
@@ -120,7 +118,7 @@ export function useAutoPlay({ frequency, currentStation, playlistManager }: UseA
         }
       }
     }
-  }, [currentStation, frequency, isAudioInitialized, playlistManager]);
+  }, [currentStation, frequency, isAudioInitialized, playlistManager, interferenceAudioService]);
 
   // Effet pour configurer les événements d'interaction si l'autoplay n'est pas prêt
   useEffect(() => {

@@ -164,7 +164,7 @@ export default function StationDetailPage() {
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold">Station non trouvée</h1>
-        <p className="text-muted-foreground">Cette station n'existe pas ou vous n'y avez pas accès.</p>
+        <p className="text-muted-foreground">Cette station n&apos;existe pas ou vous n&apos;y avez pas accès.</p>
         <Button onClick={() => router.push('/admin/stations')} className="mt-4">Retour aux stations</Button>
       </div>
     );
@@ -221,11 +221,11 @@ export default function StationDetailPage() {
          <Card className="lg:col-span-2">
             <CardHeader>
                 <CardTitle>Gestion de la Playlist</CardTitle>
-                 <CardDescription>La playlist de cette station est un mix de pistes générées par IA et d'ajouts manuels. Vous pouvez la régénérer à tout moment.</CardDescription>
+                 <CardDescription>La playlist de cette station est un mix de pistes générées par IA et d&apos;ajouts manuels. Vous pouvez la régénérer à tout moment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="space-y-2">
-                    <Label htmlFor="message-theme">Thème de la station pour l'IA</Label>
+                    <Label htmlFor="message-theme">Thème de la station pour l&apos;IA</Label>
                     <Input
                         id="message-theme"
                         value={station.theme}
@@ -233,7 +233,7 @@ export default function StationDetailPage() {
                         className="font-mono"
                     />
                      <p className="text-xs text-muted-foreground">
-                        Ce thème est utilisé par l'IA lors de la régénération de la playlist.
+                        Ce thème est utilisé par l&apos;IA lors de la régénération de la playlist.
                      </p>
                 </div>
                 <Button onClick={handleRegeneratePlaylist} disabled={isRegenerating} className="w-full">
@@ -326,7 +326,7 @@ export default function StationDetailPage() {
        <Card>
           <CardHeader>
             <CardTitle>Playlist Actuelle</CardTitle>
-            <CardDescription>Les pistes sont jouées dans l'ordre de la radio (aléatoire pour l'instant).</CardDescription>
+            <CardDescription>Les pistes sont jouées dans l&apos;ordre de la radio (aléatoire pour l&apos;instant).</CardDescription>
           </CardHeader>
           <CardContent>
             {sortedPlaylist.length > 0 ? (

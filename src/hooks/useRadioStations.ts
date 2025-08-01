@@ -75,12 +75,12 @@ export function useRadioStations({ user, autoLoad = true }: UseRadioStationsProp
       loadStations();
       loadStats();
     }
-  }, [user?.id, autoLoad]);
+  }, [user?.id, autoLoad, loadStations, loadStats]);
 
   // Apply filters when stations or filters change
   useEffect(() => {
     applyFilters();
-  }, [stations, searchTerm, filters]);
+  }, [stations, searchTerm, filters, applyFilters]);
 
   // Load stations from database
   const loadStations = useCallback(async () => {

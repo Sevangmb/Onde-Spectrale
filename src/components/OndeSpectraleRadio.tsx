@@ -211,7 +211,7 @@ export function OndeSpectraleRadio() {
       // L'interférence sera gérée par l'effet useEffect
       setIsScanning(false);
     }, 1000);
-  }, [isScanning, sliderValue, frequency, isAudioInitialized, radioSounds, setIsScanning, setSliderValue, setFrequency]);
+  }, [isScanning, sliderValue, frequency, isAudioInitialized, radioSounds, setIsScanning, setSliderValue, setFrequency, interferenceAudioService]);
 
   const handleFrequencyChange = (value: number[]) => {
     setSliderValue(value[0]);
@@ -231,7 +231,7 @@ export function OndeSpectraleRadio() {
     if (user) {
       await updateUserFrequency(user.uid, newFreq);
     }
-  }, [setFrequency, user, isAudioInitialized]);
+  }, [setFrequency, user, isAudioInitialized, interferenceAudioService]);
 
   const isRadioActive = useMemo(() => isClient && !isLoadingStation && currentStation !== null, [isClient, isLoadingStation, currentStation]);
 
@@ -443,7 +443,7 @@ export function OndeSpectraleRadio() {
                                     onClick={handleUserInteraction}
                                     className="retro-button text-xs px-4 py-2 animate-pulse bg-primary/20 hover:bg-primary/30 border-primary/40"
                                   >
-                                    🎵 ACTIVER L'AUDIO AUTO
+                                    🎵 ACTIVER L&apos;AUDIO AUTO
                                   </button>
                                 )}
                               </div>

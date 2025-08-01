@@ -9,9 +9,9 @@ import { validateAndSanitize, StationUpdateSchema } from '@/lib/validation';
 // ========================================
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // GET /api/stations/[id] - Récupérer une station par ID
@@ -22,7 +22,7 @@ export async function GET(
   const startTime = Date.now();
   
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const useCache = searchParams.get('cache') !== 'false';
     const includePlaylist = searchParams.get('includePlaylist') !== 'false';
@@ -72,7 +72,8 @@ export async function GET(
     return NextResponse.json(response);
 
   } catch (error) {
-    errorHandler.logError(error as Error, { stationId: params.id });
+    const { id } = await params;
+    errorHandler.logError(error as Error, { stationId: id });
     
     if (error instanceof BackendError) {
       return NextResponse.json(
@@ -100,7 +101,7 @@ export async function PUT(
   const startTime = Date.now();
   
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // TODO: Vérifier les permissions utilisateur
@@ -144,7 +145,8 @@ export async function PUT(
     return NextResponse.json(response);
 
   } catch (error) {
-    errorHandler.logError(error as Error, { stationId: params.id });
+    const { id } = await params;
+    errorHandler.logError(error as Error, { stationId: id });
     
     if (error instanceof BackendError) {
       return NextResponse.json(
@@ -172,7 +174,7 @@ export async function DELETE(
   const startTime = Date.now();
   
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // TODO: Vérifier les permissions utilisateur
     // const user = await getCurrentUser(request);
@@ -206,7 +208,8 @@ export async function DELETE(
     return NextResponse.json(response);
 
   } catch (error) {
-    errorHandler.logError(error as Error, { stationId: params.id });
+    const { id } = await params;
+    errorHandler.logError(error as Error, { stationId: id });
     
     if (error instanceof BackendError) {
       return NextResponse.json(
@@ -234,7 +237,7 @@ export async function PATCH(
   const startTime = Date.now();
   
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { action, data } = body;
 
@@ -307,8 +310,9 @@ export async function PATCH(
     }
 
   } catch (error) {
+    const { id } = await params;
     errorHandler.logError(error as Error, { 
-      stationId: params.id,
+      stationId: id,
       action: (await request.json()).action 
     });
     
