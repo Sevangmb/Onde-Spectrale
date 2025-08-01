@@ -50,7 +50,24 @@ export function EnhancedPlaylistInterface({
   allDjs, 
   onUpdate 
 }: EnhancedPlaylistInterfaceProps) {
-  const playlist = useUnifiedPlaylistManager({ station, user, allDjs });
+  // TODO: Fix useUnifiedPlaylistManager call - needs dependencies parameter
+  // For now, using a placeholder until proper dependencies are provided
+  const playlistDependencies = {
+    usePlaybackState: () => ({ isPlaying: false, currentTrack: null, volume: 1, isLoading: false, errorMessage: null, position: 0 }),
+    useDataState: () => ({ 
+      stations: new Map(), 
+      currentStation: null, 
+      playlists: new Map(), 
+      failedTracks: new Set<string>(), 
+      lastUpdated: {}, 
+      isLoadingStation: false 
+    }),
+    useUIState: () => ({ showPlaylist: false, autoPlayEnabled: false, ttsEnabled: false, ttsMessage: null, audioContextEnabled: false }),
+    useRadioActions: () => ({ playTrack: () => {}, togglePlayback: () => {}, setVolume: () => {}, addFailedTrack: () => {}, clearFailedTracks: () => {}, enableAutoPlay: () => {}, enableTTS: () => {}, enableAudioContext: () => {}, setError: () => {}, setTTSMessage: () => {} }),
+    playlistManagerService: { getAvailableTemplates: () => [], analyzePlaylistPerformance: () => Promise.resolve({ success: false }), getPersonalizedRecommendations: () => Promise.resolve({ success: false }) }
+  };
+  
+  const playlist = useUnifiedPlaylistManager({ station, user, allDjs }, playlistDependencies);
   
   // Local state
   const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
@@ -72,12 +89,6 @@ export function EnhancedPlaylistInterface({
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const availableTemplates = playlist.getAvailableTemplates();
   
-  // Load analytics and recommendations on mount
-  useEffect(() => {
-    loadAnalytics();
-    loadRecommendations();
-  }, [station.id, loadAnalytics, loadRecommendations]);
-  
   const loadAnalytics = useCallback(async () => {
     const result = await playlist.analyzePlaylist();
     if (result.success && result.analytics) {
@@ -91,6 +102,12 @@ export function EnhancedPlaylistInterface({
       setRecommendations(result.recommendations);
     }
   }, [playlist]);
+  
+  // Load analytics and recommendations on mount
+  useEffect(() => {
+    loadAnalytics();
+    loadRecommendations();
+  }, [station.id, loadAnalytics, loadRecommendations]);
   
   // Computed playlist statistics
   const playlistStats = useMemo(() => {
@@ -515,7 +532,7 @@ export function EnhancedPlaylistInterface({
                   <SelectValue placeholder="Choisir un template" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableTemplates.map(template => (
+                  {availableTemplates.map((template: any) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name} - {template.description}
                     </SelectItem>

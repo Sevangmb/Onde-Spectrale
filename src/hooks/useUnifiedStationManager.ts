@@ -42,46 +42,6 @@ export function useUnifiedStationManager({
   const [filters, setFilters] = useState<any>({});
   const [filteredStations, setFilteredStations] = useState<StationWithPlaylistControls[]>([]);
 
-  // Auto-load stations
-  useEffect(() => {
-    if (autoLoad && user?.id) {
-      loadStations();
-    }
-  }, [user?.id, autoLoad, loadStations]);
-
-  // Apply filters
-  useEffect(() => {
-    applyFilters();
-  }, [stations, searchTerm, filters, applyFilters]);
-
-  // Enhanced station loader with playlist controls
-  const loadStations = useCallback(async () => {
-    if (!user?.id) {
-      setStations([]);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const rawStations = await radioStationManager.getUserStations(user.id, true);
-      
-      // Enhance each station with playlist controls
-      const enhancedStations: StationWithPlaylistControls[] = rawStations.map(station => ({
-        ...station,
-        playlistControls: createPlaylistControls(station.id)
-      }));
-
-      setStations(enhancedStations);
-    } catch (err) {
-      console.error('Error loading stations:', err);
-      setError('Erreur lors du chargement des stations');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id, createPlaylistControls]);
-
   // Create playlist controls for a station
   const createPlaylistControls = useCallback((stationId: string) => ({
     addTrack: async (track: PlaylistItem): Promise<boolean> => {
@@ -111,7 +71,7 @@ export function useUnifiedStationManager({
         const result = await radioStationManager.updateStationPlaylist(stationId, updatedPlaylist);
         
         if (result.success) {
-          await loadStations();
+          await loadStations(); // Refresh data
           return true;
         }
         return false;
@@ -125,18 +85,15 @@ export function useUnifiedStationManager({
         const station = stations.find(s => s.id === stationId);
         if (!station) return false;
 
-        const reorderedPlaylist = trackIds.map(id => 
-          station.playlist.find(t => t.id === id)
-        ).filter(Boolean) as PlaylistItem[];
+        // Reorder playlist based on trackIds order
+        const reorderedPlaylist = trackIds
+          .map(id => station.playlist.find(t => t.id === id))
+          .filter(Boolean) as PlaylistItem[];
 
-        const result = await radioStationManager.updateStationPlaylist(
-          stationId, 
-          reorderedPlaylist, 
-          true // Optimize order
-        );
+        const result = await radioStationManager.updateStationPlaylist(stationId, reorderedPlaylist);
         
         if (result.success) {
-          await loadStations();
+          await loadStations(); // Refresh data
           return true;
         }
         return false;
@@ -150,19 +107,17 @@ export function useUnifiedStationManager({
         const station = stations.find(s => s.id === stationId);
         if (!station) return false;
 
-        const dj = allDjs.find(d => d.id === station.djCharacterId);
-        if (!dj) return false;
+        const djCharacter = allDjs.find(dj => dj.id === station.djCharacterId);
+        if (!djCharacter) return false;
 
-        const result = await playlistManagerService.generateFromTemplate(
+        const result = await playlistManagerService.generatePlaylistForStation(
           stationId,
-          'balanced-mix',
-          dj,
+          djCharacter,
           theme || station.theme
         );
-
-        if (result.success && result.playlist) {
-          await radioStationManager.updateStationPlaylist(stationId, result.playlist);
-          await loadStations();
+        
+        if (result.success) {
+          await loadStations(); // Refresh data
           return true;
         }
         return false;
@@ -173,17 +128,10 @@ export function useUnifiedStationManager({
 
     optimizePlaylist: async (): Promise<boolean> => {
       try {
-        const station = stations.find(s => s.id === stationId);
-        if (!station) return false;
-
-        const result = await playlistManagerService.reorderPlaylist(
-          stationId,
-          station.playlist,
-          { optimizeOrder: true }
-        );
-
+        const result = await playlistManagerService.optimizePlaylist(stationId);
+        
         if (result.success) {
-          await loadStations();
+          await loadStations(); // Refresh data
           return true;
         }
         return false;
@@ -191,30 +139,56 @@ export function useUnifiedStationManager({
         return false;
       }
     }
-  }), [stations, loadStations, allDjs]);
+  }), [stations, allDjs, loadStations]);
+
+  // Enhanced station loader with playlist controls
+  const loadStations = useCallback(async () => {
+    if (!user?.id) {
+      setStations([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const rawStations = await radioStationManager.getUserStations(user.id, true);
+      
+      // Enhance each station with playlist controls
+      const enhancedStations: StationWithPlaylistControls[] = rawStations.map(station => ({
+        ...station,
+        playlistControls: createPlaylistControls(station.id)
+      }));
+
+      setStations(enhancedStations);
+    } catch (err) {
+      console.error('Error loading stations:', err);
+      setError('Erreur lors du chargement des stations');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, createPlaylistControls]);
 
   // Apply filters and search
   const applyFilters = useCallback(() => {
     let filtered = [...stations];
 
-    // Search filter
+    // Apply search filter
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(station => 
-        station.name.toLowerCase().includes(searchLower) ||
-        station.theme?.toLowerCase().includes(searchLower) ||
-        station.description?.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(station =>
+        station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        station.theme.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        station.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Owner filter
-    if (filters.ownerId) {
-      filtered = filtered.filter(station => station.ownerId === filters.ownerId);
+    // Apply other filters
+    if (filters.genre) {
+      filtered = filtered.filter(station => station.genre === filters.genre);
     }
 
-    // Active filter
-    if (filters.isActive !== undefined) {
-      filtered = filtered.filter(station => station.isActive === filters.isActive);
+    if (filters.djCharacter) {
+      filtered = filtered.filter(station => station.djCharacterId === filters.djCharacter);
     }
 
     setFilteredStations(filtered);
@@ -333,10 +307,22 @@ export function useUnifiedStationManager({
     return dj?.name || 'DJ Inconnu';
   }, [allDjs]);
 
+  // Auto-load stations
+  useEffect(() => {
+    if (autoLoad && user?.id) {
+      loadStations();
+    }
+  }, [user?.id, autoLoad, loadStations]);
+
+  // Apply filters
+  useEffect(() => {
+    applyFilters();
+  }, [stations, searchTerm, filters, applyFilters]);
+
   return {
-          // Data
-      stations: filteredStations,
-      allStations: stations,
+    // Data
+    stations: filteredStations,
+    allStations: stations,
     stats,
     
     // State

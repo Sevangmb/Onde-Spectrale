@@ -83,17 +83,6 @@ export function RadioStationManager({ user, allDjs }: RadioStationManagerProps) 
     description: ''
   });
 
-  // Load stations on mount
-  useEffect(() => {
-    loadStations();
-    loadStats();
-  }, [user?.id, loadStations, loadStats]);
-
-  // Apply filters and search
-  useEffect(() => {
-    applyFiltersAndSearch();
-  }, [stations, searchTerm, filters, applyFiltersAndSearch]);
-
   // Load stations from database
   const loadStations = useCallback(async () => {
     if (!user?.id) return;

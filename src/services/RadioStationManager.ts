@@ -20,6 +20,7 @@ import { db } from '@/lib/firebase';
 import { safeToISOString } from '@/lib/dateUtils';
 import { playlistManagerService } from './PlaylistManagerService';
 import { stationService } from './StationService';
+import { BaseService, type ServiceResult } from './BaseService';
 import type { Station, PlaylistItem, DJCharacter, CustomDJCharacter, User } from '@/lib/types';
 import { generatePlaylist } from '@/ai/flows/generate-playlist-flow';
 import { getRandomPlexTracks } from '@/lib/plex';
@@ -65,17 +66,27 @@ export interface StationStats {
 }
 
 /**
- * Service complet de gestion CRUD des stations radio
- * Fonctionnalités:
- * - Création, modification, suppression des stations
- * - Validation des fréquences et des données
- * - Gestion des playlists intégrée
- * - Statistiques et analytics
- * - Filtrage et recherche avancés
- * - Gestion des conflits de fréquence
+ * Enhanced RadioStationManager with BaseService integration
+ * 
+ * Features:
+ * - Enhanced error handling with automatic retry
+ * - Performance monitoring and metrics
+ * - Intelligent caching for frequently accessed stations
+ * - Event-driven updates for real-time synchronization
+ * - Optimized database queries with proper indexing
+ * - Comprehensive validation and conflict resolution
  */
-export class RadioStationManager {
+export class RadioStationManager extends BaseService {
   private static instance: RadioStationManager | null = null;
+
+  private constructor() {
+    super('RadioStationManager', {
+      enableCaching: true,
+      enableMetrics: true,
+      retryAttempts: 3,
+      timeout: 15000
+    });
+  }
 
   static getInstance(): RadioStationManager {
     if (!RadioStationManager.instance) {
@@ -89,90 +100,91 @@ export class RadioStationManager {
   // ========================================
 
   /**
-   * Crée une nouvelle station radio
+   * Enhanced station creation with BaseService integration
    */
   async createStation(
     data: CreateStationData,
     generatePlaylistAutomatically = true
-  ): Promise<{ success: boolean; stationId?: string; station?: Station; error?: string }> {
-    try {
-      console.log('🆕 Creating new station:', data.name);
+  ): Promise<ServiceResult<{ stationId: string; station: Station }>> {
+    return this.execute(
+      async () => {
+        console.log('🆕 Creating new station:', data.name);
 
-      // Validation des données
-      const validation = this.validateStationData(data);
-      if (!validation.isValid) {
-        return { success: false, error: validation.errors.join(', ') };
-      }
-
-      // Vérifier si la fréquence est disponible
-      const existingStation = await this.getStationByFrequency(data.frequency);
-      if (existingStation) {
-        return { 
-          success: false, 
-          error: `La fréquence ${data.frequency} MHz est déjà occupée par "${existingStation.name}"` 
-        };
-      }
-
-      // Générer une playlist automatiquement si demandé
-      let playlist: PlaylistItem[] = [];
-      if (generatePlaylistAutomatically) {
-        const playlistResult = await this.generateDefaultPlaylist(data);
-        if (playlistResult.success && playlistResult.playlist) {
-          playlist = playlistResult.playlist;
-        } else {
-          console.warn('Failed to generate playlist, continuing with empty playlist');
+        // Validation des données
+        const validation = this.validateStationData(data);
+        if (!validation.isValid) {
+          throw new Error(validation.errors.join(', '));
         }
+
+        // Vérifier si la fréquence est disponible
+        const existingStation = await this.getStationByFrequency(data.frequency);
+        if (existingStation) {
+          throw new Error(`La fréquence ${data.frequency} MHz est déjà occupée par "${existingStation.name}"`);
+        }
+
+        // Générer une playlist automatiquement si demandé
+        let playlist: PlaylistItem[] = [];
+        if (generatePlaylistAutomatically) {
+          const playlistResult = await this.generateDefaultPlaylist(data);
+          if (playlistResult.success && playlistResult.playlist) {
+            playlist = playlistResult.playlist;
+          } else {
+            console.warn('Failed to generate playlist, continuing with empty playlist');
+          }
+        }
+
+        // Créer le document station
+        const stationData = {
+          name: data.name,
+          frequency: data.frequency,
+          djCharacterId: data.djCharacterId,
+          theme: data.theme,
+          ownerId: data.ownerId,
+          playlist,
+          isActive: data.isActive ?? true,
+          tags: data.tags || [],
+          description: data.description || '',
+          createdAt: serverTimestamp(),
+          lastModified: serverTimestamp(),
+          playCount: 0,
+        };
+
+        const docRef = await addDoc(collection(db, 'stations'), stationData);
+
+        // Mettre à jour les statistiques utilisateur
+        if (data.ownerId !== 'system') {
+          await this.updateUserStats(data.ownerId, { stationsCreated: 1 });
+        }
+
+        // Invalider le cache
+        stationService.invalidateStationCache(data.frequency);
+
+        const createdStation: Station = {
+          id: docRef.id,
+          ...stationData,
+          createdAt: safeToISOString(new Date()),
+          lastModified: safeToISOString(new Date()),
+        };
+
+        // Emit station created event
+        this.emitEvent('station.created', {
+          stationId: docRef.id,
+          frequency: data.frequency,
+          ownerId: data.ownerId
+        });
+
+        console.log('✅ Station created successfully:', createdStation.name);
+        return {
+          stationId: docRef.id,
+          station: createdStation
+        };
+      },
+      'createStation',
+      {
+        retryable: false, // Don't retry creation to avoid duplicates
+        cacheKey: undefined // Don't cache creation operations
       }
-
-      // Créer le document station
-      const stationData = {
-        name: data.name,
-        frequency: data.frequency,
-        djCharacterId: data.djCharacterId,
-        theme: data.theme,
-        ownerId: data.ownerId,
-        playlist,
-        isActive: data.isActive ?? true,
-        tags: data.tags || [],
-        description: data.description || '',
-        createdAt: serverTimestamp(),
-        lastModified: serverTimestamp(),
-        playCount: 0,
-        
-      };
-
-      const docRef = await addDoc(collection(db, 'stations'), stationData);
-
-      // Mettre à jour les statistiques utilisateur
-      if (data.ownerId !== 'system') {
-        await this.updateUserStats(data.ownerId, { stationsCreated: 1 });
-      }
-
-      // Invalider le cache
-      stationService.invalidateStationCache(data.frequency);
-
-      const createdStation: Station = {
-        id: docRef.id,
-        ...stationData,
-        createdAt: safeToISOString(new Date()),
-        lastModified: safeToISOString(new Date()),
-        
-      };
-
-      console.log('✅ Station created successfully:', createdStation.name);
-      return { 
-        success: true, 
-        stationId: docRef.id, 
-        station: createdStation 
-      };
-
-    } catch (error) {
-      console.error('❌ Error creating station:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la création' 
-      };
-    }
+    );
   }
 
   /**
@@ -377,33 +389,39 @@ export class RadioStationManager {
   }
 
   /**
-   * Récupère une station par fréquence
+   * Enhanced station retrieval by frequency with caching
    */
   async getStationByFrequency(frequency: number): Promise<Station | null> {
-    try {
-      const stationsCol = collection(db, 'stations');
-      const margin = 0.01;
-      const q = query(
-        stationsCol,
-        where('frequency', '>=', frequency - margin),
-        where('frequency', '<=', frequency + margin)
-      );
+    const result = await this.execute(
+      async () => {
+        const stationsCol = collection(db, 'stations');
+        const margin = 0.01;
+        const q = query(
+          stationsCol,
+          where('frequency', '>=', frequency - margin),
+          where('frequency', '<=', frequency + margin)
+        );
 
-      const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) {
-        return null;
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+          return null;
+        }
+
+        // Retourner la station la plus proche
+        const stationDoc = querySnapshot.docs.sort((a, b) => 
+          Math.abs(a.data().frequency - frequency) - Math.abs(b.data().frequency - frequency)
+        )[0];
+
+        return this.serializeStation(stationDoc);
+      },
+      'getStationByFrequency',
+      {
+        retryable: true,
+        cacheKey: `station_freq_${frequency.toFixed(1)}` // Cache by frequency
       }
+    );
 
-      // Retourner la station la plus proche
-      const stationDoc = querySnapshot.docs.sort((a, b) => 
-        Math.abs(a.data().frequency - frequency) - Math.abs(b.data().frequency - frequency)
-      )[0];
-
-      return this.serializeStation(stationDoc);
-    } catch (error) {
-      console.error('Error fetching station by frequency:', error);
-      return null;
-    }
+    return result.success ? result.data || null : null;
   }
 
   /**

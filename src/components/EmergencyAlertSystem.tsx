@@ -86,38 +86,6 @@ export function EmergencyAlertSystem({ isRadioActive, currentFrequency }: Emerge
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const alertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Déclencher des alertes aléatoirement
-  useEffect(() => {
-    if (!isRadioActive) return;
-
-    const triggerRandomAlert = () => {
-      // Probabilité d'alerte basée sur la fréquence (plus de chance sur certaines fréquences)
-      const baseChance = 0.1; // 10% de chance de base
-      const frequencyBonus = currentFrequency > 100 ? 0.05 : 0; // Bonus sur hautes fréquences
-      const chance = baseChance + frequencyBonus;
-
-      if (Math.random() < chance) {
-        const randomAlert = EMERGENCY_ALERTS[Math.floor(Math.random() * EMERGENCY_ALERTS.length)];
-        showAlert(randomAlert);
-      }
-    };
-
-    // Vérifier toutes les 30 secondes
-    const interval = setInterval(triggerRandomAlert, 30000);
-
-    // Première alerte après 10 secondes pour le test
-    timerRef.current = setTimeout(() => {
-      if (Math.random() < 0.3) { // 30% de chance
-        triggerRandomAlert();
-      }
-    }, 10000);
-
-    return () => {
-      clearInterval(interval);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [isRadioActive, currentFrequency, showAlert]);
-
   const hideAlert = useCallback(() => {
     setIsAnimating(true);
     setTimeout(() => {
@@ -152,6 +120,38 @@ export function EmergencyAlertSystem({ isRadioActive, currentFrequency }: Emerge
       hideAlert();
     }, alert.duration);
   }, [currentAlert, hideAlert]);
+
+  // Déclencher des alertes aléatoirement
+  useEffect(() => {
+    if (!isRadioActive) return;
+
+    const triggerRandomAlert = () => {
+      // Probabilité d'alerte basée sur la fréquence (plus de chance sur certaines fréquences)
+      const baseChance = 0.1; // 10% de chance de base
+      const frequencyBonus = currentFrequency > 100 ? 0.05 : 0; // Bonus sur hautes fréquences
+      const chance = baseChance + frequencyBonus;
+
+      if (Math.random() < chance) {
+        const randomAlert = EMERGENCY_ALERTS[Math.floor(Math.random() * EMERGENCY_ALERTS.length)];
+        showAlert(randomAlert);
+      }
+    };
+
+    // Vérifier toutes les 30 secondes
+    const interval = setInterval(triggerRandomAlert, 30000);
+
+    // Première alerte après 10 secondes pour le test
+    timerRef.current = setTimeout(() => {
+      if (Math.random() < 0.3) { // 30% de chance
+        triggerRandomAlert();
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [isRadioActive, currentFrequency, showAlert]);
 
 
   if (!isVisible || !currentAlert) return null;

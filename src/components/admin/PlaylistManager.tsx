@@ -54,11 +54,6 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
 
   const templates = playlistManagerService.getAvailableTemplates();
 
-  // Load analytics on mount
-  useEffect(() => {
-    loadAnalytics();
-  }, [station.id, loadAnalytics]);
-
   const loadAnalytics = useCallback(async () => {
     try {
       const result = await playlistManagerService.analyzePlaylistPerformance(station.id);
@@ -69,6 +64,11 @@ export function PlaylistManager({ station, dj, onPlaylistUpdate }: PlaylistManag
       console.error('Failed to load analytics:', error);
     }
   }, [station.id]);
+
+  // Load analytics on mount
+  useEffect(() => {
+    loadAnalytics();
+  }, [station.id, loadAnalytics]);
 
   // Handle drag and drop
   const handleDragStart = (trackId: string) => {

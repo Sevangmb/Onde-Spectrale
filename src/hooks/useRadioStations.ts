@@ -69,19 +69,6 @@ export function useRadioStations({ user, autoLoad = true }: UseRadioStationsProp
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<StationFilters>({});
 
-  // Auto-load stations when user changes
-  useEffect(() => {
-    if (autoLoad && user?.id) {
-      loadStations();
-      loadStats();
-    }
-  }, [user?.id, autoLoad, loadStations, loadStats]);
-
-  // Apply filters when stations or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [stations, searchTerm, filters, applyFilters]);
-
   // Load stations from database
   const loadStations = useCallback(async () => {
     if (!user?.id) {
@@ -399,6 +386,19 @@ export function useRadioStations({ user, autoLoad = true }: UseRadioStationsProp
     
     return Math.round((baseFrequency + step) * 10) / 10; // Fallback
   }, [stations]);
+
+  // Auto-load stations when user changes
+  useEffect(() => {
+    if (autoLoad && user?.id) {
+      loadStations();
+      loadStats();
+    }
+  }, [user?.id, autoLoad, loadStations, loadStats]);
+
+  // Apply filters when stations or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [stations, searchTerm, filters, applyFilters]);
 
   return {
     // Data

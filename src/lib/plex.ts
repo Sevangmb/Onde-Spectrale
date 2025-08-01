@@ -3,6 +3,7 @@
 
 import { PlaylistItem } from '@/lib/types';
 import { PlexLibrary, PlexResponse as PlexApiResponse, PlexGenre } from '@/types/plex';
+import logger from '@/lib/logger';
 
 interface PlexTrack {
   key: string;
@@ -37,14 +38,27 @@ const PLEX_TOKEN = process.env.PLEX_TOKEN || '';
 /**
  * Recherche de musique dans la bibliothèque Plex
  */
-export async function searchPlexMusic(query: string, limit: number = 10): Promise<PlaylistItem[]> {
+export async function searchPlexMusic(
+  query: string,
+  limit: number = 10,
+  filter?: string,
+  sortBy?: string
+): Promise<PlaylistItem[]> {
   if (!PLEX_SERVER_URL || !PLEX_TOKEN) {
-    console.warn('URL ou Token Plex manquant');
+    logger.warn('URL ou Token Plex manquant');
     return [];
   }
 
   try {
-    const searchUrl = `${PLEX_SERVER_URL}/search?query=${encodeURIComponent(query)}&type=10&X-Plex-Token=${PLEX_TOKEN}`;
+    let searchUrl = `${PLEX_SERVER_URL}/search?query=${encodeURIComponent(query)}&type=10&X-Plex-Token=${PLEX_TOKEN}`;
+
+    if (filter) {
+      searchUrl += `&genre=${encodeURIComponent(filter)}`;
+    }
+
+    if (sortBy) {
+      searchUrl += `&sort=${encodeURIComponent(sortBy)}`;
+    }
     
     const response = await fetch(searchUrl, {
       headers: {
@@ -66,7 +80,7 @@ export async function searchPlexMusic(query: string, limit: number = 10): Promis
     for (const track of tracks.slice(0, limit)) {
       const mediaKey = track.Media?.[0]?.Part?.[0]?.key;
       if (!mediaKey) {
-        console.warn(`⚠️ Pas de clé média pour la piste: ${track.title}`);
+        logger.warn(`⚠️ Pas de clé média pour la piste: ${track.title}`);
         continue;
       }
 
@@ -87,7 +101,7 @@ export async function searchPlexMusic(query: string, limit: number = 10): Promis
     }
     return results;
   } catch (error) {
-    console.error('Erreur recherche Plex:', error);
+    logger.error('Erreur recherche Plex:', error);
     return [];
   }
 }
@@ -115,7 +129,7 @@ export async function getPlexMusicLibraries() {
     return data.MediaContainer.Directory?.filter((lib: PlexLibrary) => lib.type === 'artist') || [];
 
   } catch (error) {
-    console.error('Erreur récupération bibliothèques Plex:', error);
+    logger.error('Erreur récupération bibliothèques Plex:', error);
     return [];
   }
 }
@@ -171,7 +185,7 @@ export async function getRandomPlexTracks(libraryKey?: string, limit: number = 2
     return results;
 
   } catch (error) {
-    console.error('Erreur pistes aléatoires Plex:', error);
+    logger.error('Erreur pistes aléatoires Plex:', error);
     return [];
   }
 }
@@ -242,7 +256,7 @@ export async function getPlexTracksByGenre(genre: string, limit: number = 20): P
     }).filter(track => track.url);
 
   } catch (error) {
-    console.error(`Erreur récupération pistes genre "${genre}":`, error);
+    logger.error(`Erreur récupération pistes genre "${genre}":`, error);
     return [];
   }
 }
@@ -269,7 +283,7 @@ export async function getPlexGenres(): Promise<string[]> {
     const genres = data.MediaContainer?.Metadata || [];
     return genres.map((genre: PlexGenre) => genre.title).sort();
   } catch (error) {
-    console.error('Erreur récupération genres Plex:', error);
+    logger.error('Erreur récupération genres Plex:', error);
     return [];
   }
 }

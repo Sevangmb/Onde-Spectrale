@@ -10,7 +10,7 @@ import {
   useUserState,
   useRadioActions 
 } from '@/stores/enhancedRadioStore';
-import { createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions';
+import { createDefaultStations, getCustomCharactersForUser, updateUserFrequency } from '@/app/actions-enhanced';
 import type { DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { DJ_CHARACTERS } from '@/lib/data';
 import { auth } from '@/lib/firebase';

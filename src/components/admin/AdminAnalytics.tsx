@@ -38,13 +38,6 @@ export function AdminAnalytics() {
   const adminState = useAdminState();
   const { updateRealTimeAnalytics } = useAdminActions();
 
-  // Load analytics data when period changes
-  useEffect(() => {
-    if (adminState.isMonitoringActive) {
-      loadAnalyticsData();
-    }
-  }, [selectedPeriod, adminState.isMonitoringActive, loadAnalyticsData]);
-
   const loadAnalyticsData = useCallback(async () => {
     if (!adminState.isMonitoringActive) return;
     
@@ -58,6 +51,13 @@ export function AdminAnalytics() {
       setIsLoading(false);
     }
   }, [selectedPeriod, adminState.isMonitoringActive, updateRealTimeAnalytics]);
+
+  // Load analytics data when period changes
+  useEffect(() => {
+    if (adminState.isMonitoringActive) {
+      loadAnalyticsData();
+    }
+  }, [selectedPeriod, adminState.isMonitoringActive, loadAnalyticsData]);
 
   // Use real analytics data from store
   const analyticsData = {

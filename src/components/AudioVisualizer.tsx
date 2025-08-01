@@ -55,16 +55,6 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
     setupAudioContext();
   }, [audioRef, isEnabled]);
 
-  useEffect(() => {
-    if (isPlaying && isEnabled && analyserRef.current && dataArrayRef.current) {
-      startVisualization();
-    } else {
-      stopVisualization();
-    }
-
-    return () => stopVisualization();
-  }, [isPlaying, isEnabled, visualizerType, startVisualization]);
-
   const startVisualization = useCallback(() => {
     if (!canvasRef.current || !analyserRef.current || !dataArrayRef.current) return;
 
@@ -189,6 +179,16 @@ export function AudioVisualizer({ audioRef, isPlaying, className = '' }: AudioVi
       case 'circular': return <Activity className="h-4 w-4" />;
     }
   };
+
+  useEffect(() => {
+    if (isPlaying && isEnabled && analyserRef.current && dataArrayRef.current) {
+      startVisualization();
+    } else {
+      stopVisualization();
+    }
+
+    return () => stopVisualization();
+  }, [isPlaying, isEnabled, visualizerType, startVisualization]);
 
   return (
     <Card className={`border-orange-500/30 bg-black/40 backdrop-blur-sm ${className}`}>

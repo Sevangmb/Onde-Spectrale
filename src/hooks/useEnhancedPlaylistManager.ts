@@ -58,6 +58,15 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
     }
   }, [playback.volume]);
   
+  // Helper function to get first available track
+  const getFirstAvailableTrack = useCallback((): PlaylistItem | null => {
+    if (!data.currentStation) return null;
+    
+    return data.currentStation.playlist.find(track => 
+      !data.failedTracks.has(track.id)
+    ) || null;
+  }, [data.currentStation, data.failedTracks]);
+  
   // Enhanced play track function with service integration
   const playTrackById = useCallback(async (trackId: string): Promise<void> => {
     if (!isMountedRef.current || !data.currentStation || currentOperationId.current === trackId) {
@@ -190,15 +199,6 @@ export function useEnhancedPlaylistManager({ user }: EnhancedPlaylistManagerProp
       }
     }
   }, [playback.isPlaying, playback.isLoading, playback.currentTrack, ui.autoPlayEnabled, actions, playTrackById, getFirstAvailableTrack]);
-  
-  // Helper function to get first available track
-  const getFirstAvailableTrack = useCallback((): PlaylistItem | null => {
-    if (!data.currentStation) return null;
-    
-    return data.currentStation.playlist.find(track => 
-      !data.failedTracks.has(track.id)
-    ) || null;
-  }, [data.currentStation, data.failedTracks]);
   
   // Enhanced next track with better error handling
   const nextTrack = useCallback(() => {
