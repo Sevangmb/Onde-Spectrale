@@ -172,13 +172,17 @@ function parseDuration(duration: string | number): number {
  */
 export async function validateAudioUrl(url: string): Promise<boolean> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
     const response = await fetch(url, { 
       method: 'HEAD',
-      timeout: 5000 
+      signal: controller.signal
     });
     
+    clearTimeout(timeoutId);
     return response.ok && 
-           response.headers.get('content-type')?.includes('audio');
+           (response.headers.get('content-type')?.includes('audio') ?? false);
   } catch {
     return false;
   }

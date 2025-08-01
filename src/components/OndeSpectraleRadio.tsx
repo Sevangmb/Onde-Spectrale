@@ -406,7 +406,9 @@ export function OndeSpectraleRadio() {
                     isPlaying={playlistManager.isPlaying}
                     isLoadingTrack={playlistManager.isLoadingTrack}
                     failedTracks={playlistManager.failedTracks}
-                    onTrackSelect={playlistManager.playTrack}
+                    onTrackSelect={async (index: number) => {
+                      await playlistManager.playTrack(index);
+                    }}
                     onPlayPause={playlistManager.togglePlayPause}
                     onNext={playlistManager.nextTrack}
                     onPrevious={playlistManager.previousTrack}

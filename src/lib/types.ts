@@ -65,6 +65,7 @@ export type User = {
   lastFrequency: number;
   createdAt: string;
   lastLogin: string;
+};
 
 // --- PlayerState pour monitoring temps réel admin ---
 export type PlayerState = {
