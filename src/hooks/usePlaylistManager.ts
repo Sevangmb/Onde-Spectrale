@@ -4,7 +4,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { PlaylistItem, Station, DJCharacter, CustomDJCharacter } from '@/lib/types';
 import { getAudioForTrack } from '@/app/actions';
-import { searchMusicAdvanced } from '@/app/actions-improved';
+import { searchMusic } from '@/app/actions';
 
 interface PlaylistManagerProps {
   station: Station | null;
